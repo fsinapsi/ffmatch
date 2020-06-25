@@ -1,0 +1,14 @@
+
+all:		ffmatch
+
+clean:
+	rm -f *~ *.c ffmatch ffmatch-compile ffmatch.log
+
+install:	all
+	cp -f ffmatch /local/bin
+
+ffmatch:	ffmatch.trp init.tin lang.tin gui.tin cfg.tin utils.tin \
+		constants.tin supervision.tin scdscan.tin match.tin map.tin \
+		sift.tin audio.tin permute.tin threads.tin
+	trpc -f ffmatch.trp
+

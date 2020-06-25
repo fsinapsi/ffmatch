@@ -1,0 +1,383 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun url-home-page () "http://fsinapsi.altervista.org")
+
+(defun compile-time () (cdate))
+
+(defun version ()
+        (+ (int->str (date-day (compile-time)) 2 '0') "-"
+           (int->str (date-month (compile-time)) 2 '0') "-"
+           (int->str (date-year (compile-time)) 4 '0') ))
+
+(defun gc-version () (gc-version0 (gc-version-major) (gc-version-minor)))
+(defun gc-version0 (maj min)
+        (if (or (= maj undef) (= min undef))
+                "< 7.1"
+                (sprint maj '.' min) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet is-a-supported-movie (path)
+        (deflocal f)
+
+        (set f (fopenro path))
+        (<> f undef)
+        (alt    (is-avi f)
+                (is-mp4 f)
+                (seq    (close f)
+                        (fail) ))
+        (close f) )
+
+(defnet is-avi (f)
+        (fsetpos 0 f)
+        (= (freadstr f 4) "RIFF")
+        (fsetpos 8 f)
+        (= (freadstr f 4) "AVI ") )
+
+(defnet is-mp4 (f)
+        (deflocal cnt size type)
+
+        (fsetpos 0 f)
+        (parse-mp4-box f cnt size type)
+        (>= size cnt)
+        (in type [ 0x6d6f6f76 0x66747970 ]) )
+
+(defnet parse-mp4-box (f @cnt @size @type)
+        (set @size (freaduint-be f 32))
+        (set @type (freaduint-be f 32))
+        (set @cnt 8)
+        (if (= @size 1)
+        then    (set @size (freaduint-be f 64))
+                (inc @cnt 8) )
+        (if (= @size 0)
+        then    (set @size (+ (- (length f) (fpos f)) @cnt)) )
+        (if (= @type 0x75756964) ; uuid
+        then    (set @type (freaduint-be f 64))
+                (set @type (+ (* @type (pow 2 64)) (freaduint-be f 64)))
+                (inc @cnt 16) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun key-scd (av name)
+        (+ "scd-" (key-basic av name)) )
+
+(defun key-sck (av1 av2 name1 name2)
+        (+ "sck-" (key-basic av1 name1) (key-basic av2 name2)) )
+
+(defun key-map (av1 av2 name1 name2)
+        (+ "map-" (key-basic av1 name1) (key-basic av2 name2)) )
+
+(defun key-basic (av name)
+        (gcry-sha1sum-fast (+ (int->str (width av) 5 '0')
+                              (int->str (height av) 5 '0')
+                              (int->str (av-index-entries av) 6 '0')
+                              name )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet read-frame (av pos pix)
+        (deflocal p)
+
+        (if (= (av-pts av) (- pos 1))
+        then    (av-read-frame av pix)
+                (= (av-pts av) pos)
+        else    (set p pos)
+                (repeat until (= p 0)
+                        until (and (av-index-keyframe av p) (not (av-index-keyframe av (- p 1))))
+                        (inc p -1) )
+                (av-seek-frame av p)
+                (av-skip-frame av (- pos p))
+                (av-read-frame av pix)
+                (if (<> (av-pts av) pos)
+                then    (repeat (av-seek-frame av p)
+                                (repeat (av-read-frame av pix)
+                                        until (>= (av-pts av) pos)
+                                        (set p 0) )
+                                until (= (av-pts av) pos)
+                                (> p 0)
+                                (inc p -1)
+                                (repeat until (= p 0)
+                                        until (av-index-keyframe av p)
+                                        (inc p -1) )))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun array-avg (a) net array-avg)
+(defnet array-avg (a @m)
+        (deflocal l i)
+
+        (set l (length a))
+        (set @m 0)
+        (for i in 1 .. (length a) do
+                (set @m (approximate (+ @m <a (for-pos)>))) )
+        (if (> l 0)
+        then    (set @m (/ @m l)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun seq-threshold (v min max thr) net seq-threshold)
+(defnet seq-threshold (v min max thr @a)
+        (deflocal i n k)
+
+        (set n 1)
+        (for i in (+ min 1) .. max do
+                (if (>= <v i> thr)
+                then    (inc n) ))
+        (set @a (array n))
+        (set n 0)
+        (set k min)
+        (for i in (+ min 1) .. max do
+                (if (>= <v i> thr)
+                then    (set <@a n> (cons (- i k) k))
+                        (set k i)
+                        (inc n) ))
+        (set <@a n> (cons (- max k -1) k)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet pix-clear (pix)
+        (pix-draw-box pix 0 0 (maxint) (maxint) (pix-color 0 0 0 0)) )
+
+(defnet pix-clear-and-copy-pix (pix icon)
+        (pix-clear pix)
+        (pix-draw-pix pix
+                (/ (- (width pix) (width icon)) 2)
+                (/ (- (height pix) (height icon)) 2)
+                icon ))
+
+(defnet pix-logo (pix)
+        (pix-clear-and-copy-pix pix
+                (pix-load-static "icons/128x128/emblem-videos.png") ))
+
+(defnet pix-wip (pix)
+        (pix-clear-and-copy-pix pix
+                (pix-load-static "icons/80x80/work-in-progress.png") ))
+
+(defnet pix-error (pix)
+        (pix-clear-and-copy-pix pix
+                (pix-load-static "icons/48x48/dialog-error-4.png") ))
+
+(defnet pix-copy-frames (pix frm1 frm2 pix1 pix2 gamma1 gamma2)
+        (deflocal sy)
+
+        (pix-clear pix)
+        (pix-scale frm1 pix1)
+        (pix-scale frm2 pix2)
+        (pix-gamma pix1 gamma1)
+        (pix-gamma pix2 gamma2)
+        (set sy (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
+        (pix-draw-pix pix (/ (- (width pix) (width pix1)) 2) sy pix1)
+        (pix-draw-pix pix (/ (- (width pix) (width pix2)) 2) (+ sy (height pix1) (space)) pix2) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet msg-log (m msg)
+        (sendbuf 100 (cons "p2" msg) to (match-th-main m)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gtk-message-info (parent msg)
+        (if (cli)
+        then    (print "INF: " msg nl)
+        else    (if (cmingw)
+                then    (gtk-message-info--old parent msg)
+                else    (gtk-message-basic parent msg
+                                (pix-load-static "icons/48x48/dialog-information-2.png") ))))
+
+(defnet gtk-message-warning (parent msg)
+        (if (cli)
+        then    (print "WRN: " msg nl)
+        else    (if (cmingw)
+                then    (gtk-message-warning--old parent msg)
+                else    (gtk-message-basic parent msg
+                                (pix-load-static "icons/48x48/dialog-important-2.png") ))))
+
+(defnet gtk-message-error (parent msg)
+        (if (cli)
+        then    (print "ERR: " msg nl)
+        else    (if (cmingw)
+                then    (gtk-message-error--old parent msg)
+                else    (gtk-message-basic parent msg
+                                (pix-load-static "icons/48x48/dialog-error-4.png") ))))
+
+(defnet gtk-message-basic (parent msg icon)
+        (deflocal win vb hb)
+
+        (set win (gtk-window-new))
+        (if (<> parent undef)
+        then    (gtk-window-set-transient-for win parent)
+                (gtk-window-set-modal win true) )
+        (gtk-window-set-resizable win false)
+        (gtk-window-set-title win "")
+        (gtk-container-set-border-width win 8)
+        (gtk-signal-connect win "destroy" (netptr gtk-destroy))
+
+        (set vb (gtk-vbox-new false 10))
+        (gtk-container-add win vb)
+
+        (set hb (gtk-hbox-new false 12))
+        (gtk-box-pack-start vb hb false false 0)
+
+                (gtk-box-pack-start hb (gtk-image-new-from-pixbuf icon) false false 0)
+                (gtk-box-pack-start hb (gtk-label-new (str-split msg 60)) true true 0)
+
+        (set hb (gtk-hbox-new false 6))
+        (gtk-box-pack-start vb hb false false 0)
+
+        (gtk-box-pack-end hb (gtk-iconed-button
+                (pix-load-static "icons/16x16/dialog-cancel-3.png")
+                $"Close"
+                (netptr gtk-close-win)
+                win ) false false 0 )
+
+        (gtk-widget-show-all win)
+    ;    (if (<> parent undef)
+    ;    then    (gtk-window-set-position win (cmacro GTK_WIN_POS_CENTER_ON_PARENT)) )
+        (gtk-main) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gtk-question (parent msg)
+        (if (cmingw)
+        then    (gtk-question--old parent msg)
+        else    (gtk-question--new parent msg) ))
+
+(defnet gtk-question--new (parent msg)
+        (deflocal win vb hb a)
+
+        (set a (array default true 1))
+
+        (set win (gtk-window-new))
+        (if (<> parent undef)
+        then    (gtk-window-set-transient-for win parent)
+                (gtk-window-set-modal win true) )
+        (gtk-window-set-resizable win false)
+        (gtk-window-set-title win "")
+        (gtk-container-set-border-width win 8)
+        (gtk-signal-connect win "destroy" (netptr gtk-destroy))
+
+        (set vb (gtk-vbox-new false 10))
+        (gtk-container-add win vb)
+
+        (set hb (gtk-hbox-new false 12))
+        (gtk-box-pack-start vb hb false false 0)
+
+                (gtk-box-pack-start hb (gtk-image-new-from-pixbuf (pix-load-static "icons/48x48/dialog-question-2.png")) false false 0)
+                (gtk-box-pack-start hb (gtk-label-new (str-split msg 60)) true true 0)
+
+        (set hb (gtk-hbox-new false 6))
+        (gtk-box-pack-start vb hb false false 0)
+
+        (gtk-box-pack-end hb (gtk-iconed-button
+                (pix-load-static "icons/16x16/dialog-cancel-3.png")
+                $"Cancel"
+                (netptr gtk-close-win)
+                win ) false false 0 )
+
+        (gtk-box-pack-end hb (gtk-iconed-button
+                (pix-load-static "icons/16x16/dialog-apply.png")
+                "Ok"
+                (netptr gtk-question-ok)
+                (cons win a) ) false false 0 )
+
+        (gtk-widget-show-all win)
+    ;    (if (<> parent undef)
+    ;    then    (gtk-window-set-position win (cmacro GTK_WIN_POS_CENTER_ON_PARENT)) )
+        (gtk-main)
+        (not <a 0>) )
+
+(defnet gtk-question-ok (a)
+        (close (car a))
+        (set a (cdr a))
+        (set <a 0> false) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

@@ -1,0 +1,138 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet init (@info)
+        (if (and (cmingw) (not (cli)))
+        then    (set-icon "icons/emblem-videos.ico") )
+        (set @info (assoc))
+        (if (not (cli)) then (init-lang))
+        (init-parse-args @info)
+        (init-db @info)
+        (init-default @info) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet init-lang ()
+        (deflocal lang)
+
+        (set lang (gtk-get-default-language))
+        (if (lmatch lang "it")
+        then    (set-lang 1) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet init-parse-args (info)
+        (deflocal i p)
+
+        (for i in 1 .. (- (argc) 1) do
+                (set p (argv i))
+                (alt    (seq    (lmatch remove p "--cfg=")
+                                (set <info "cfg-path"> p) )
+                        (success) )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defglobal _db)
+
+(defnet init-db (info)
+        (deflocal path crea)
+
+        (set path <info "cfg-path">)
+        (if (= path undef)
+        then    (if (cmingw)
+                then    (set path (+ (cwd) "/ffmatch.cfg"))
+                else    (set path (+ (getenv "HOME") "/.treep"))
+                        (if (= path undef)
+                        then    (gtk-message-error undef "please define the environment variable `HOME'")
+                                (exit -1) )
+                        (alt    (pathexists path)
+                                (mkdir path)
+                                (seq    (gtk-message-error undef (+ "creation of directory `" (utf8-validate path) "' failed"))
+                                        (exit -1) ))
+                        (set path (+ path "/ffmatch.cfg")) ))
+        (set crea (not (pathexists path)))
+        (set _db (sqlite3-open path))
+        (if (= _db undef)
+        then    (gtk-message-error undef (+ "cannot open `" (utf8-validate path) "'"))
+                (exit -1) )
+        (alt    (not crea)
+                (seq    (sqlite3-exec _db undef
+                                "CREATE TABLE config(" \
+                                        "key char unique not null," \
+                                        "value char not null)" )
+                        (cfg-set "date-run-first" (now))
+                        (gtk-message-info undef (+ "the settings file was saved as `" (utf8-validate path) "'")) )
+                (seq    (close _db)
+                        (remove path)
+                        (gtk-message-error undef "creation of settings file failed")
+                        (exit -1) ))
+        (cfg-set "cdate" (cdate))
+        (cfg-set "date-run-last" (now))
+        (cfg-inc "runs" 1)
+        (sqlite3-begin _db)
+        (opt    (sqlite3-exec _db undef
+                        "CREATE TABLE paths(" \
+                                "path char unique not null," \
+                                "name char not null)" )
+                (sqlite3-exec _db undef
+                        "CREATE INDEX paths_name ON paths(name)" ))
+        (sqlite3-end _db)
+        (set-lang (cfg-get-lang)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet init-default (info)
+        (deflocal default-info)
+
+        (set default-info (assoc-default (default-parameters)))
+        (assoc-set info "default" default-info) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

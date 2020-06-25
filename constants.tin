@@ -1,0 +1,54 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun w () 400)
+(defun h () 500)
+(defun fc-width () 800)
+(defun fc-height () 600)
+(defun space () 10)
+(defun framerates () [ 25 (/ 24000 1001) 24 ])
+(defun default-parameters ()
+        [ [ "init-scd-threshold" . 15 ]
+          [ "min-scd-threshold" . 3.5 ]
+          [ "scd-threshold-ratio" . 0.95 ]
+          [ "scd-min-blocks" . 4 ]
+          [ "scd-min-avg-block-size" . 16 ]
+          [ "final-closure" . true ]
+          [ "checks-per-interval" . 4 ]
+          [ "checks-per-interval-extra" . 8 ]
+          [ "min-keypoints" . 60 ]
+          [ "min-keypoints-min-ratio" . 0.05 ]
+          [ "min-keypoints-min-ratio-lum" . 0.2 ]
+          [ "sift-match-threshold" . 0.40 ]
+          [ "sift-match-threshold-min-ratio" . 0.02 ]
+          [ "sift-agreements-min" . 12000 ]
+          [ "sift-proportionality-threshold" . 0.9 ]
+          [ "sift-scale" . false ]
+          [ "sift-scale-pixels" . (* 500 500) ]
+          [ "filter-gamma1" . 1 ]
+          [ "filter-mirror1" . false ]
+          [ "filter-flip1" . false ]
+          [ "filter-gamma2" . 1 ]
+          [ "filter-mirror2" . false ]
+          [ "filter-flip2" . false ]
+          [ "sift-draw-lines" . true ]
+          [ "supervision-skip-double" . 10 ]
+          ])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

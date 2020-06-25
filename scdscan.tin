@@ -1,0 +1,109 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet scdscan (th-main name av pix default-info @v)
+        (deflocal key)
+
+        (pix-wip pix)
+        (scdscan-draw-image th-main)
+        (sendbuf 100 (cons "p2" (+ "scanning `" name "'..." nl)) to th-main)
+        (set key (key-scd av name))
+        (set @v (cfg-get key))
+        (if (<> @v undef)
+        then    (set @v (nth 4 @v))
+        else    (scdscan-basic th-main name av pix default-info @v)
+                (cfg-set key (list (width av) (height av) (av-index-entries av) name @v)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet scdscan-basic (th-main name av pix default-info @v)
+        (deflocal abort l l1 frm pix1 pix2 gamma1 gamma2 cnt k pts val)
+
+        (set abort false)
+        (av-seek-frame av 0)
+
+        (set l (av-index-entries av))
+        (set l1 (- l 1))
+
+        (set frm (array 2))
+        (set <frm 0> (pix-create (width av) (height av)))
+        (set <frm 1> (pix-create (width av) (height av)))
+
+        (set k (min (/ (- (width pix) (* 2 (space))) (width av))
+                    (/ (- (height pix) (* 3 (space))) 2 (height av)) ))
+
+        (set pix1 (pix-create (* k (width av)) (* k (height av))))
+        (set pix2 (pix-create (* k (width av)) (* k (height av))))
+
+        (set gamma1 (cfg-get-or-default-num "filter-gamma1" default-info))
+        (set gamma2 (cfg-get-or-default-num "filter-gamma2" default-info))
+
+        (set @v (array default 0 l1))
+
+        (set cnt 1)
+        (set k 0)
+        (av-read-frame av (nth k frm))
+        (opt*   (not abort)
+                (set k (- 1 k))
+                (av-read-frame av (nth k frm))
+                (set pts (av-pts av))
+                (if (and (integerp pts) (< pts l1))
+                then    (set val (pix-scd-histogram (nth k frm) (nth (- 1 k) frm)))
+                        (set <@v pts> val)
+                        (if (>= val 0.3)
+                        then    (pix-copy-frames pix (nth (- 1 k) frm) (nth k frm) pix1 pix2 gamma1 gamma2)
+                                (alt    (scdscan-draw-image th-main)
+                                        (set abort true) )))
+                (inc cnt)
+                (if (= (% cnt 100) 0)
+                then    (sendbuf 100 (cons "c1" (+ "frame " cnt "/" l " (" (rint (/ cnt l 0.01)) "%)")) to th-main) )
+                (opt    (receivenb abort from th-main)
+                        (set abort true) ))
+        (close pix1 pix2 (nth 0 frm) (nth 1 frm))
+        (not abort)
+        (sendbuf 100 (cons "c1" (+ "frame " l "/" l " (100%)")) to th-main) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet scdscan-draw-image (th-main)
+        (deflocal msg)
+
+        (send [ "d" . undef ] to th-main)
+        (receive msg from th-main)
+        (if (not msg)
+        then    (receive msg from th-main)
+                (fail) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

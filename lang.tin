@@ -1,0 +1,431 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun languages ()
+        [ "English"
+          "Italiano"
+        ])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(deflang
+
+"Close"
+1
+"Chiudi"
+
+"Cancel"
+1
+"Annulla"
+
+"Preferences"
+1
+"Preferenze"
+
+"Language"
+1
+"Lingua"
+
+"Changing the language requires a restart to take effect."
+1
+"Per usufruire della modifica della lingua occorre far ripartire il programma."
+
+"File `"
+1
+"Il file `"
+
+"' exists."
+1
+(iso->utf8 "' esiste già.")
+
+"Do you want to overwrite it?"
+1
+"Vuoi sovrascriverlo?"
+
+" is actually linked to "
+1
+(iso->utf8 " è già collegato a ")
+
+"Do you want to remove the link?"
+1
+"Vuoi rimuovere il collegamento?"
+
+"Can't link "
+1
+(iso->utf8 "È impossibile collegare ")
+
+" to "
+1
+" a "
+
+"At the moment "
+1
+"Al momento "
+
+" can only be mapped in ["
+1
+(iso->utf8 " può essere mappato soltanto in [")
+
+" will be linked to "
+1
+(iso->utf8 " verrà collegato a ")
+
+"Are you sure?"
+1
+"Confermi?"
+
+"\nNOTE: a previously established link will be removed."
+1
+(iso->utf8 "\nNOTA: verrà rimosso un precedente collegamento.")
+
+"Save frame "
+1
+"Salva il frame "
+
+" as..."
+1
+" come..."
+
+"checks: "
+1
+"controlli: "
+
+" (passed: "
+1
+" (passati: "
+
+"horizontal ratio: "
+1
+"rapporto orizzontale: "
+
+"vertical ratio: "
+1
+"rapporto verticale: "
+
+"\n1st movie frame(s) not found in the 2nd one:\n"
+1
+"\nframe(s) del primo filmato che non sono presenti nel secondo:\n"
+
+"\n2nd movie frame(s) not found in the 1st one:\n"
+1
+"\nframe(s) del secondo filmato che non sono presenti nel primo:\n"
+
+"Select movie 1"
+1
+"Seleziona il filmato 1"
+
+"Select movie 2"
+1
+"Seleziona il filmato 2"
+
+"Swap order"
+1
+"Scambia l'ordine"
+
+"Save top text as..."
+1
+"Salva il testo di sopra come..."
+
+"Save bottom text as..."
+1
+"Salva il testo di sotto come..."
+
+"Save frame 1 as..."
+1
+"Salva il frame 1 come..."
+
+"Save frame 2 as..."
+1
+"Salva il frame 2 come..."
+
+"Exit"
+1
+"Esci"
+
+"Print selected movie names"
+1
+"Stampa i nomi dei filmati selezionati"
+
+"Report failed checks"
+1
+"Riporta i controlli falliti"
+
+"Restore default parameters"
+1
+"Ripristina i parametri di default"
+
+"Sequences"
+1
+"Sequenze"
+
+"Final closure"
+1
+"Chiusura finale"
+
+"enabled"
+1
+"abilitato"
+
+"Checks"
+1
+"Controlli"
+
+"Scaling"
+1
+"Scalatura"
+
+"Filters"
+1
+"Filtri"
+
+"Line drawing"
+1
+"Disegno linee"
+
+"There are no obsolete paths."
+1
+"Non ci sono path obsoleti."
+
+"There are no obsolete data."
+1
+"Non ci sono dati obsoleti."
+
+"Select movie "
+1
+"Seleziona il filmato "
+
+"This version supports only AVI and MP4/MOV movies"
+1
+"Questa versione supporta solo filmati AVI e MP4/MOV"
+
+": not recognized as a movie"
+1
+": filmato non riconosciuto"
+
+"Creation of file `"
+1
+"La creazione del file `"
+
+"' failed."
+1
+(iso->utf8 "' è fallita.")
+
+"select movie 1"
+1
+"seleziona il filmato 1"
+
+"select movie 2"
+1
+"seleziona il filmato 2"
+
+"start"
+1
+"avvia il riconoscimento"
+
+"abort"
+1
+"interrompi"
+
+"supervisor mode on/off"
+1
+(iso->utf8 "modalità supervisore on/off")
+
+"audio tracks"
+1
+"tracce audio"
+
+"preferences"
+1
+"preferenze"
+
+"Clear"
+1
+"Pulizia"
+
+"Clear \"scd\" data 1"
+1
+"Cancella i dati \"scd\" del filmato 1"
+
+"Clear \"scd\" data 2"
+1
+"Cancella i dati \"scd\" del filmato 2"
+
+"Clear \"sift check\" data"
+1
+"Cancella i dati \"sift check\""
+
+"Clear failed checks"
+1
+"Cancella i controlli falliti"
+
+"Clear \"mapping\" data"
+1
+"Cancella i dati di \"mapping\""
+
+"Clear obsolete paths"
+1
+"Cancella i path obsoleti"
+
+"Clear obsolete data"
+1
+"Cancella i dati obsoleti"
+
+"Clear top text"
+1
+"Pulisci il testo di sopra"
+
+"Clear bottom text"
+1
+"Pulisci il testo di sotto"
+
+"There are no failed checks."
+1
+"Non ci sono controlli falliti."
+
+"The \"scd\" data for movie 1 will be deleted."
+1
+"I dati \"scd\" del filmato 1 verranno cancellati."
+
+"The \"scd\" data for movie 2 will be deleted."
+1
+"I dati \"scd\" del filmato 2 verranno cancellati."
+
+"The \"sift check\" data will be deleted."
+1
+"I dati \"sift check\" verranno cancellati."
+
+"The \"mapping\" data will be deleted."
+1
+"I dati di \"mapping\" verranno cancellati."
+
+"Default parameters will be restored."
+1
+"Verranno ripristinati i parametri di default."
+
+"obsolete path will be deleted."
+1
+(iso->utf8 "path obsoleto verrà cancellato.")
+
+"obsolete paths will be deleted."
+1
+"path obsoleti verranno cancellati."
+
+"1 obsolete data will be deleted."
+1
+(iso->utf8 "1 dato obsoleto verrà cancellato.")
+
+" obsolete data will be deleted."
+1
+" dati obsoleti verranno cancellati."
+
+"selected movie "
+1
+"selezionato filmato "
+
+"The current operation will be aborted."
+1
+(iso->utf8 "L'operazione in corso verrà interrotta.")
+
+"1 failed check will be deleted."
+1
+(iso->utf8 "1 controllo fallito verrà cancellato.")
+
+" failed checks will be deleted."
+1
+" controlli falliti verranno cancellati."
+
+"Audio tracks"
+1
+"Tracce audio"
+
+"select audio"
+1
+"seleziona audio"
+
+"save track as..."
+1
+"salva la traccia come..."
+
+"Select audio"
+1
+"Seleziona audio"
+
+"It seems like the audio track contains extraneous data. Please fix it."
+1
+(iso->utf8 "Sembra che la traccia audio contenga dati estranei. È consigliabile ripararla.")
+
+"Please, select a frame rate"
+1
+"Seleziona un frame rate"
+
+"Please, select both audio tracks"
+1
+"Seleziona entrambe le tracce audio"
+
+"Audio tracks are not compatible"
+1
+"Le tracce audio non sono compatibili"
+
+"Save audio track"
+1
+"Salva traccia audio"
+
+"for video"
+1
+"per il video"
+
+"as..."
+1
+"come..."
+
+"It seems like stream lengths are inconsistent:"
+1
+"Sembra che le lunghezze degli stream siano inconsistenti"
+
+"duration of video"
+1
+"durata del video"
+
+"duration of audio"
+1
+"durata dell'audio"
+
+"Do you want to continue?"
+1
+"Desideri continuare?"
+
+"Audio track successfully saved as `"
+1
+(iso->utf8 "La traccia audio è stata salvata con successo come `")
+
+"I/O error."
+1
+"errore di I/O."
+
+        )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

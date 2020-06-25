@@ -1,0 +1,415 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet supervision (info)
+        (deflocal pix)
+
+        (if (assoc-get info "supervision")
+        then    (assoc-set info "supervision" false)
+                (supervision-clear info)
+                (set pix (assoc-get info "pix"))
+                (pix-logo pix)
+                (gtk-image-set-from-pixbuf (assoc-get info "w-image") pix)
+        else    (<> (assoc-get info "av1") undef)
+                (<> (assoc-get info "av2") undef)
+                (assoc-set info "supervision" true)
+                (supervision-pix info) )
+        (gui-update info) )
+
+(defnet supervision-clear (info)
+        (close (assoc-get info "supervision-pix1")
+               (assoc-get info "supervision-pix2") )
+        (assoc-clr info "supervision-n1")
+        (assoc-clr info "supervision-n2")
+        (assoc-clr info "supervision-pix1")
+        (assoc-clr info "supervision-pix2") )
+
+(defnet supervision-pix-with-check (info)
+        (= (assoc-get info "supervision") true)
+        (supervision-pix info) )
+
+(defnet supervision-pix (info)
+        (deflocal n1 n2 oldn1 oldn2 av1 av2 pix frm1 frm2 k default-info)
+
+        (set n1 (assoc-get info "w-spin1"))
+        (gtk-spin-button-update n1)
+        (set n1 (gtk-spin-button-get-value n1))
+        (set n2 (assoc-get info "w-spin2"))
+        (gtk-spin-button-update n2)
+        (set n2 (gtk-spin-button-get-value n2))
+        (set oldn1 (assoc-get info "supervision-n1"))
+        (set oldn2 (assoc-get info "supervision-n2"))
+        (or (<> n1 oldn1) (<> n2 oldn2))
+        (set av1 (assoc-get info "av1"))
+        (set av2 (assoc-get info "av2"))
+        (set pix (assoc-get info "pix"))
+        (if (and (= oldn1 undef) (= oldn2 undef))
+        then    (pix-clear pix)
+                (set k (min (/ (- (width pix) (* 2 (space))) (max (width av1) (width av2)))
+                            (/ (- (height pix) (* 3 (space))) (+ (height av1) (height av2))) ))
+                (assoc-set info "supervision-pix1" (pix-create (* k (width av1)) (* k (height av1))))
+                (assoc-set info "supervision-pix2" (pix-create (* k (width av2)) (* k (height av2)))) )
+        (set frm1 (assoc-get info "supervision-pix1"))
+        (set frm2 (assoc-get info "supervision-pix2"))
+        (set k (/ (- (height pix) (height frm1) (height frm2) (space)) 2))
+        (set default-info (assoc-get info "default"))
+        (if (<> n1 oldn1)
+        then    (alt    (seq    (read-frame av1 n1 frm1)
+                                (pix-gamma frm1 (cfg-get-or-default-num "filter-gamma1" default-info))
+                                (if (cfg-get-or-default "filter-mirror1" default-info)
+                                then    (pix-hflip frm1) )
+                                (if (cfg-get-or-default "filter-flip1" default-info)
+                                then    (pix-vflip frm1) ))
+                        (pix-error frm1) )
+                (pix-draw-pix pix (/ (- (width pix) (width frm1)) 2) k frm1)
+                (assoc-set info "supervision-n1" n1) )
+        (if (<> n2 oldn2)
+        then    (alt    (seq    (read-frame av2 n2 frm2)
+                                (pix-gamma frm2 (cfg-get-or-default-num "filter-gamma2" default-info))
+                                (if (cfg-get-or-default "filter-mirror2" default-info)
+                                then    (pix-hflip frm2) )
+                                (if (cfg-get-or-default "filter-flip2" default-info)
+                                then    (pix-vflip frm2) ))
+                        (pix-error frm2) )
+                (pix-draw-pix pix (/ (- (width pix) (width frm2)) 2) (+ k (height frm1) (space)) frm2)
+                (assoc-set info "supervision-n2" n2) )
+        (gtk-image-set-from-pixbuf (assoc-get info "w-image") pix) )
+
+(defnet supervision-scd-left1 (info)
+        (deflocal av scd thres n)
+
+        (set av (assoc-get info "av1"))
+        (set scd (cfg-get (key-scd av (fullpath->name (assoc-get info "path1")))))
+        (listp scd)
+        (set scd (nth 4 scd))
+        (set thres (gtk-spin-button-get-value (assoc-get info "w-scd-spin1")))
+        (for n in 1 .. (- (assoc-get info "supervision-n1") 1) rev do
+                (if (>= (nth n scd) thres)
+                then    (gtk-spin-button-set-value (assoc-get info "w-spin1") n)
+                        (fail) )))
+
+(defnet supervision-scd-right1 (info)
+        (deflocal av scd thres n)
+
+        (set av (assoc-get info "av1"))
+        (set scd (cfg-get (key-scd av (fullpath->name (assoc-get info "path1")))))
+        (listp scd)
+        (set scd (nth 4 scd))
+        (set thres (gtk-spin-button-get-value (assoc-get info "w-scd-spin1")))
+        (for n in (+ (assoc-get info "supervision-n1") 1) .. (- (av-index-entries av) 2) do
+                (if (>= (nth n scd) thres)
+                then    (gtk-spin-button-set-value (assoc-get info "w-spin1") n)
+                        (fail) )))
+
+(defnet supervision-scd-left2 (info)
+        (deflocal av scd thres n)
+
+        (set av (assoc-get info "av2"))
+        (set scd (cfg-get (key-scd av (fullpath->name (assoc-get info "path2")))))
+        (listp scd)
+        (set scd (nth 4 scd))
+        (set thres (gtk-spin-button-get-value (assoc-get info "w-scd-spin2")))
+        (for n in 1 .. (- (assoc-get info "supervision-n2") 1) rev do
+                (if (>= (nth n scd) thres)
+                then    (gtk-spin-button-set-value (assoc-get info "w-spin2") n)
+                        (fail) )))
+
+(defnet supervision-scd-right2 (info)
+        (deflocal av scd thres n)
+
+        (set av (assoc-get info "av2"))
+        (set scd (cfg-get (key-scd av (fullpath->name (assoc-get info "path2")))))
+        (listp scd)
+        (set scd (nth 4 scd))
+        (set thres (gtk-spin-button-get-value (assoc-get info "w-scd-spin2")))
+        (for n in (+ (assoc-get info "supervision-n2") 1) .. (- (av-index-entries av) 2) do
+                (if (>= (nth n scd) thres)
+                then    (gtk-spin-button-set-value (assoc-get info "w-spin2") n)
+                        (fail) )))
+
+(defnet supervision-sync (info)
+        (deflocal map n1 n2 p q n u ut prv i)
+
+        (set i (cfg-get (key-map (assoc-get info "av1")
+                                 (assoc-get info "av2")
+                                 (fullpath->name (assoc-get info "path1"))
+                                 (fullpath->name (assoc-get info "path2")) )))
+        (<> i undef)
+        (set map (map-create (nth 0 i) (nth 1 i)))
+        (set n1 (assoc-get info "supervision-n1"))
+        (set n2 (assoc-get info "supervision-n2"))
+        (for i in (nth 2 i) do
+                (set p (nth 0 i))
+                (set q (nth 1 i))
+                (set n (nth 2 i))
+                (if (in n1 p .. (+ p n -1))
+                then    (set n (+ n1 q -p))
+                        (<> n n2)
+                        (gtk-spin-button-set-value (assoc-get info "w-spin2") n)
+                        (fail) )
+                (map-bind-basic (car map) p q n)
+                (map-bind-basic (cdr map) q p n) )
+        (set u (map-undef-basic (car map) (cdr map)))
+        (set ut (queue-get u))
+        (for i in (car map) do
+                (set p (nth 0 i))
+                (set q (nth 1 i))
+                (set n (nth 2 i))
+                (if (= n undef)
+                then    (if (and (= p (nth 0 ut)) (= q (nth 1 ut)))
+                        then    (if (in n1 p .. q)
+                                then    (set n (min (max (+ (nth 2 ut) n1 -p) (nth 2 ut)) (nth 3 ut)))
+                                        (if (= n n2)
+                                        then    (set n (min (max (+ (nth 3 ut) n1 -q) (nth 2 ut)) (nth 3 ut))) )
+                                        (<> n n2)
+                                        (gtk-spin-button-set-value (assoc-get info "w-spin2") n)
+                                        (fail) )
+                                (set ut (queue-get u))
+                        else    (if (in n1 p .. q)
+                                then    (set n (if (= prv undef) 1 prv))
+                                        (<> n n2)
+                                        (gtk-spin-button-set-value (assoc-get info "w-spin2") n)
+                                        (fail) ))
+                        (clr prv)
+                else    (set prv (+ n q -p)) )))
+
+(defnet supervision-left (info)
+        (supervision-sync-skip info -1) )
+
+(defnet supervision-right (info)
+        (supervision-sync-skip info 1) )
+
+(defnet supervision-left-double (info)
+        (supervision-sync-skip info -(cfg-get-or-default-num "supervision-skip-double" (assoc-get info "default"))) )
+
+(defnet supervision-right-double (info)
+        (supervision-sync-skip info (cfg-get-or-default-num "supervision-skip-double" (assoc-get info "default"))) )
+
+(defnet supervision-left-first (info)
+        (deflocal n c i t p done pirr)
+
+        (set n (assoc-get info "supervision-n1"))
+        (set c 1)
+        (set done false)
+        (set pirr false)
+        (for i in (assoc-get info "a-combo-goto") do
+                (set t (nth 2 i))
+                (if (or (= t 1) (= t 3) (and (= t 0) (not pirr)))
+                then    (set p (nth 0 i))
+                        (if (> p n)
+                        then    (set done true)
+                        else    (set c p) ))
+                until done
+                (set pirr (= t 0)) )
+        (supervision-sync-skip info (- c n)) )
+
+(defnet supervision-right-last (info)
+        (deflocal n c i t p done pirr)
+
+        (set n (assoc-get info "supervision-n1"))
+        (set c (- (av-index-entries (assoc-get info "av1")) 2))
+        (set done false)
+        (set pirr false)
+        (for i in (assoc-get info "a-combo-goto") rev do
+                (set t (nth 2 i))
+                (if (or (= t 2) (= t 3) (and (= t 0) (not pirr)))
+                then    (set p (nth 0 i))
+                        (if (< p n)
+                        then    (set done true)
+                        else    (set c p) ))
+                until done
+                (set pirr (= t 0)) )
+        (supervision-sync-skip info (- c n)) )
+
+(defnet supervision-sync-skip (info n)
+        (deflocal av1 av2 n1 n2 c)
+
+        (<> n 0)
+        (set av1 (assoc-get info "av1"))
+        (set av2 (assoc-get info "av2"))
+        (set n1 (+ n (assoc-get info "supervision-n1")))
+        (set n2 (+ n (assoc-get info "supervision-n2")))
+        (set c (min n1 n2))
+        (if (< c 1)
+        then    (set c (- 1 c))
+                (inc n1 c)
+                (inc n2 c) )
+        (set c (min (- (av-index-entries av1) n1) (- (av-index-entries av2) n2)))
+        (if (< c 2)
+        then    (inc c -2)
+                (inc n1 c)
+                (inc n2 c) )
+        (gtk-spin-button-set-value (assoc-get info "w-spin1") n1)
+        (gtk-spin-button-set-value (assoc-get info "w-spin2") n2) )
+
+(defnet supervision-force (info)
+        (deflocal key k a win map n1 n2 d p q n i)
+
+        (set key (key-map (assoc-get info "av1")
+                          (assoc-get info "av2")
+                          (fullpath->name (assoc-get info "path1"))
+                          (fullpath->name (assoc-get info "path2")) ))
+        (set k (cfg-get key))
+        (<> k undef)
+        (set a (nth 2 k))
+        (set n1 (assoc-get info "supervision-n1"))
+        (set n2 (assoc-get info "supervision-n2"))
+        (set win (assoc-get info "w-win"))
+        (set map (map-create (nth 0 k) (nth 1 k)))
+        (for i in a do
+                (set p (nth 0 i))
+                (set q (nth 1 i))
+                (set n (nth 2 i))
+                (if (in n1 p .. (+ p n -1))
+                then    (set d (for-pos))
+                        (if (= (+ n1 q -p) n2)
+                        then    (gtk-question win (+ "" n1 $" is actually linked to " n2 "." nl
+                                                     $"Do you want to remove the link?" ))
+                                (array-remove a d)
+                                (cfg-set key k)
+                                (gui-report info)
+                                (gui-update info)
+                                (if (= n1 p)
+                                then    (for i in (assoc-get info "a-combo-goto") do
+                                                (if (and (= (nth 0 i) (+ n1 n)) (in (nth 2 i) [ 1 3 ]))
+                                                then    (gtk-combo-box-set-active (assoc-get info "w-combo-goto") (for-pos)) )))
+                                (if (= n1 (+ p n -1))
+                                then    (for i in (assoc-get info "a-combo-goto") do
+                                                (if (and (= (nth 0 i) (- n1 n)) (in (nth 2 i) [ 2 3 ]))
+                                                then    (gtk-combo-box-set-active (assoc-get info "w-combo-goto") (for-pos)) )))
+                                (fail) )
+                else    (map-bind-basic (car map) p q n)
+                        (map-bind-basic (cdr map) q p n) ))
+        (set p false)
+        (for i in (map-undef-basic (car map) (cdr map)) do
+                (set p (in n1 (nth 0 i) .. (nth 1 i)))
+                until p )
+        (if (not p)
+        then    (gtk-message-warning win (+ $"Can't link " n1 $" to " n2))
+                (fail) )
+        (if (not (in n2 (nth 2 i) .. (nth 3 i)))
+        then    (gtk-message-warning win (+ $"At the moment " n1 $" can only be mapped in ["
+                        (int->str (nth 2 i) 6 '0') "-" (int->str (nth 3 i) 6 '0') "]." ))
+                (fail) )
+        (gtk-question win (+ "" n1 $" will be linked to " n2 ". " $"Are you sure?"
+                             (if (integerp d) $"\nNOTE: a previously established link will be removed." "") ))
+        (if (integerp d)
+        then    (array-remove a d) )
+        (array-append a (list n1 n2 1))
+        (cfg-set key k)
+        (gui-report info)
+        (gui-update info)
+        (for i in (assoc-get info "a-combo-goto") do
+                (if (= (nth 0 i) n1)
+                then    (gtk-combo-box-set-active (assoc-get info "w-combo-goto") (for-pos)) )))
+
+(defnet supervision-goto (info cb ab)
+        (set cb (gtk-combo-box-get-active cb))
+        (>= cb 0)
+        (set cb (nth cb ab))
+        (gtk-spin-button-set-value (assoc-get info "w-spin1") (nth 0 cb))
+        (gtk-spin-button-set-value (assoc-get info "w-spin2") (nth 1 cb)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet supervision-save-frame (info which)
+        (deflocal win vb hb fc path i)
+
+        (set win (gtk-window-new))
+        (gtk-window-set-transient-for win (assoc-get info "w-win"))
+        (gtk-window-set-modal win true)
+        (gtk-window-set-title win (+ $"Save frame " which $" as..."))
+        (gtk-container-set-border-width win 8)
+
+        (set vb (gtk-vbox-new false 10))
+        (gtk-container-add win vb)
+
+        (set fc (gtk-file-chooser-widget-new (cmacro GTK_FILE_CHOOSER_ACTION_SAVE)))
+        (gtk-box-pack-start vb fc true true 0)
+        (gtk-file-chooser-set-show-hidden fc true)
+
+        (set path (cfg-get "save-path"))
+        (repeat until (= path undef)
+                (alt    (seq    (pathexists path)
+                                (if (isdir path)
+                                then    (gtk-file-chooser-set-current-folder fc path)
+                                else    (gtk-file-chooser-select-filename fc path) )
+                                (clr path) )
+                        (seq    (rtrim path '/')
+                                (search "/" path i (maxint))
+                                (set path (sub 0 (+ i 1) path)) )
+                        (clr path) ))
+
+        (gtk-file-chooser-set-current-name fc (+ (utf8-validate (fullpath->name (assoc-get info (+ "path" which))))
+                "-" (int->str (assoc-get info (+ "supervision-n" which)) 6 '0') ".png" ))
+
+        (set hb (gtk-hbox-new false 6))
+        (gtk-box-pack-start vb hb false false 0)
+
+        (gtk-box-pack-end hb (gtk-iconed-button
+                (pix-load-static "icons/16x16/dialog-cancel-3.png")
+                $"Cancel"
+                (netptr gtk-close-win)
+                win ) false false 0 )
+
+        (set i (list fc win which info))
+
+        (gtk-signal-connect fc "file-activated" (netptr supervision-save-frame-ok) i)
+
+        (gtk-box-pack-end hb (gtk-iconed-button
+                (pix-load-static "icons/16x16/dialog-apply.png")
+                "Ok"
+                (netptr supervision-save-frame-ok)
+                i ) false false 0 )
+
+        (gtk-window-set-default-size win (fc-width) (fc-height))
+        (gtk-widget-show-all win) )
+
+(defnet supervision-save-frame-ok (info)
+        (deflocal path win which av pix)
+
+        (set path (gtk-file-chooser-get-filename (nth 0 info)))
+        (stringp path)
+        (not (isdir path))
+        (set win (nth 1 info))
+        (set which (nth 2 info))
+        (set info (nth 3 info))
+        (if (pathexists path)
+        then    (gtk-question win (+ $"File `" path $"' exists." nl
+                                     $"Do you want to overwrite it?" )))
+        (close win)
+        (cfg-set "save-path" path)
+        (set av (assoc-get info (+ "av" which)))
+        (set pix (pix-create (width av) (height av)))
+        (alt    (read-frame av (assoc-get info (+ "supervision-n" which)) pix)
+                (pix-clear pix) )
+        (if (rmatch case path ".jpg" ".jpeg")
+        then    (pix-save-jpg pix path)
+        else    (pix-save-png pix path) )
+        (close pix) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

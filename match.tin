@@ -1,0 +1,460 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet match (th-main name1 name2 av1 av2 scd1 scd2 pix default-info)
+        (deflocal m scd-min-blocks scd-min-avg-block-size thres1 thres2 thres avg1 avg2 alternate i j)
+
+        (pix-wip pix)
+        (scdscan-draw-image th-main)
+
+        (set scd-min-blocks (cfg-get-or-default-num "scd-min-blocks" default-info))
+        (set scd-min-avg-block-size (cfg-get-or-default-num "scd-min-avg-block-size" default-info))
+
+        (set m (match-create name1 name2 av1 av2 scd1 scd2 th-main pix default-info))
+        (set i (map-free1 m))
+        (map-report m)
+
+        (set avg1 (array-avg scd1))
+        (set avg2 (array-avg scd2))
+
+        (for alternate in [ false true ] do
+                (if alternate
+                then    (msg-log m "\n\n\nstarting alternate strategies\n\n\n") )
+                (set thres (match-params m "init-scd-threshold"))
+                (while (>= thres (match-params m "min-scd-threshold")) do
+                        (set thres1 (* avg1 thres))
+                        (set thres2 (* avg2 thres))
+                        (repeat (msg-log m (+ "begin match-step: " (approx3 thres1) "-" (approx3 thres2) nl))
+                                (set j i)
+                                (match-step false alternate false m thres1 thres2 scd-min-blocks scd-min-avg-block-size)
+                                until (match-abort m)
+                                (set i (map-free1 m))
+                                (msg-log m (+ "end match-step: " (approx3 thres1) "-" (approx3 thres2) " -> " (- j i) nl))
+                                until (= i j) )
+                        until (match-abort m)
+                        (set thres (* thres (match-params m "scd-threshold-ratio"))) )
+                until (match-abort m) )
+
+        (if (and (not (match-abort m)) (cfg-get-or-default "final-closure" default-info))
+        then    (match-step false true true m thres1 thres2 scd-min-blocks scd-min-avg-block-size) )
+
+        (match-destroy m true) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet match-step (ignore-false alternate final-closure m thres1 thres2 scd-min-blocks scd-min-avg-block-size)
+        (deflocal u ut a1 a2 p1a p1b p2a p2b
+                  best-p2 best-d1 best-d2 n mdb segfirst seglast bound )
+
+        (set u (map-undef1 m))
+        (while (> (length u) 0) do
+                (set ut (queue-get u))
+                (set segfirst (= (nth 0 ut) 1))
+                (set seglast (= (nth 1 ut) (map-max1 m)))
+                (set bound 0)
+                (set a1 (seq-threshold (match-scd1 m) (nth 0 ut) (nth 1 ut) thres1))
+                (set a2 (seq-threshold (match-scd2 m) (nth 2 ut) (nth 3 ut) thres2))
+                (set p1a 0)
+                (set p1b (- (length a1) 1))
+                (set p2a 0)
+                (set p2b (- (length a2) 1))
+                (while (and (<= p1a p1b) (not (match-abort m))) do
+                        (alt    (match-receivenb m)
+                                (seq    (match-best ignore-false a1 a2 p1a p1b p2a p2b best-p2 best-d1 best-d2 n)
+                                        (set mdb (/ n (max best-d1 best-d2)))
+                                        (>= mdb 8)
+                                        (or (and (>= (min best-d1 best-d2) scd-min-blocks)
+                                                 (>= mdb scd-min-avg-block-size) )
+                                            (and (= p1a 0) (= best-p2 p2a) (not segfirst))
+                                            (and (> (+ p1a best-d1) p1b) (> (+ best-p2 best-d2) p2b) (not seglast)) )
+                                        (match-check-and-bind alternate m (cdr (nth p1a a1)) (cdr (nth best-p2 a2)) n)
+                                        (inc bound n)
+                                        (inc p1a best-d1)
+                                        (set p2a (+ best-p2 best-d2)) )
+                                (inc p1a) ))
+                (if (and alternate (= bound 0) (not (match-abort m)))
+                then    (match-step-alternate final-closure m ut a1 a2 segfirst seglast) )))
+
+(defnet match-step-alternate (final-closure m ut a1 a2 segfirst seglast)
+        (deflocal p1a p2a p1b p2b size1 size2 n n1 n2 score1 score2)
+
+        (set p1a (nth 0 ut))
+        (set p2a (nth 2 ut))
+        (set p1b (- (length a1) 1))
+        (set p2b (- (length a2) 1))
+        (set size1 (- (nth 1 ut) p1a -1))
+        (set size2 (- (nth 3 ut) p2a -1))
+        (set n (min size1 size2))
+        (set n1 (min (car (nth 0 a1)) (car (nth 0 a2))))
+        (set n2 (min (car (nth p1b a1)) (car (nth p2b a2))))
+        (alt    (seq    (= size1 size2)
+                        (if final-closure
+                        then    (msg-log m (+ "\nfinal closure: ["
+                                              (int->str p1a 6 '0') "-" (int->str (+ p1a n -1) 6 '0')
+                                              "] <-> ["
+                                              (int->str p2a 6 '0') "-" (int->str (+ p2a n -1) 6 '0')
+                                              "] (" n ")" nl ))
+                                (map-bind m p1a p2a n)
+                                (map-report m)
+                        else    (match-check-and-bind true m p1a p2a n) ))
+
+                (truep (match-abort m))
+
+                (seq    (not segfirst)
+                        (not seglast)
+                        ; (> (+ n1 n2) n) ; si puo` fare meglio?
+                        (match-check true m p1a p2a n1 score1)
+                        (match-check true m (+ p1a size1 -n2) (+ p2a size2 -n2) n2 score2)
+
+                        (msg-log m (+ "conflicting strategies: " (approx3 score1) " vs " (approx3 score2) nl))
+
+                        (if (>= (abs (- score1 score2)) 0.03)
+                        then    (msg-log m (+ "done" nl))
+                                (if (> score1 score2)
+                                then    (match-check-and-bind true m p1a p2a n1)
+                                else    (match-check-and-bind true m (+ p1a size1 -n2) (+ p2a size2 -n2) n2) )))
+
+                (truep (match-abort m))
+
+                (seq    (not segfirst)
+                        (match-check true m p1a p2a n1 score1)
+                        (> score1 0)
+                        (match-check-and-bind true m p1a p2a n1) )
+
+                (truep (match-abort m))
+
+                (seq    (not seglast)
+                        (match-check true m (+ p1a size1 -n2) (+ p2a size2 -n2) n2 score2)
+                        (> score2 0)
+                        (match-check-and-bind true m (+ p1a size1 -n2) (+ p2a size2 -n2) n2) )
+
+                (success) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet match-best (ignore-false a1 a2 p1 p1b p2a p2b @best-p2 @best-d1 @best-d2 @best-n)
+        (deflocal d1 d2 x1 x2 n i done ab1 ab2)
+
+        (set ab1 true)
+        (set ab2 true)
+        (set @best-d1 0)
+        (while (<= p2a p2b) do
+                (set d1 p1)
+                (set d2 p2a)
+                (set n 0)
+                (repeat (set x1 (car (nth d1 a1)))
+                        (set x2 (car (nth d2 a2)))
+                        (if (= x1 x2)
+                        then    (inc d1)
+                                (inc d2)
+                                (inc n x1)
+                                (set done false)
+                        else (if ignore-false
+                        then    (alt    (seq    (= ab1 true)
+                                                (match-best-ignore-false x1 a2 d2 p2b i)
+                                                (inc d1)
+                                                (inc d2 i)
+                                                (inc n x1)
+                                                (set ab2 false)
+                                                (set done false) )
+                                        (seq    (= ab2 true)
+                                                (match-best-ignore-false x2 a1 d1 p1b i)
+                                                (inc d1 i)
+                                                (inc d2)
+                                                (inc n x2)
+                                                (set ab1 false)
+                                                (set done false) )
+                                        (set done true) )
+                        else    (set done true) ))
+                        until done
+                        until (> d1 p1b)
+                        until (> d2 p2b) )
+                (inc d1 -p1)
+                (if (> d1 @best-d1)
+                then    (set @best-p2 p2a)
+                        (set @best-d1 d1)
+                        (set @best-d2 (- d2 p2a))
+                        (set @best-n n) )
+                (inc p2a) )
+        (> @best-d1 0) )
+
+(defnet match-best-ignore-false (target a p1 p2 @n)
+        (deflocal sum)
+
+        (set sum 0)
+        (set @n 0)
+        (repeat (inc sum (car (nth p1 a)))
+                (<= sum target)
+                (inc @n)
+                until (= sum target)
+                (< p1 p2)
+                (inc p1) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet match-check (alternate m p1 p2 n @score)
+        (deflocal step cnt score i j)
+
+        (set step (max 1 (/ (- n 1)
+                (- (+ (match-params m "checks-per-interval")
+                      (if alternate (match-params m "checks-per-interval-extra") 0) )
+                   1 ))))
+        (set @score 0)
+        (set cnt 0)
+        (set i 0)
+        (repeat (set j (rint i))
+                (sift-check alternate m (+ p1 j) (+ p2 j) score)
+                (if (> score 0)
+                then    (inc cnt)
+                        (inc @score score) )
+                until (= i (- n 1))
+                (inc i step) )
+        (if (> cnt 0)
+        then    (set @score (/ @score cnt)) ))
+
+(defnet match-check-and-bind (alternate m p1 p2 n)
+        (deflocal score)
+
+        (msg-log m (+ "\ninterval to check: ["
+                (int->str p1 6 '0') "-" (int->str (+ p1 n -1) 6 '0')
+                "] <-> ["
+                (int->str p2 6 '0') "-" (int->str (+ p2 n -1) 6 '0')
+                "] (" n ")" nl ))
+
+        (match-check alternate m p1 p2 n score)
+        (map-bind m p1 p2 n)
+        (map-report m)
+
+        (msg-log m (+ "\ninterval accepted: ["
+                (int->str p1 6 '0') "-" (int->str (+ p1 n -1) 6 '0')
+                "] <-> ["
+                (int->str p2 6 '0') "-" (int->str (+ p2 n -1) 6 '0')
+                "] (" n ")" nl )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun match-create (name1 name2 av1 av2 scd1 scd2 th-main pix default-info) net match-create)
+(defnet match-create (name1 name2 av1 av2 scd1 scd2 th-main pix default-info @m)
+        (deflocal frm1 frm2 pix1 pix2 k params v)
+
+        (av-seek-frame av1 0)
+        (av-skip-frame av1)
+        (av-seek-frame av2 0)
+        (av-skip-frame av2)
+        (set params (assoc))
+        (for k in [ "init-scd-threshold"
+                    "min-scd-threshold"
+                    "scd-threshold-ratio"
+                    "checks-per-interval"
+                    "checks-per-interval-extra"
+                    "min-keypoints"
+                    "min-keypoints-min-ratio"
+                    "min-keypoints-min-ratio-lum"
+                    "sift-match-threshold"
+                    "sift-match-threshold-min-ratio"
+                    "sift-agreements-min"
+                    "sift-proportionality-threshold"
+                    "filter-gamma1"
+                    "filter-gamma2"
+                  ] do
+                (assoc-set params k (cfg-get-or-default-num k default-info)) )
+        (for k in [ "filter-mirror1"
+                    "filter-flip1"
+                    "filter-mirror2"
+                    "filter-flip2"
+                    "sift-draw-lines"
+                  ] do
+                (assoc-set params k (cfg-get-or-default k default-info)) )
+        (set pix1 (cfg-get-or-default "sift-scale" default-info))
+        (set pix2 (cfg-get-or-default-num "sift-scale-pixels" default-info))
+        (match-create-frm av1 frm1 pix1 pix2)
+        (match-create-frm av2 frm2 pix1 pix2)
+        (set k (min (/ (- (width pix) (* 2 (space))) (max (width frm1) (width frm2)))
+                    (/ (- (height pix) (* 3 (space))) (+ (height frm1) (height frm2))) ))
+        (set pix1 (pix-create (* k (width frm1)) (* k (height frm1))))
+        (set pix2 (pix-create (* k (width frm2)) (* k (height frm2))))
+        (set @m (array 26))
+        (set k (cfg-get (key-sck av1 av2 name1 name2)))
+        (if (<> k undef)
+        then    (set <@m  0> (nth 0 k))
+                (set <@m  1> (nth 1 k))
+                (set <@m  6> (nth 2 k))
+                (set <@m  7> (nth 3 k))
+                (set <@m  8> (nth 4 k))
+                (set <@m  9> (nth 5 k))
+                (if (= (length k) 8)
+                then    (set <@m 23> (nth 6 k))
+                        (set <@m 24> (nth 7 k))
+                else    ; FIXME qui andrebbero ricalcolate le luminosita`
+                        ; dei frame che hanno un res intero
+                        (set <@m 23> 0)
+                        (set <@m 24> 0) )
+        else    (set <@m  0> (assoc))
+                (set <@m  1> 0)
+                (set <@m  6> 0)
+                (set <@m  7> 0)
+                (set <@m  8> 0)
+                (set <@m  9> 0)
+                (set <@m 23> 0)
+                (set <@m 24> 0) )
+        (set <@m  2> av1)
+        (set <@m  3> av2)
+        (set <@m  4> frm1)
+        (set <@m  5> frm2)
+        (set <@m 10> (map-create (- (length scd1) 1) (- (length scd2) 1)))
+        (set <@m 11> th-main)
+        (set <@m 12> (thread-create (netptr th-sift-features) (thread-self)))
+        (set <@m 13> (thread-create (netptr th-sift-features) (thread-self)))
+        (set <@m 14> name1)
+        (set <@m 15> name2)
+        (set <@m 16> pix1)
+        (set <@m 17> pix2)
+        (set <@m 18> pix)
+        (set <@m 19> (array 0))
+        (set <@m 20> scd1)
+        (set <@m 21> scd2)
+        (set <@m 22> params)
+        (set <@m 25> false)
+        (set k (cfg-get (key-map av1 av2 name1 name2)))
+        (if (<> k undef)
+        then    (for k in (nth 2 k) do
+                        (map-bind @m (nth 0 k) (nth 1 k) (nth 2 k)) )))
+
+(defnet match-create-frm (av @frm sift-scale sift-scale-pixels)
+        (deflocal w h k)
+
+        (set w (width av))
+        (set h (height av))
+        (if sift-scale
+        then    (set k (sqrt (/ (* w h) sift-scale-pixels)))
+                (set w (rint (/ w k)))
+                (set h (rint (/ h k))) )
+        (set @frm (pix-create w h)) )
+
+(defnet match-destroy (m store)
+        (close (match-frm1 m) (match-frm2 m) (match-pix1 m) (match-pix2 m))
+        (if store
+        then    (cfg-set (key-sck (match-av1 m) (match-av2 m)
+                                  (match-name1 m) (match-name2 m) )
+                         (list (match-cache m) (match-passed m) (nth 6 m) (nth 7 m)
+                               (nth 8 m) (nth 9 m) (nth 23 m) (nth 24 m) ))
+                (cfg-set (key-map (match-av1 m) (match-av2 m)
+                                  (match-name1 m) (match-name2 m) )
+                         (list (- (length (match-scd1 m)) 1)
+                               (- (length (match-scd2 m)) 1)
+                               (match-map-step m) )))
+        (send undef to (match-th-sift1 m))
+        (send undef to (match-th-sift2 m))
+        (thread-join (match-th-sift1 m))
+        (thread-join (match-th-sift2 m))
+        (not (match-abort m)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet match-receivenb (m)
+        (deflocal msg)
+
+        (receivenb msg from (match-th-main m))
+        (match-abort m) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun match-cache (m) (nth 0 m))
+(defun match-passed (m) (nth 1 m))
+(defun match-av1 (m) (nth 2 m))
+(defun match-av2 (m) (nth 3 m))
+(defun match-frm1 (m) (nth 4 m))
+(defun match-frm2 (m) (nth 5 m))
+(defun match-rx (m) (/ (nth 7 m) (nth 6 m)))
+(defun match-ry (m) (/ (nth 9 m) (nth 8 m)))
+(defun match-width1 (m) (width (match-av1 m)))
+(defun match-height1 (m) (height (match-av1 m)))
+(defun match-width2 (m) (width (match-av2 m)))
+(defun match-height2 (m) (height (match-av2 m)))
+(defun match-hcorrection (m)
+        (/ (/ (match-width2 m) (width (match-frm2 m)))
+           (/ (match-width1 m) (width (match-frm1 m))) ))
+(defun match-vcorrection (m)
+        (/ (/ (match-height2 m) (height (match-frm2 m)))
+           (/ (match-height1 m) (height (match-frm1 m))) ))
+(defun match-map (m) (nth 10 m))
+(defun match-th-main (m) (nth 11 m))
+(defun match-th-sift1 (m) (nth 12 m))
+(defun match-th-sift2 (m) (nth 13 m))
+(defun match-name1 (m) (nth 14 m))
+(defun match-name2 (m) (nth 15 m))
+(defun match-pix1 (m) (nth 16 m))
+(defun match-pix2 (m) (nth 17 m))
+(defun match-pix (m) (nth 18 m))
+(defun match-map-step (m) (nth 19 m))
+(defun match-scd1 (m) (nth 20 m))
+(defun match-scd2 (m) (nth 21 m))
+(defun match-params (m key) (assoc-get (nth 22 m) key))
+(defun match-abort (m) (nth 25 m))
+(defnet match-abort (m) (set <m 25> true))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

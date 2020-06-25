@@ -1,0 +1,292 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-check (alternate m p1 p2 @score)
+        (deflocal cache key)
+
+        (opt (match-receivenb m))
+        (not (match-abort m))
+        (set cache (match-cache m))
+        (set key (+ (int->str p1 6 '0') (int->str p2 6 '0')))
+        (set @score (assoc-get cache key))
+        (if (= @score undef)
+        then    (sift-check-basic alternate m p1 p2 cache key @score) )
+        (if (booleanp @score)
+        then    (= @score true)
+                (set @score 0) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-check-basic (alternate m p1 p2 cache key @score)
+        (deflocal av1 av2 frm1 frm2 dlum filt1 filt2 k1 k2)
+
+        (msg-log m (+ "sift check: " p1 " <-> " p2 nl))
+        (set av1 (match-av1 m))
+        (set av2 (match-av2 m))
+        (set frm1 (match-frm1 m))
+        (set frm2 (match-frm2 m))
+        (sift-read-frame m av1 p1 frm1)
+        (sift-read-frame m av2 p2 frm2)
+        (if (match-params m "filter-mirror1")
+        then    (pix-hflip frm1) )
+        (if (match-params m "filter-flip1")
+        then    (pix-vflip frm1) )
+        (if (match-params m "filter-mirror2")
+        then    (pix-hflip frm2) )
+        (if (match-params m "filter-flip2")
+        then    (pix-vflip frm2) )
+        (send frm1 to (match-th-sift1 m))
+        (send frm2 to (match-th-sift2 m))
+        (set dlum (/ (- (pix-get-luminance frm1) (pix-get-luminance frm2)) 255))
+        (pix-copy-frames (match-pix m) frm1 frm2 (match-pix1 m) (match-pix2 m)
+                (match-params m "filter-gamma1") (match-params m "filter-gamma2") )
+        (sift-draw-image m)
+        (receive filt1 from (match-th-sift1 m))
+        (receive filt2 from (match-th-sift2 m))
+        (if (match-abort m)
+        then    (close filt1 filt2)
+                (fail) )
+        (set k1 (if (= filt1 undef) 0 (length filt1)))
+        (set k2 (if (= filt2 undef) 0 (length filt2)))
+        (alt    (if (< (min k1 k2) (match-params m "min-keypoints"))
+                then    (if alternate
+                        then    (sift-check-too-few-keypoints m p1 p2 filt1 filt2 k1 k2 dlum @score)
+                        else    (set @score true) )
+                else    (sift-check-enough-keypoints m filt1 filt2 k1 k2 dlum @score) )
+                (seq    (close filt1 filt2)
+                        (fail) ))
+        (close filt1 filt2)
+        (assoc-set cache key @score)
+        (if (booleanp @score)
+        then    (if @score
+                then    (inc <m 1>)
+                else    (if (match-params m "sift-draw-lines")
+                        then    (sift-draw-x m)
+                                (sift-draw-image m) )))
+        (not (match-abort m)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-check-too-few-keypoints (m p1 p2 filt1 filt2 k1 k2 dlum @score)
+        (if (< (max k1 k2) (match-params m "min-keypoints"))
+        then    (set @score true)
+        else    (if (< (nth 23 m) 40)
+                then    (msg-log m (+ "delayed (dlum=" (approx3 dlum) ")" nl))
+                        (fail) )
+                (if (> (abs (- dlum (/ (nth 24 m) (nth 23 m)))) (match-params m "min-keypoints-min-ratio-lum"))
+                then    (set @score false)
+                else    (set @score (>= (/ (min k1 k2) (max k1 k2)) (match-params m "min-keypoints-min-ratio"))) ))
+        (msg-log m (+ "too few keypoints (" k1 "," k2 ": " @score ") - dlum: "
+                      (approx3 dlum) " (avg: " (approx3 (/ (nth 24 m) (nth 23 m))) ")" nl )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-check-enough-keypoints (m filt1 filt2 k1 k2 dlum @score)
+        (deflocal matches nx ny bnx bny sumrx sumry deltax deltay avgx avgy rx ry)
+
+        (set matches (vl-sift-match filt1 filt2 0 (match-params m "sift-match-threshold")))
+        (if (< (/ (length matches) (min k1 k2)) (match-params m "sift-match-threshold-min-ratio"))
+        then    (set @score false)
+                (msg-log m (+ "too few matches (" (length matches) " [" k1 "," k2 "])" nl))
+        else    (sift-analyze matches nx ny bnx bny sumrx sumry deltax deltay)
+                (if (= (min nx ny) 0)
+                then    (set @score false)
+                        (msg-log m (+ "too few agreements (" nx "," ny ")" nl))
+                else    (if (and (= (min (nth 6 m) (nth 8 m)) 0)
+                                 (< (min bnx bny) (match-params m "sift-agreements-min")) )
+                        then    (msg-log m (+ "delayed (" bnx "," bny ")" nl))
+                                (fail) )
+                        (set sumrx (* sumrx (match-hcorrection m)))
+                        (set sumry (* sumry (match-vcorrection m)))
+                        (set avgx (/ sumrx bnx))
+                        (set avgy (/ sumry bny))
+                        (msg-log m (+ "x -> " bnx " (" (approx2 (/ bnx nx 0.01)) "%): " (approx3 avgx) nl
+                                      "y -> " bny " (" (approx2 (/ bny ny 0.01)) "%): " (approx3 avgy) nl ))
+                        (set rx (if (= (nth 6 m) 0) avgx (match-rx m)))
+                        (set ry (if (= (nth 8 m) 0) avgy (match-ry m)))
+                        (if (or (< (/ (min avgx rx) (max avgx rx))
+                                   (match-params m "sift-proportionality-threshold") )
+                                (< (/ (min avgy ry) (max avgy ry))
+                                   (match-params m "sift-proportionality-threshold") ))
+                        then    (set @score false)
+                                (msg-log m (+ "proportionality check failed" nl))
+                        else    (if (match-params m "sift-draw-lines")
+                                then    (sift-draw-matches m matches)
+                                        (sift-draw-image m) )
+                                (set @score (+ (/ bnx nx) (/ bny ny)))
+                                (inc <m 1>)
+                                (inc <m 23>)
+                                (inc <m 24> (approximate dlum))
+                                (if (>= (min bnx bny) (match-params m "sift-agreements-min"))
+                                then    (inc <m 6> bnx)
+                                        (set <m 7> (approximate (+ (nth 7 m) sumrx)))
+                                        (inc <m 8> bny)
+                                        (set <m 9> (approximate (+ (nth 9 m) sumry))) )))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-read-frame (m av p frm)
+        (alt    (read-frame av p frm)
+                (seq    (pix-clear frm)
+                        (msg-log m (+ "\n\n\nwarning: can't read frame " p nl nl nl)) )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-analyze (matches @nx @ny @bnx @bny @sumrx @sumry @deltax @deltay)
+        (deflocal i)
+
+        (set i (sift-analyze matches))
+        (set @nx     (car i)) (set i (cdr i))
+        (set @ny     (car i)) (set i (cdr i))
+        (set @bnx    (car i)) (set i (cdr i))
+        (set @bny    (car i)) (set i (cdr i))
+        (set @sumrx  (car i)) (set i (cdr i))
+        (set @sumry  (car i)) (set i (cdr i))
+        (set @deltax (car i)) (set i (cdr i))
+        (set @deltay (car i)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-draw-matches (m matches)
+        (deflocal pix kx1 ky1 kx2 ky2 sx1 sy1 sx2 sy2 i)
+
+        (set pix (match-pix m))
+        (set kx1 (/ (width (match-pix1 m)) (width (match-frm1 m))))
+        (set ky1 (/ (height (match-pix1 m)) (height (match-frm1 m))))
+        (set kx2 (/ (width (match-pix2 m)) (width (match-frm2 m))))
+        (set ky2 (/ (height (match-pix2 m)) (height (match-frm2 m))))
+        (set sx1 (/ (- (width pix) (width (match-pix1 m))) 2))
+        (set sy1 (/ (- (height pix) (height (match-pix1 m)) (height (match-pix2 m)) (space)) 2))
+        (set sx2 (/ (- (width pix) (width (match-pix2 m))) 2))
+        (set sy2 (+ sy1 (height (match-pix1 m)) (space)))
+        (while (> (length matches) 0) do
+                (set i (queue-get matches))
+                (pix-draw-line pix
+                               (+ (* (car (car i)) kx1) sx1)
+                               (+ (* (cdr (car i)) ky1) sy1)
+                               (+ (* (car (cdr i)) kx2) sx2)
+                               (+ (* (cdr (cdr i)) ky2) sy2)
+                              (purple) )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-draw-x (m)
+        (deflocal pix w1 h1 w2 h2 x1 y1 x2 y2)
+
+        (set pix (match-pix m))
+        (set w1 (width (match-pix1 m)))
+        (set h1 (height (match-pix1 m)))
+        (set w2 (width (match-pix2 m)))
+        (set h2 (height (match-pix2 m)))
+        (set x1 (/ (- (width pix) w1) 2))
+        (set y1 (/ (- (height pix) h1 h2 (space)) 2))
+        (set x2 (+ (/ (- (width pix) w2) 2) w2 -1))
+        (set y2 (+ (/ (- (height pix) h1 h2 (space)) 2) h1 (space) h2 -1))
+        (pix-draw-line pix (+ x1 2) y1 x2 (- y2 2) (red))
+        (pix-draw-line pix (+ x1 1) y1 x2 (- y2 1) (red))
+        (pix-draw-line pix x1 y1 x2 y2 (red))
+        (pix-draw-line pix x1 (+ y1 1) (- x2 1) y2 (red))
+        (pix-draw-line pix x1 (+ y1 2) (- x2 2) y2 (red))
+        (set x1 (+ (/ (- (width pix) w1) 2) w1 -1))
+        (set y1 (/ (- (height pix) h1 h2 (space)) 2))
+        (set x2 (/ (- (width pix) w2) 2))
+        (set y2 (+ (/ (- (height pix) h1 h2 (space)) 2) h1 (space) h2 -1))
+        (pix-draw-line pix (- x1 2) y1 x2 (- y2 2) (red))
+        (pix-draw-line pix (- x1 1) y1 x2 (- y2 1) (red))
+        (pix-draw-line pix x1 y1 x2 y2 (red))
+        (pix-draw-line pix x1 (+ y1 1) (+ x2 1) y2 (red))
+        (pix-draw-line pix x1 (+ y1 2) (+ x2 2) y2 (red)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet sift-draw-image (m)
+        (deflocal th-main msg)
+
+        (set th-main (match-th-main m))
+        (send [ "d" . undef ] to th-main)
+        (receive msg from th-main)
+        (if (not msg)
+        then    (receive msg from th-main)
+                (match-abort m) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
