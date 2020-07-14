@@ -5,7 +5,7 @@ clean:
 	rm -f *~ *.c ffmatch ffmatch-compile ffmatch.log
 
 install:	all
-	cp -f ffmatch /local/bin
+	cp -f ffmatch /usr/local/bin
 
 ffmatch:	ffmatch.trp init.tin lang.tin gui.tin cfg.tin utils.tin \
 		constants.tin supervision.tin scdscan.tin match.tin map.tin \
