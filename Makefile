@@ -2,7 +2,7 @@
 all:		ffmatch
 
 clean:
-	rm -f *~ *.c ffmatch ffmatch-compile ffmatch.log
+	rm -f *~ *.c ffmatch ffmatch-compile.sh ffmatch.log *.exe
 
 install:	all
 	cp -f ffmatch /usr/local/bin
