@@ -123,7 +123,7 @@
         (deflocal default-info)
 
         (set default-info (assoc-default (default-parameters)))
-        (assoc-set info "default" default-info) )
+        (set <info "default"> default-info) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

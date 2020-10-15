@@ -42,7 +42,7 @@
         (map-max-basic (cdr (match-map m))) )
 
 (defun map-max-basic (map)
-        (nth 1 (nth (- (length map) 1) map)) )
+        <map -1 1> )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -67,7 +67,7 @@
         (set @n 0)
         (while (> (length u) 0) do
                 (set ut (queue-get u))
-                (inc @n (- (nth 1 ut) (nth 0 ut) -1)) ))
+                (inc @n (- <ut 1> <ut 0> -1)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -89,13 +89,13 @@
         (deflocal i j a aa freea freeb found)
 
         (for i in 0 .. (- (length map) 1) do
-                (set a (nth i map))
-                (set freea (nth 0 a))
-                (set freeb (nth 1 a))
+                (set a <map i>)
+                (set freea <a 0>)
+                (set freeb <a 1>)
                 (set found (in p freea .. freeb))
                 until found )
-        (= found true)
-        (= (nth 2 a) undef)
+        (truep found)
+        (= <a 2> undef)
         (set j (+ p n -1))
         (in j freea .. freeb)
         (if (> p freea)
@@ -112,19 +112,20 @@
         (set <a 0> p)
         (set <a 1> j)
         (set <a 2> q)
-        (if (and (= p freea)
-                 (= (- (nth 2 (nth (- i 1) map)) (nth 0 (nth (- i 1) map)))
+        (if (and (> i 0)
+                 (= p freea)
+                 (= (- <map (- i 1) 2> <map (- i 1) 0>)
                     (- q p) ))
         then    (array-remove map i)
                 (inc i -1)
-                (set a (nth i map))
+                (set a <map i>)
                 (set <a 1> j)
-                (set p (nth 0 a))
-                (set q (nth 2 a)) )
+                (set p <a 0>)
+                (set q <a 2>) )
         (if (and (= j freeb)
-                 (= (- (nth 2 (nth (+ i 1) map)) (nth 0 (nth (+ i 1) map)))
+                 (= (- <map (+ i 1) 2> <map (+ i 1) 0>)
                     (- q p) ))
-        then    (set <a 1> (nth 1 (nth (+ i 1) map)))
+        then    (set <a 1> <map (+ i 1) 1>)
                 (array-remove map (+ i 1)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -150,13 +151,13 @@
         (set @q (queue))
         (set min 1)
         (for i in 1 .. (length map1) do
-                (set a (nth (for-pos) map1))
+                (set a <map1 (for-pos)>)
                 (if (= <a 2> undef)
                 then    (set max (if (= i (length map1))
-                                (nth 1 (nth (- (length map2) 1) map2))
-                                (- (nth 2 (nth i map1)) 1) ))
+                                <map2 -1 1>
+                                (- <map1 i 2> 1) ))
                         (if (<= min max)
-                        then    (queue-put @q (list (nth 0 a) (nth 1 a) min max)) )
+                        then    (queue-put @q (list <a 0> <a 1> min max)) )
                 else    (set min (+ <a 2> <a 1> -<a 0> 1)) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -181,9 +182,9 @@
 
         (set found false)
         (for i in 1 .. (length map) do
-                (set a (nth (for-pos) map))
-                (if (in p (nth 0 a) .. (nth 1 a))
-                then    (set @q (+ (nth 2 a) p -(nth 0 a)))
+                (set a <map (for-pos)>)
+                (if (in p <a 0> .. <a 1>)
+                then    (set @q (+ <a 2> p -<a 0>))
                         (set found true) )
                 until found )
         (= found true) )
@@ -231,16 +232,16 @@
         (set ut (queue-get u))
         (set map (car map))
         (for i in 1 .. (length map) do
-                (set a (nth (for-pos) map))
-                (set p1 (nth 0 a))
-                (set p2 (nth 1 a))
-                (set q (nth 2 a))
+                (set a <map (for-pos)>)
+                (set p1 <a 0>)
+                (set p2 <a 1>)
+                (set q <a 2>)
                 (set hd (+ "[" (int->str p1 6 '0') "-" (int->str p2 6 '0') "] "))
                 (if (= q undef)
-                then    (if (and (= p1 (nth 0 ut)) (= p2 (nth 1 ut)))
-                        then    (map-report-print (cons "p1c" (cons (red) (+ hd "-/-> ???" " {" (- p2 p1 -1) "-" (- (nth 3 ut) (nth 2 ut) -1) "}" nl))) target)
+                then    (if (and (= p1 <ut 0>) (= p2 <ut 1>))
+                        then    (map-report-print (cons "p1c" (cons (red) (+ hd "-/-> ???" " {" (- p2 p1 -1) "-" (- <ut 3> <ut 2> -1) "}" nl))) target)
                                 (if (arrayp ab)
-                                then    (array-append ab (list p1 (nth 2 ut) 0) (list p2 (nth 3 ut) 0)) )
+                                then    (array-append ab (list p1 <ut 2> 0) (list p2 <ut 3> 0)) )
                                 (set ut (queue-get u))
                         else    (queue-put wrn1 (list p1 p2 (if (= prv undef) 0 prv))) )
                         (clr prv)
@@ -268,9 +269,9 @@
 
         (while (> (length wrn) 0) do
                 (set i (queue-get wrn))
-                (map-report-print (cons "p1" (+ "[" (int->str (nth 0 i) 6 '0') "-" (int->str (nth 1 i) 6 '0')
-                        "] ---> [" (int->str (nth 2 i) 6 '0') "] {"
-                        (- (nth 1 i) (nth 0 i) -1) "}" nl )) target )))
+                (map-report-print (cons "p1" (+ "[" (int->str <i 0> 6 '0') "-" (int->str <i 1> 6 '0')
+                        "] ---> [" (int->str <i 2> 6 '0') "] {"
+                        (- <i 1> <i 0> -1) "}" nl )) target )))
 
 (defnet map-report-print (msg target)
         (deflocal req)

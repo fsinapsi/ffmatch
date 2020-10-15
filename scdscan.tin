@@ -17,9 +17,9 @@
         (set key (key-scd av name))
         (set @v (cfg-get key))
         (if (<> @v undef)
-        then    (set @v (nth 4 @v))
+        then    (set @v <@v 4>)
         else    (scdscan-basic th-main name av pix default-info @v)
-                (cfg-set key (list (width av) (height av) (av-index-entries av) name @v)) ))
+                (cfg-set key (list (width av) (height av) (av-approximated-number-of-frames av) name @v)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -32,12 +32,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet scdscan-basic (th-main name av pix default-info @v)
-        (deflocal abort l l1 frm pix1 pix2 gamma1 gamma2 cnt k pts val)
+        (deflocal abort l l1 frm pix1 pix2 gamma1 gamma2 k val frameno t)
 
         (set abort false)
         (av-seek-frame av 0)
 
-        (set l (av-index-entries av))
+        (set l (av-approximated-number-of-frames av))
         (set l1 (- l 1))
 
         (set frm (array 2))
@@ -55,28 +55,32 @@
 
         (set @v (array default 0 l1))
 
-        (set cnt 1)
         (set k 0)
-        (av-read-frame av (nth k frm))
+        (set t (now))
+        (av-read-frame av <frm k>)
         (opt*   (not abort)
                 (set k (- 1 k))
-                (av-read-frame av (nth k frm))
-                (set pts (av-pts av))
-                (if (and (integerp pts) (< pts l1))
-                then    (set val (pix-scd-histogram (nth k frm) (nth (- 1 k) frm)))
-                        (set <@v pts> val)
+                (av-read-frame av <frm k>)
+                (set frameno (av-frameno av))
+                (if (< frameno l1)
+                then    (set val (pix-scd-histogram <frm k> <frm (- 1 k)>))
+                        (set <@v frameno> val)
                         (if (>= val 0.3)
-                        then    (pix-copy-frames pix (nth (- 1 k) frm) (nth k frm) pix1 pix2 gamma1 gamma2)
+                        then    (pix-copy-frames pix <frm (- 1 k)> <frm k> pix1 pix2 gamma1 gamma2)
                                 (alt    (scdscan-draw-image th-main)
                                         (set abort true) )))
-                (inc cnt)
-                (if (= (% cnt 100) 0)
-                then    (sendbuf 100 (cons "c1" (+ "frame " cnt "/" l " (" (rint (/ cnt l 0.01)) "%)")) to th-main) )
-                (opt    (receivenb abort from th-main)
-                        (set abort true) ))
-        (close pix1 pix2 (nth 0 frm) (nth 1 frm))
+                (if (= (% frameno 100) 0)
+                then    (sendbuf 100 (cons "c1" (+ "frame " frameno "/" l " (" (rint (/ frameno (- (now) t)))
+                                                   " fps) (" (rint (/ frameno l 0.01)) "%)" ))
+                                 to th-main ))
+                (alt    (seq    (receivenb abort from th-main)
+                                (set abort true) )
+                        (if (not (av-is-frame-recoverable av))
+                        then    (sendbuf 100 (cons "p2" "irregular timestamps not supported (read the docs)...\n") to th-main)
+                                (set abort true) )))
+        (close pix1 pix2 <frm 0> <frm 1>)
         (not abort)
-        (sendbuf 100 (cons "c1" (+ "frame " l "/" l " (100%)")) to th-main) )
+        (sendbuf 100 (cons "c1" (+ "frame " l "/" l " (" (rint (/ frameno (- (now) t))) " fps) (100%)")) to th-main) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

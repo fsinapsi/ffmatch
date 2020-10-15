@@ -51,7 +51,7 @@
 
 "' exists."
 1
-(iso->utf8 "' esiste già.")
+"' esiste giÃ ."
 
 "Do you want to overwrite it?"
 1
@@ -59,7 +59,7 @@
 
 " is actually linked to "
 1
-(iso->utf8 " è già collegato a ")
+" Ã¨ giÃ  collegato a "
 
 "Do you want to remove the link?"
 1
@@ -67,7 +67,7 @@
 
 "Can't link "
 1
-(iso->utf8 "È impossibile collegare ")
+"Ãˆ impossibile collegare "
 
 " to "
 1
@@ -79,11 +79,11 @@
 
 " can only be mapped in ["
 1
-(iso->utf8 " può essere mappato soltanto in [")
+" puÃ² essere mappato soltanto in ["
 
 " will be linked to "
 1
-(iso->utf8 " verrà collegato a ")
+" verrÃ  collegato a "
 
 "Are you sure?"
 1
@@ -91,7 +91,7 @@
 
 "\nNOTE: a previously established link will be removed."
 1
-(iso->utf8 "\nNOTA: verrà rimosso un precedente collegamento.")
+"\nNOTA: verrÃ  rimosso un precedente collegamento."
 
 "Save frame "
 1
@@ -209,13 +209,9 @@
 1
 "Seleziona il filmato "
 
-"This version supports only AVI and MP4/MOV movies"
+": movie not supported"
 1
-"Questa versione supporta solo filmati AVI e MP4/MOV"
-
-": not recognized as a movie"
-1
-": filmato non riconosciuto"
+": filmato non supportato"
 
 "Creation of file `"
 1
@@ -223,7 +219,7 @@
 
 "' failed."
 1
-(iso->utf8 "' è fallita.")
+"' Ã¨ fallita."
 
 "select movie 1"
 1
@@ -243,7 +239,7 @@
 
 "supervisor mode on/off"
 1
-(iso->utf8 "modalità supervisore on/off")
+"modalitÃ  supervisore on/off"
 
 "audio tracks"
 1
@@ -319,7 +315,7 @@
 
 "obsolete path will be deleted."
 1
-(iso->utf8 "path obsoleto verrà cancellato.")
+"path obsoleto verrÃ  cancellato."
 
 "obsolete paths will be deleted."
 1
@@ -327,7 +323,7 @@
 
 "1 obsolete data will be deleted."
 1
-(iso->utf8 "1 dato obsoleto verrà cancellato.")
+"1 dato obsoleto verrÃ  cancellato."
 
 " obsolete data will be deleted."
 1
@@ -339,11 +335,11 @@
 
 "The current operation will be aborted."
 1
-(iso->utf8 "L'operazione in corso verrà interrotta.")
+"L'operazione in corso verrÃ  interrotta."
 
 "1 failed check will be deleted."
 1
-(iso->utf8 "1 controllo fallito verrà cancellato.")
+"1 controllo fallito verrÃ  cancellato."
 
 " failed checks will be deleted."
 1
@@ -367,7 +363,7 @@
 
 "It seems like the audio track contains extraneous data. Please fix it."
 1
-(iso->utf8 "Sembra che la traccia audio contenga dati estranei. È consigliabile ripararla.")
+"Sembra che la traccia audio contenga dati estranei. Ãˆ consigliabile ripararla."
 
 "Please, select a frame rate"
 1
@@ -411,7 +407,7 @@
 
 "Audio track successfully saved as `"
 1
-(iso->utf8 "La traccia audio è stata salvata con successo come `")
+"La traccia audio Ã¨ stata salvata con successo come `"
 
 "I/O error."
 1

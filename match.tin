@@ -64,11 +64,11 @@
         (set u (map-undef1 m))
         (while (> (length u) 0) do
                 (set ut (queue-get u))
-                (set segfirst (= (nth 0 ut) 1))
-                (set seglast (= (nth 1 ut) (map-max1 m)))
+                (set segfirst (= <ut 0> 1))
+                (set seglast (= <ut 1> (map-max1 m)))
                 (set bound 0)
-                (set a1 (seq-threshold (match-scd1 m) (nth 0 ut) (nth 1 ut) thres1))
-                (set a2 (seq-threshold (match-scd2 m) (nth 2 ut) (nth 3 ut) thres2))
+                (set a1 (seq-threshold (match-scd1 m) <ut 0> <ut 1> thres1))
+                (set a2 (seq-threshold (match-scd2 m) <ut 2> <ut 3> thres2))
                 (set p1a 0)
                 (set p1b (- (length a1) 1))
                 (set p2a 0)
@@ -82,7 +82,7 @@
                                                  (>= mdb scd-min-avg-block-size) )
                                             (and (= p1a 0) (= best-p2 p2a) (not segfirst))
                                             (and (> (+ p1a best-d1) p1b) (> (+ best-p2 best-d2) p2b) (not seglast)) )
-                                        (match-check-and-bind alternate m (cdr (nth p1a a1)) (cdr (nth best-p2 a2)) n)
+                                        (match-check-and-bind alternate m (cdr <a1 p1a>) (cdr <a2 best-p2>) n)
                                         (inc bound n)
                                         (inc p1a best-d1)
                                         (set p2a (+ best-p2 best-d2)) )
@@ -93,15 +93,15 @@
 (defnet match-step-alternate (final-closure m ut a1 a2 segfirst seglast)
         (deflocal p1a p2a p1b p2b size1 size2 n n1 n2 score1 score2)
 
-        (set p1a (nth 0 ut))
-        (set p2a (nth 2 ut))
+        (set p1a <ut 0>)
+        (set p2a <ut 2>)
         (set p1b (- (length a1) 1))
         (set p2b (- (length a2) 1))
-        (set size1 (- (nth 1 ut) p1a -1))
-        (set size2 (- (nth 3 ut) p2a -1))
+        (set size1 (- <ut 1> p1a -1))
+        (set size2 (- <ut 3> p2a -1))
         (set n (min size1 size2))
-        (set n1 (min (car (nth 0 a1)) (car (nth 0 a2))))
-        (set n2 (min (car (nth p1b a1)) (car (nth p2b a2))))
+        (set n1 (min (car <a1 0>) (car <a2 0>)))
+        (set n2 (min (car <a1 p1b>) (car <a2 p2b>)))
         (alt    (seq    (= size1 size2)
                         (if final-closure
                         then    (msg-log m (+ "\nfinal closure: ["
@@ -165,8 +165,8 @@
                 (set d1 p1)
                 (set d2 p2a)
                 (set n 0)
-                (repeat (set x1 (car (nth d1 a1)))
-                        (set x2 (car (nth d2 a2)))
+                (repeat (set x1 (car <a1 d1>))
+                        (set x2 (car <a2 d2>))
                         (if (= x1 x2)
                         then    (inc d1)
                                 (inc d2)
@@ -206,7 +206,7 @@
 
         (set sum 0)
         (set @n 0)
-        (repeat (inc sum (car (nth p1 a)))
+        (repeat (inc sum (car <a p1>))
                 (<= sum target)
                 (inc @n)
                 until (= sum target)
@@ -276,10 +276,6 @@
 (defnet match-create (name1 name2 av1 av2 scd1 scd2 th-main pix default-info @m)
         (deflocal frm1 frm2 pix1 pix2 k params v)
 
-        (av-seek-frame av1 0)
-        (av-skip-frame av1)
-        (av-seek-frame av2 0)
-        (av-skip-frame av2)
         (set params (assoc))
         (for k in [ "init-scd-threshold"
                     "min-scd-threshold"
@@ -296,14 +292,14 @@
                     "filter-gamma1"
                     "filter-gamma2"
                   ] do
-                (assoc-set params k (cfg-get-or-default-num k default-info)) )
+                (set <params k> (cfg-get-or-default-num k default-info)) )
         (for k in [ "filter-mirror1"
                     "filter-flip1"
                     "filter-mirror2"
                     "filter-flip2"
                     "sift-draw-lines"
                   ] do
-                (assoc-set params k (cfg-get-or-default k default-info)) )
+                (set <params k> (cfg-get-or-default k default-info)) )
         (set pix1 (cfg-get-or-default "sift-scale" default-info))
         (set pix2 (cfg-get-or-default-num "sift-scale-pixels" default-info))
         (match-create-frm av1 frm1 pix1 pix2)
@@ -315,16 +311,16 @@
         (set @m (array 26))
         (set k (cfg-get (key-sck av1 av2 name1 name2)))
         (if (<> k undef)
-        then    (set <@m  0> (nth 0 k))
-                (set <@m  1> (nth 1 k))
-                (set <@m  6> (nth 2 k))
-                (set <@m  7> (nth 3 k))
-                (set <@m  8> (nth 4 k))
-                (set <@m  9> (nth 5 k))
+        then    (set <@m  0> <k 0>)
+                (set <@m  1> <k 1>)
+                (set <@m  6> <k 2>)
+                (set <@m  7> <k 3>)
+                (set <@m  8> <k 4>)
+                (set <@m  9> <k 5>)
                 (if (= (length k) 8)
-                then    (set <@m 23> (nth 6 k))
-                        (set <@m 24> (nth 7 k))
-                else    ; FIXME qui andrebbero ricalcolate le luminosita`
+                then    (set <@m 23> <k 6>)
+                        (set <@m 24> <k 7>)
+                else    ; FIXME qui andrebbero ricalcolate le luminosità
                         ; dei frame che hanno un res intero
                         (set <@m 23> 0)
                         (set <@m 24> 0) )
@@ -356,8 +352,8 @@
         (set <@m 25> false)
         (set k (cfg-get (key-map av1 av2 name1 name2)))
         (if (<> k undef)
-        then    (for k in (nth 2 k) do
-                        (map-bind @m (nth 0 k) (nth 1 k) (nth 2 k)) )))
+        then    (for k in <k 2> do
+                        (map-bind @m <k 0> <k 1> <k 2>) )))
 
 (defnet match-create-frm (av @frm sift-scale sift-scale-pixels)
         (deflocal w h k)
@@ -375,8 +371,8 @@
         (if store
         then    (cfg-set (key-sck (match-av1 m) (match-av2 m)
                                   (match-name1 m) (match-name2 m) )
-                         (list (match-cache m) (match-passed m) (nth 6 m) (nth 7 m)
-                               (nth 8 m) (nth 9 m) (nth 23 m) (nth 24 m) ))
+                         (list (match-cache m) (match-passed m) <m 6> <m 7>
+                               <m 8> <m 9> <m 23> <m 24> ))
                 (cfg-set (key-map (match-av1 m) (match-av2 m)
                                   (match-name1 m) (match-name2 m) )
                          (list (- (length (match-scd1 m)) 1)
@@ -414,14 +410,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun match-cache (m) (nth 0 m))
-(defun match-passed (m) (nth 1 m))
-(defun match-av1 (m) (nth 2 m))
-(defun match-av2 (m) (nth 3 m))
-(defun match-frm1 (m) (nth 4 m))
-(defun match-frm2 (m) (nth 5 m))
-(defun match-rx (m) (/ (nth 7 m) (nth 6 m)))
-(defun match-ry (m) (/ (nth 9 m) (nth 8 m)))
+(defun match-cache (m) <m 0>)
+(defun match-passed (m) <m 1>)
+(defun match-av1 (m) <m 2>)
+(defun match-av2 (m) <m 3>)
+(defun match-frm1 (m) <m 4>)
+(defun match-frm2 (m) <m 5>)
+(defun match-rx (m) (/ <m 7> <m 6>))
+(defun match-ry (m) (/ <m 9> <m 8>))
 (defun match-width1 (m) (width (match-av1 m)))
 (defun match-height1 (m) (height (match-av1 m)))
 (defun match-width2 (m) (width (match-av2 m)))
@@ -432,20 +428,20 @@
 (defun match-vcorrection (m)
         (/ (/ (match-height2 m) (height (match-frm2 m)))
            (/ (match-height1 m) (height (match-frm1 m))) ))
-(defun match-map (m) (nth 10 m))
-(defun match-th-main (m) (nth 11 m))
-(defun match-th-sift1 (m) (nth 12 m))
-(defun match-th-sift2 (m) (nth 13 m))
-(defun match-name1 (m) (nth 14 m))
-(defun match-name2 (m) (nth 15 m))
-(defun match-pix1 (m) (nth 16 m))
-(defun match-pix2 (m) (nth 17 m))
-(defun match-pix (m) (nth 18 m))
-(defun match-map-step (m) (nth 19 m))
-(defun match-scd1 (m) (nth 20 m))
-(defun match-scd2 (m) (nth 21 m))
-(defun match-params (m key) (assoc-get (nth 22 m) key))
-(defun match-abort (m) (nth 25 m))
+(defun match-map (m) <m 10>)
+(defun match-th-main (m) <m 11>)
+(defun match-th-sift1 (m) <m 12>)
+(defun match-th-sift2 (m) <m 13>)
+(defun match-name1 (m) <m 14>)
+(defun match-name2 (m) <m 15>)
+(defun match-pix1 (m) <m 16>)
+(defun match-pix2 (m) <m 17>)
+(defun match-pix (m) <m 18>)
+(defun match-map-step (m) <m 19>)
+(defun match-scd1 (m) <m 20>)
+(defun match-scd2 (m) <m 21>)
+(defun match-params (m key) <m 22 key>)
+(defun match-abort (m) <m 25>)
 (defnet match-abort (m) (set <m 25> true))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -33,55 +33,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet is-a-supported-movie (path)
-        (deflocal f)
-
-        (set f (fopenro path))
-        (<> f undef)
-        (alt    (is-avi f)
-                (is-mp4 f)
-                (seq    (close f)
-                        (fail) ))
-        (close f) )
-
-(defnet is-avi (f)
-        (fsetpos 0 f)
-        (= (freadstr f 4) "RIFF")
-        (fsetpos 8 f)
-        (= (freadstr f 4) "AVI ") )
-
-(defnet is-mp4 (f)
-        (deflocal cnt size type)
-
-        (fsetpos 0 f)
-        (parse-mp4-box f cnt size type)
-        (>= size cnt)
-        (in type [ 0x6d6f6f76 0x66747970 ]) )
-
-(defnet parse-mp4-box (f @cnt @size @type)
-        (set @size (freaduint-be f 32))
-        (set @type (freaduint-be f 32))
-        (set @cnt 8)
-        (if (= @size 1)
-        then    (set @size (freaduint-be f 64))
-                (inc @cnt 8) )
-        (if (= @size 0)
-        then    (set @size (+ (- (length f) (fpos f)) @cnt)) )
-        (if (= @type 0x75756964) ; uuid
-        then    (set @type (freaduint-be f 64))
-                (set @type (+ (* @type (pow 2 64)) (freaduint-be f 64)))
-                (inc @cnt 16) ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defun key-scd (av name)
         (+ "scd-" (key-basic av name)) )
 
@@ -94,43 +45,8 @@
 (defun key-basic (av name)
         (gcry-sha1sum-fast (+ (int->str (width av) 5 '0')
                               (int->str (height av) 5 '0')
-                              (int->str (av-index-entries av) 6 '0')
+                              (int->str (av-approximated-number-of-frames av) 6 '0')
                               name )))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet read-frame (av pos pix)
-        (deflocal p)
-
-        (if (= (av-pts av) (- pos 1))
-        then    (av-read-frame av pix)
-                (= (av-pts av) pos)
-        else    (set p pos)
-                (repeat until (= p 0)
-                        until (and (av-index-keyframe av p) (not (av-index-keyframe av (- p 1))))
-                        (inc p -1) )
-                (av-seek-frame av p)
-                (av-skip-frame av (- pos p))
-                (av-read-frame av pix)
-                (if (<> (av-pts av) pos)
-                then    (repeat (av-seek-frame av p)
-                                (repeat (av-read-frame av pix)
-                                        until (>= (av-pts av) pos)
-                                        (set p 0) )
-                                until (= (av-pts av) pos)
-                                (> p 0)
-                                (inc p -1)
-                                (repeat until (= p 0)
-                                        until (av-index-keyframe av p)
-                                        (inc p -1) )))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

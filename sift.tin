@@ -15,7 +15,7 @@
         (not (match-abort m))
         (set cache (match-cache m))
         (set key (+ (int->str p1 6 '0') (int->str p2 6 '0')))
-        (set @score (assoc-get cache key))
+        (set @score <cache key>)
         (if (= @score undef)
         then    (sift-check-basic alternate m p1 p2 cache key @score) )
         (if (booleanp @score)
@@ -71,7 +71,7 @@
                 (seq    (close filt1 filt2)
                         (fail) ))
         (close filt1 filt2)
-        (assoc-set cache key @score)
+        (set <cache key> @score)
         (if (booleanp @score)
         then    (if @score
                 then    (inc <m 1>)
@@ -93,14 +93,14 @@
 (defnet sift-check-too-few-keypoints (m p1 p2 filt1 filt2 k1 k2 dlum @score)
         (if (< (max k1 k2) (match-params m "min-keypoints"))
         then    (set @score true)
-        else    (if (< (nth 23 m) 40)
+        else    (if (< <m 23> 40)
                 then    (msg-log m (+ "delayed (dlum=" (approx3 dlum) ")" nl))
                         (fail) )
-                (if (> (abs (- dlum (/ (nth 24 m) (nth 23 m)))) (match-params m "min-keypoints-min-ratio-lum"))
+                (if (> (abs (- dlum (/ <m 24> <m 23>))) (match-params m "min-keypoints-min-ratio-lum"))
                 then    (set @score false)
                 else    (set @score (>= (/ (min k1 k2) (max k1 k2)) (match-params m "min-keypoints-min-ratio"))) ))
         (msg-log m (+ "too few keypoints (" k1 "," k2 ": " @score ") - dlum: "
-                      (approx3 dlum) " (avg: " (approx3 (/ (nth 24 m) (nth 23 m))) ")" nl )))
+                      (approx3 dlum) " (avg: " (approx3 (/ <m 24> <m 23>)) ")" nl )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -123,7 +123,7 @@
                 (if (= (min nx ny) 0)
                 then    (set @score false)
                         (msg-log m (+ "too few agreements (" nx "," ny ")" nl))
-                else    (if (and (= (min (nth 6 m) (nth 8 m)) 0)
+                else    (if (and (= (min <m 6> <m 8>) 0)
                                  (< (min bnx bny) (match-params m "sift-agreements-min")) )
                         then    (msg-log m (+ "delayed (" bnx "," bny ")" nl))
                                 (fail) )
@@ -133,8 +133,8 @@
                         (set avgy (/ sumry bny))
                         (msg-log m (+ "x -> " bnx " (" (approx2 (/ bnx nx 0.01)) "%): " (approx3 avgx) nl
                                       "y -> " bny " (" (approx2 (/ bny ny 0.01)) "%): " (approx3 avgy) nl ))
-                        (set rx (if (= (nth 6 m) 0) avgx (match-rx m)))
-                        (set ry (if (= (nth 8 m) 0) avgy (match-ry m)))
+                        (set rx (if (= <m 6> 0) avgx (match-rx m)))
+                        (set ry (if (= <m 8> 0) avgy (match-ry m)))
                         (if (or (< (/ (min avgx rx) (max avgx rx))
                                    (match-params m "sift-proportionality-threshold") )
                                 (< (/ (min avgy ry) (max avgy ry))
@@ -150,9 +150,9 @@
                                 (inc <m 24> (approximate dlum))
                                 (if (>= (min bnx bny) (match-params m "sift-agreements-min"))
                                 then    (inc <m 6> bnx)
-                                        (set <m 7> (approximate (+ (nth 7 m) sumrx)))
+                                        (set <m 7> (approximate (+ <m 7> sumrx)))
                                         (inc <m 8> bny)
-                                        (set <m 9> (approximate (+ (nth 9 m) sumry))) )))))
+                                        (set <m 9> (approximate (+ <m 9> sumry))) )))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -165,7 +165,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet sift-read-frame (m av p frm)
-        (alt    (read-frame av p frm)
+        (alt    (av-read-frame av frm p)
                 (seq    (pix-clear frm)
                         (msg-log m (+ "\n\n\nwarning: can't read frame " p nl nl nl)) )))
 
@@ -180,17 +180,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet sift-analyze (matches @nx @ny @bnx @bny @sumrx @sumry @deltax @deltay)
-        (deflocal i)
+        (deflocal l)
 
-        (set i (sift-analyze matches))
-        (set @nx     (car i)) (set i (cdr i))
-        (set @ny     (car i)) (set i (cdr i))
-        (set @bnx    (car i)) (set i (cdr i))
-        (set @bny    (car i)) (set i (cdr i))
-        (set @sumrx  (car i)) (set i (cdr i))
-        (set @sumry  (car i)) (set i (cdr i))
-        (set @deltax (car i)) (set i (cdr i))
-        (set @deltay (car i)) )
+        (set l (sift-analyze matches))
+        (list-pop l @nx)
+        (list-pop l @ny)
+        (list-pop l @bnx)
+        (list-pop l @bny)
+        (list-pop l @sumrx)
+        (list-pop l @sumry)
+        (list-pop l @deltax)
+        (list-pop l @deltay) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
