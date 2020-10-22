@@ -673,7 +673,7 @@
                         (> n 0)
                         (set n (av-approximated-number-of-frames av))
                         (integerp n)
-                        (>= n 10) )
+                        (>= n 3) )
                 (seq    (close av)
                         (gtk-message-error win (+ path $": movie not supported"))
                         (fail) ))
@@ -840,7 +840,7 @@
         (set av <info "av1">)
         (<> av undef)
         (set key (key-scd av (fullpath->name <info "path1">)))
-        (= (cfg-exists key) true)
+        (truep (cfg-exists key))
         (gtk-question <info "w-win">
                 (+ $"The \"scd\" data for movie 1 will be deleted." nl $"Are you sure?") )
         (cfg-clr key)
@@ -852,11 +852,21 @@
         (set av <info "av2">)
         (<> av undef)
         (set key (key-scd av (fullpath->name <info "path2">)))
-        (= (cfg-exists key) true)
+        (truep (cfg-exists key))
         (gtk-question <info "w-win">
                 (+ $"The \"scd\" data for movie 2 will be deleted." nl $"Are you sure?") )
         (cfg-clr key)
         (gui-update info) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-clear-sck (info)
         (deflocal av1 av2 key)
@@ -868,11 +878,21 @@
         (set key (key-sck av1 av2
                 (fullpath->name <info "path1">)
                 (fullpath->name <info "path2">) ))
-        (= (cfg-exists key) true)
+        (truep (cfg-exists key))
         (gtk-question <info "w-win">
                 (+ $"The \"sift check\" data will be deleted." nl $"Are you sure?") )
         (cfg-clr key)
         (gui-update info) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-clear-failed-sck (info)
         (deflocal win av1 av2 key sck cache i)
@@ -901,6 +921,16 @@
         (cfg-set key sck)
         (gui-report info) )
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defnet gui-clear-map (info)
         (deflocal av1 av2 key)
 
@@ -911,12 +941,22 @@
         (set key (key-map av1 av2
                 (fullpath->name <info "path1">)
                 (fullpath->name <info "path2">) ))
-        (= (cfg-exists key) true)
+        (truep (cfg-exists key))
         (gtk-question <info "w-win">
                 (+ $"The \"mapping\" data will be deleted." nl $"Are you sure?") )
         (cfg-clr key)
         (gui-report info)
         (gui-update info) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-clear-paths (info)
         (deflocal win q l)
@@ -940,6 +980,16 @@
 (defnet gui-clear-paths-cback (q path)
         (if (not (pathexists path))
         then    (queue-put q (sqlite3-escape-strings path)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-clear-data-and-vacuum (info)
         (deflocal win a q l)
@@ -996,6 +1046,16 @@
                         then    (queue-put q key) )
                 "map-"  (if (or (not (in code1 a)) (not (in code2 a)))
                         then    (queue-put q key) )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-clear-text1 (info)
         (gtk-text-buffer-set-text <info "w-text1"> "")

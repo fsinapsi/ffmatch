@@ -18,7 +18,7 @@
         (set @v (cfg-get key))
         (if (<> @v undef)
         then    (set @v <@v 4>)
-        else    (scdscan-basic th-main name av pix default-info @v)
+        else    (scdscan-low th-main name av pix default-info @v)
                 (cfg-set key (list (width av) (height av) (av-approximated-number-of-frames av) name @v)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -31,56 +31,92 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet scdscan-basic (th-main name av pix default-info @v)
-        (deflocal abort l l1 frm pix1 pix2 gamma1 gamma2 k val frameno t)
+(defnet scdscan-low (th-main name av pix default-info @v)
+        (deflocal th-read-frame abort l l1 frm pix1 pix2 gamma1 gamma2 idx val frameno t)
 
-        (set abort false)
         (av-seek-frame av 0)
 
         (set l (av-approximated-number-of-frames av))
         (set l1 (- l 1))
 
-        (set frm (array 2))
+        (set frm (array 3))
         (set <frm 0> (pix-create (width av) (height av)))
         (set <frm 1> (pix-create (width av) (height av)))
+        (set <frm 2> (pix-create (width av) (height av)))
 
-        (set k (min (/ (- (width pix) (* 2 (space))) (width av))
-                    (/ (- (height pix) (* 3 (space))) 2 (height av)) ))
+        (set val (min (/ (- (width pix) (* 2 (space))) (width av))
+                      (/ (- (height pix) (* 3 (space))) 2 (height av)) ))
 
-        (set pix1 (pix-create (* k (width av)) (* k (height av))))
-        (set pix2 (pix-create (* k (width av)) (* k (height av))))
+        (set pix1 (pix-create (* val (width av)) (* val (height av))))
+        (set pix2 (pix-create (* val (width av)) (* val (height av))))
 
         (set gamma1 (cfg-get-or-default-num "filter-gamma1" default-info))
         (set gamma2 (cfg-get-or-default-num "filter-gamma2" default-info))
 
         (set @v (array default 0 l1))
 
-        (set k 0)
+        (set th-read-frame (thread-create (netptr scdscan-read-frame-th) av (thread-self)))
+        (<> th-read-frame undef)
+
         (set t (now))
-        (av-read-frame av <frm k>)
-        (opt*   (not abort)
-                (set k (- 1 k))
-                (av-read-frame av <frm k>)
+
+        (send <frm 0> to th-read-frame)
+        (receive val from th-read-frame)
+        (send <frm 1> to th-read-frame)
+        (set idx 1)
+        (set abort false)
+        (repeat (receive val from th-read-frame)
+                until (not val)
                 (set frameno (av-frameno av))
-                (if (< frameno l1)
-                then    (set val (pix-scd-histogram <frm k> <frm (- 1 k)>))
-                        (set <@v frameno> val)
-                        (if (>= val 0.3)
-                        then    (pix-copy-frames pix <frm (- 1 k)> <frm k> pix1 pix2 gamma1 gamma2)
-                                (alt    (scdscan-draw-image th-main)
-                                        (set abort true) )))
+                until (>= frameno l1)
+                (if (not (av-is-frame-recoverable av))
+                then    (sendbuf 100 [ "p2" . "irregular timestamps not supported (read the docs)...\n" ] to th-main)
+                        (set abort true) )
+                (opt    (receivenb abort from th-main)
+                        (set abort true) )
+                until abort
+                (send <frm (scdscan-succ idx)> to th-read-frame)
+                (set val (pix-scd-histogram <frm (scdscan-prec idx)> <frm idx>))
+                (set <@v frameno> val)
+                (if (>= val 0.3)
+                then    (pix-copy-frames pix <frm (scdscan-prec idx)> <frm idx> pix1 pix2 gamma1 gamma2)
+                        (alt    (scdscan-draw-image th-main)
+                                (set abort true) ))
                 (if (= (% frameno 100) 0)
                 then    (sendbuf 100 (cons "c1" (+ "frame " frameno "/" l " (" (rint (/ frameno (- (now) t)))
                                                    " fps) (" (rint (/ frameno l 0.01)) "%)" ))
                                  to th-main ))
-                (alt    (seq    (receivenb abort from th-main)
-                                (set abort true) )
-                        (if (not (av-is-frame-recoverable av))
-                        then    (sendbuf 100 (cons "p2" "irregular timestamps not supported (read the docs)...\n") to th-main)
-                                (set abort true) )))
-        (close pix1 pix2 <frm 0> <frm 1>)
+                (set idx (scdscan-succ idx)) )
+
+        (close pix1 pix2 <frm 0> <frm 1> <frm 2>)
+        (send undef to th-read-frame)
+        (thread-join th-read-frame)
         (not abort)
         (sendbuf 100 (cons "c1" (+ "frame " l "/" l " (" (rint (/ frameno (- (now) t))) " fps) (100%)")) to th-main) )
+
+(defun scdscan-succ (idx) (% (+ idx 1) 3))
+
+(defun scdscan-prec (idx) (% (- idx 1) 3))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet scdscan-read-frame-th (av client)
+        (deflocal pix res)
+
+        (repeat (receive pix from client)
+                until (= pix undef)
+                (alt    (seq    (av-read-frame av pix)
+                                (set res true) )
+                        (set res false) )
+                (send res to client) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
