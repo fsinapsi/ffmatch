@@ -316,8 +316,6 @@
         (set hb (gtk-hbox-new false 0))
         (gtk-box-pack-start vb hb false false 0)
 
-                (gtk-box-pack-start hb (gtk-label-new "") true false 0)
-
                 (set w (gtk-combo-box-text-new))
                 (gtk-box-pack-start hb w false false 0)
                 (set text (array 0))
@@ -330,7 +328,7 @@
                 (set w (gtk-spin-button-new-with-range 1 100000 1))
                 (gtk-spin-button-set-value w 0)
                 (gtk-spin-button-set-numeric w true)
-                (gtk-box-pack-start hb w false false 4)
+                (gtk-box-pack-start hb w true true 4)
                 (gtk-signal-connect w "value-changed" (netptr supervision-pix-with-check) info)
                 (set <info "w-spin1"> w)
 
@@ -367,7 +365,7 @@
                 (set w (gtk-spin-button-new-with-range 1 100000 1))
                 (gtk-spin-button-set-value w 0)
                 (gtk-spin-button-set-numeric w true)
-                (gtk-box-pack-start hb w false false 4)
+                (gtk-box-pack-start hb w true true 4)
                 (gtk-signal-connect w "value-changed" (netptr supervision-pix-with-check) info)
                 (set <info "w-spin2"> w)
 

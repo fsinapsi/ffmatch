@@ -8,14 +8,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet th-sift-features (th)
-        (deflocal pix filt)
+(defnet th-sift-features (th frm)
+        (deflocal filt)
 
-        (repeat (receive pix from th)
-                until (not (pixp pix))
-                (set filt (vl-sift-new (width pix) (height pix) -1 3 -1))
-                (vl-sift-match-descr filt pix)
-                (send filt to th) ))
+        (set filt (vl-sift-new (width frm) (height frm) -1 3 0)) ; -1
+        (repeat (receive frm from th)
+                until (not (pixp frm))
+                (vl-sift-match-descr filt frm)
+                (send filt to th) )
+        (close filt) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
