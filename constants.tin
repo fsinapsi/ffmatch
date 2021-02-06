@@ -31,7 +31,7 @@
           [ "sift-agreements-min" . 12000 ]
           [ "sift-proportionality-threshold" . 0.9 ]
           [ "sift-scale" . true ]
-          [ "sift-scale-pixels" . (* 250 250) ]
+          [ "sift-scale-pixels" . (* 500 250) ]
           [ "filter-gamma1" . 1 ]
           [ "filter-mirror1" . false ]
           [ "filter-flip1" . false ]
@@ -40,6 +40,7 @@
           [ "filter-flip2" . false ]
           [ "sift-draw-lines" . true ]
           [ "supervision-skip-double" . 10 ]
+          [ "match-scale" . true ]
           ])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

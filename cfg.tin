@@ -344,6 +344,15 @@
                 (gtk-spin-button-set-value w (cfg-get-or-default-num "supervision-skip-double" default-info))
                 (gtk-spin-button-set-numeric w true)
 
+                (set hb2 (gtk-hbox-new false 5))
+                (cfg-setup-frame hb hb2 $"Scaling")
+
+                        (set w (gtk-check-button-new $"enabled"))
+                        (set <cfg-info "tb-match-scale"> w)
+                        (gtk-toggle-button-set-active w (cfg-get-or-default "match-scale" default-info))
+                        (gtk-box-pack-start hb2 w false false 0)
+                        (gtk-signal-connect w "toggled" (netptr cfg-scale-toggled) cfg-info)
+
         (set hb (gtk-hbox-new false 5))
         (gtk-box-pack-start vb hb false false 0)
 
@@ -460,6 +469,7 @@
         (cfg-set "filter-flip2" (gtk-toggle-button-get-active <cfg-info "tb-filter-flip2">))
         (cfg-set "sift-draw-lines" (gtk-toggle-button-get-active <cfg-info "tb-sift-draw-lines">))
         (cfg-set "supervision-skip-double" (gtk-spin-button-get-value <cfg-info "sb-supervision-skip-double">))
+        (cfg-set "match-scale" (gtk-toggle-button-get-active <cfg-info "tb-match-scale">))
         (set old-lang (lang))
         (set new-lang (gtk-combo-box-get-active <cfg-info "cb-languages">))
         (cfg-set "lang" new-lang)
