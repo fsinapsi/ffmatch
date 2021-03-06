@@ -131,7 +131,9 @@
         (gtk-box-pack-start vb fc true true 0)
         (gtk-file-chooser-set-show-hidden fc true)
 
-        (set path (cfg-get "path"))
+        (set path (cfg-get "audio-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
         (repeat until (= path undef)
                 (alt    (seq    (pathexists path)
                                 (if (isdir path)
@@ -177,6 +179,7 @@
         (set info <info 3>)
         (set f (fopenro path))
         (<> f undef)
+        (cfg-set "audio-path" path)
         (set audio-info <info "audio-info">)
         (alt    (audio-open-ok-wav f win which audio-info duration)
                 (audio-open-ok-compressed f win which audio-info duration)
@@ -197,18 +200,18 @@
 
         (fsetpos 0 f)
         (= (freadstr f 4) "RIFF")
-        (fsetpos 8 f)
+        (skip (freaduint-le f 32))
         (= (freadstr f 8) "WAVEfmt ")
         (set offset (freaduint-le f 32))
         (>= offset 16)
-        (= (freaduint-le f 16) 1) ; PCM/uncompressed
+        (skip (freaduint-le f 16)) ;(= (freaduint-le f 16) 1) ; PCM/uncompressed
         (set ch (freaduint-le f 16))
         (set freq (freaduint-le f 32))
         (skip (freaduint-le f 32))
         (set smplsize (freaduint-le f 16))
-        (skip (freaduint-le f 16))
-        (fsetpos (+ (fpos f) offset -16) f)
-        (= (freadstr f 4) "data")
+        (fsetpos (+ offset 20) f)
+        (while (<> (freadstr f 4) "data") do
+                (fsetpos (+ (fpos f) (freaduint-le f 32)) f) )
         (skip (freaduint-le f 32))
         (set offset (fpos f))
         (set smpl (div (- (length f) offset) smplsize))
@@ -317,7 +320,7 @@
         (gtk-box-pack-start vb fc true true 0)
         (gtk-file-chooser-set-show-hidden fc true)
 
-        (set path (cfg-get "path"))
+        (set path (cfg-get "audio-path"))
         (opt    (not (isdir path))
                 (search "/" path i (maxint))
                 (set path (sub 0 (+ i 1) path)) )

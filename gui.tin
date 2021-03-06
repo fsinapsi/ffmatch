@@ -223,12 +223,6 @@
                 btn-info
                 "abort" )
 
-        (gui-setup-toggle-button info $"supervisor mode on/off" @w
-                (pix-load-static "icons/22x22/document-edit.png")
-                (netptr supervision)
-                btn-info
-                "supervision" )
-
         (gui-setup-button info $"audio tracks" @w
                 (pix-load-static "icons/22x22/audio-headset.png")
                 (netptr audio)
@@ -459,7 +453,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-update (info)
-        (deflocal menu-info btn-info av1 av2 name1 name2 running both-selected
+        (deflocal menu-info btn-info av1 av2 name1 name2 running
                   supervision map-exists i)
 
         (set menu-info <info "w-menu-bar">)
@@ -467,17 +461,16 @@
         (set av1 <info "av1">)
         (set av2 <info "av2">)
         (set running (<> <info "th"> undef))
-        (set both-selected (and (not running) (<> av1 undef) (<> av2 undef)))
-        (set supervision <info "supervision">)
-        (if supervision
-        then    (gtk-widget-show <info "w-supervision-toolbar">)
-        else    (gtk-widget-hide <info "w-supervision-toolbar">) )
+        (set supervision (and (not running) (<> av1 undef) (<> av2 undef)))
+        (if (and supervision (not <info "supervision">))
+        then    (supervision-pix info) )
+        (set <info "supervision"> supervision)
         (set map-exists false)
         (if (not running)
         then    (set name1 (fullpath->name <info "path1">))
                 (set name2 (fullpath->name <info "path2">))
                 (set map-exists (cfg-exists (key-map av1 av2 name1 name2)))
-                (gtk-widget-set-sensitive <menu-info "swap-order"> both-selected)
+                (gtk-widget-set-sensitive <menu-info "swap-order"> supervision)
                 (gtk-widget-set-sensitive <menu-info "clear-scd1">
                         (if (= av1 undef) false (cfg-exists (key-scd av1 name1))) )
                 (gtk-widget-set-sensitive <menu-info "clear-scd2">
@@ -501,13 +494,12 @@
                 (gtk-widget-set-sensitive <menu-info "print-selected">
                         (or (<> av1 undef) (<> av2 undef)) ))
         (gtk-widget-set-sensitive <info "w-menu"> (not running))
-        (gtk-widget-set-sensitive <info "w-supervision-toolbar"> (not running))
+        (gtk-widget-set-sensitive <info "w-supervision-toolbar"> (and (not running) supervision))
         (gtk-widget-set-sensitive <btn-info "open1"> (not running))
         (gtk-widget-set-sensitive <btn-info "open2"> (not running))
-        (gtk-widget-set-sensitive <btn-info "start"> both-selected)
+        (gtk-widget-set-sensitive <btn-info "start"> supervision)
         (gtk-widget-set-sensitive <btn-info "abort">
                 (and running (not <info "abort">)) )
-        (gtk-widget-set-sensitive <btn-info "supervision"> both-selected)
         (gtk-widget-set-sensitive <btn-info "audio"> map-exists)
         (gtk-widget-set-sensitive <btn-info "prefs"> (not running)) )
 
