@@ -8,10 +8,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun w () 400)
-(defun h () 500)
 (defun fc-width () 800)
 (defun fc-height () 600)
+(defun zoom-step () 1.1)
 (defun space () 10)
 (defun framerates () [ 25 (/ 24000 1001) 24 ])
 (defun default-parameters ()
@@ -33,14 +32,22 @@
           [ "sift-scale" . true ]
           [ "sift-scale-pixels" . (* 500 250) ]
           [ "filter-gamma1" . 1 ]
-          [ "filter-mirror1" . false ]
-          [ "filter-flip1" . false ]
           [ "filter-gamma2" . 1 ]
+          [ "filter-mirror1" . false ]
           [ "filter-mirror2" . false ]
+          [ "filter-flip1" . false ]
           [ "filter-flip2" . false ]
+          [ "filter-rotate1" . 0 ]
+          [ "filter-rotate2" . 0 ]
           [ "sift-draw-lines" . true ]
           [ "supervision-skip-double" . 10 ]
           [ "match-scale" . true ]
+          [ "scd-display-enabled" . true ]
+          [ "cuvid-enabled" . false ]
+          [ "vlfeat-first-octave-idx" . 0 ]
+          [ "vlfeat-nlevels-per-octave" . 3 ]
+          [ "vlfeat-peak-threshold" . 0 ]
+          [ "vlfeat-edge-threshold" . 10 ]
           ])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

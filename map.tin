@@ -36,12 +36,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun map-max1 (m)
-        (map-max-basic (car (match-map m))) )
+        (map-max-low (car (match-map m))) )
 
 (defun map-max2 (m)
-        (map-max-basic (cdr (match-map m))) )
+        (map-max-low (cdr (match-map m))) )
 
-(defun map-max-basic (map)
+(defun map-max-low (map)
         <map -1 1> )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -55,13 +55,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun map-free1 (m)
-        (map-free-basic (map-undef1 m)) )
+        (map-free-low (map-undef1 m)) )
 
 (defun map-free2 (m)
-        (map-free-basic (map-undef2 m)) )
+        (map-free-low (map-undef2 m)) )
 
-(defun map-free-basic (u) net map-free-basic)
-(defnet map-free-basic (u @n)
+(defun map-free-low (u) net map-free-low)
+(defnet map-free-low (u @n)
         (deflocal ut)
 
         (set @n 0)
@@ -82,10 +82,10 @@
 (defnet map-bind (m p q n)
         (array-append (match-map-step m) (list p q n))
         (set m (match-map m))
-        (map-bind-basic (car m) p q n)
-        (map-bind-basic (cdr m) q p n) )
+        (map-bind-low (car m) p q n)
+        (map-bind-low (cdr m) q p n) )
 
-(defnet map-bind-basic (map p q n)
+(defnet map-bind-low (map p q n)
         (deflocal i j a aa freea freeb found)
 
         (for i in 0 .. (- (length map) 1) do
@@ -139,13 +139,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun map-undef1 (m)
-        (map-undef-basic (car (match-map m)) (cdr (match-map m))) )
+        (map-undef-low (car (match-map m)) (cdr (match-map m))) )
 
 (defun map-undef2 (m)
-        (map-undef-basic (cdr (match-map m)) (car (match-map m))) )
+        (map-undef-low (cdr (match-map m)) (car (match-map m))) )
 
-(defun map-undef-basic (map1 map2) net map-undef-basic)
-(defnet map-undef-basic (map1 map2 @q)
+(defun map-undef-low (map1 map2) net map-undef-low)
+(defnet map-undef-low (map1 map2 @q)
         (deflocal i a min max)
 
         (set @q (queue))
@@ -171,13 +171,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun map-point1 (m p)
-        (map-point-basic (car (match-map m)) p) )
+        (map-point-low (car (match-map m)) p) )
 
 (defun map-point2 (m p)
-        (map-point-basic (cdr (match-map m)) p) )
+        (map-point-low (cdr (match-map m)) p) )
 
-(defun map-point-basic (map p) net map-point-basic)
-(defnet map-point-basic (map p @q)
+(defun map-point-low (map p) net map-point-low)
+(defnet map-point-low (map p @q)
         (deflocal i a found)
 
         (set found false)
@@ -200,25 +200,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet map-report (m)
-        (map-report-basic (match-th-main m) (match-map m)
+        (map-report-low (match-th-main m) (match-map m)
                 (match-name1 m) (match-name2 m)
                 (match-rx m) (match-ry m)
                 (length (match-cache m)) (match-passed m) ))
 
-(defnet map-report-basic (target map name1 name2 rx ry nchecks npassed)
+(defnet map-report-low (target map name1 name2 rx ry nchecks npassed)
         (deflocal ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q hd prv i)
 
         (if (listp target)
         then    (set ab (cdr target))
                 (set target (car target)) )
-        (set map-max1 (map-max-basic (car map)))
-        (set map-max2 (map-max-basic (cdr map)))
+        (set map-max1 (map-max-low (car map)))
+        (set map-max2 (map-max-low (cdr map)))
         (map-report-print (cons "c1" (+
                 "(1) " name1 nl
                 "(2) " name2 nl
                 nl
-                "free (1): " (map-free-basic (map-undef-basic (car map) (cdr map))) "/" map-max1 nl
-                "free (2): " (map-free-basic (map-undef-basic (cdr map) (car map))) "/" map-max2 nl
+                "free (1): " (map-free-low (map-undef-low (car map) (cdr map))) "/" map-max1 nl
+                "free (2): " (map-free-low (map-undef-low (cdr map) (car map))) "/" map-max2 nl
                 nl
                 $"checks: " nchecks $" (passed: " npassed ")" nl
                 (if (= rx undef) "" (+
@@ -228,7 +228,7 @@
                 nl )) target )
         (set wrn1 (queue))
         (set wrn2 (queue))
-        (set u (map-undef-basic (car map) (cdr map)))
+        (set u (map-undef-low (car map) (cdr map)))
         (set ut (queue-get u))
         (set map (car map))
         (for i in 1 .. (length map) do
@@ -281,10 +281,9 @@
         else    (set req (car msg))
                 (set msg (cdr msg))
                 (case req of
-                        "c1"    (gtk-text-buffer-set-text target msg)
-                        "c1c"   (gtk-text-buffer-set-text-color target (car msg) (cdr msg))
-                        "p1"    (gtk-text-buffer-append target msg)
-                        "p1c"   (gtk-text-buffer-append-color target (car msg) (cdr msg)) )))
+                        "c1"    (iup-text-set-and-go-home target msg)
+                        "p1"    (iup-text-append-and-go-home target msg)
+                        "p1c"   (iup-text-append-and-go-home-color target (car msg) (cdr msg)) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

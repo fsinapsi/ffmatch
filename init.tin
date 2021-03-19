@@ -8,13 +8,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet init (@info)
-        (set-icon "emblem-videos.ico")
-        (set @info (assoc))
-        (if (not (cli)) then (init-lang))
-        (init-parse-args @info)
-        (init-db @info)
-        (init-default @info) )
+(defglobal _kv _db)
+
+(defnet init ()
+        (set _kv (assoc))
+        (set <_kv "da-chiudere"> (queue))
+        (set <_kv "zoom-level"> 0)
+        (init-parse-args)
+        (init-db)
+        (init-default) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -26,31 +28,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet init-lang ()
-        (deflocal lang)
-
-        (set lang (gtk-get-default-language))
-        (if (lmatch lang "it")
-        then    (set-lang 1) ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet init-parse-args (info)
+(defnet init-parse-args ()
         (deflocal i p)
 
         (for i in 1 .. (- (argc) 1) do
                 (set p (argv i))
                 (alt    (seq    (lmatch remove p "--cfg=")
-                                (set <info "cfg-path"> p) )
-                        (success) )))
+                                (set <_kv "cfg-path"> p) )
+                        (seq    (iup-error60 undef (+ (utf8-validate p) $": invalid option"))
+                                (exit -1) ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -62,39 +48,38 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defglobal _db)
-
-(defnet init-db (info)
+(defnet init-db ()
         (deflocal path crea)
 
-        (set path <info "cfg-path">)
+        (set path <_kv "cfg-path">)
         (if (= path undef)
         then    (if (cmingw)
                 then    (set path (callpathp "ffmatch.cfg"))
                 else    (set path (datapath))
                         (if (= path undef)
-                        then    (gtk-message-error undef "please define the environment variable `HOME'")
+                        then    (iup-error60 undef "please define the environment variable `HOME'")
                                 (exit -1) )
                         (alt    (pathexists path)
                                 (mkdir path)
-                                (seq    (gtk-message-error undef (+ "creation of directory `" (utf8-validate path) "' failed"))
+                                (seq    (iup-error60 undef (+ "creation of directory `" (utf8-validate path) "' failed"))
                                         (exit -1) ))
                         (inc path "ffmatch.cfg") ))
         (set crea (not (pathexists path)))
         (set _db (sqlite3-open path))
         (if (= _db undef)
-        then    (gtk-message-error undef (+ "cannot open `" (utf8-validate path) "'"))
+        then    (iup-error60 undef (+ "cannot open `" (utf8-validate path) "'"))
                 (exit -1) )
+        (da-chiudere _db)
         (alt    (not crea)
                 (seq    (sqlite3-exec _db undef
                                 "CREATE TABLE config(" \
                                         "key char unique not null," \
                                         "value char not null)" )
                         (cfg-set "date-run-first" (now))
-                        (gtk-message-info undef (+ "the settings file was saved as `" (utf8-validate path) "'")) )
+                        (iup-info60 undef (+ "the settings file was saved as `" (utf8-validate path) "'")) )
                 (seq    (close _db)
                         (remove path)
-                        (gtk-message-error undef "creation of settings file failed")
+                        (iup-error60 undef "creation of settings file failed")
                         (exit -1) ))
         (cfg-set "cdate" (cdate))
         (cfg-set "date-run-last" (now))
@@ -119,11 +104,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet init-default (info)
-        (deflocal default-info)
-
-        (set default-info (assoc-default (default-parameters)))
-        (set <info "default"> default-info) )
+(defnet init-default ()
+        (set <_kv "default"> (assoc-default (default-parameters))) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

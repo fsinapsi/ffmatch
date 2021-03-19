@@ -25,6 +25,18 @@
 
 (deflang
 
+"Help"
+1
+"Aiuto"
+
+"About FFmatch"
+1
+"Info su FFmatch"
+
+": invalid option"
+1
+": opzione non valida"
+
 "Close"
 1
 "Chiudi"
@@ -289,13 +301,13 @@
 1
 "Non ci sono controlli falliti."
 
-"The \"scd\" data for movie 1 will be deleted."
+"The \"scd\" data for movie"
 1
-"I dati \"scd\" del filmato 1 verranno cancellati."
+"I dati \"scd\" del filmato"
 
-"The \"scd\" data for movie 2 will be deleted."
+"will be deleted."
 1
-"I dati \"scd\" del filmato 2 verranno cancellati."
+"verranno cancellati."
 
 "The \"sift check\" data will be deleted."
 1
@@ -325,13 +337,25 @@
 1
 " dati obsoleti verranno cancellati."
 
-"selected movie "
+"selected movie"
 1
-"selezionato filmato "
+"selezionato filmato"
+
+"resolution"
+1
+"risoluzione"
+
+"display resolution"
+1
+"risoluzione di visualizzazione"
 
 "The current operation will be aborted."
 1
 "L'operazione in corso verrà interrotta."
+
+"Aborted"
+1
+"Analisi interrotta"
 
 "1 failed check will be deleted."
 1
@@ -361,9 +385,9 @@
 1
 "Sembra che la traccia audio contenga dati estranei. È consigliabile ripararla."
 
-"Please, select a frame rate"
+"Please, select a valid frame rate"
 1
-"Seleziona un frame rate"
+"Seleziona un frame rate valido"
 
 "Please, select both audio tracks"
 1
@@ -387,7 +411,7 @@
 
 "It seems like stream lengths are inconsistent:"
 1
-"Sembra che le lunghezze degli stream siano inconsistenti"
+"Sembra che le lunghezze degli stream siano inconsistenti:"
 
 "duration of video"
 1
@@ -408,6 +432,54 @@
 "I/O error."
 1
 "errore di I/O."
+
+"elapsed time"
+1
+"tempo trascorso"
+
+"to-mux"
+1
+"da-muxare"
+
+"Version"
+1
+"Versione"
+
+"Authors"
+1
+"Autori"
+
+"License"
+1
+"Licenza"
+
+"There is an update"
+1
+"C'è un aggiornamento"
+
+"There are no updates"
+1
+"Non ci sono aggiornamenti"
+
+"Selected language"
+1
+"Lingua selezionata"
+
+"was coded in TreeP by"
+1
+"è stato scritto in TreeP da"
+
+"Please report bugs to"
+1
+"Si prega di segnalare errori a"
+
+"Source code of"
+1
+"Codice sorgente di"
+
+"approximate number of frames"
+1
+"numero approssimato di fotogrammi"
 
         )
 

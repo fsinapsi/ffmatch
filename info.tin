@@ -1,0 +1,168 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet info-cb (self)
+        (deflocal q butbox dlg i)
+
+        (set q (queue))
+
+        (set butbox (iup-box-ok undef q))
+
+        (set i (iup-vbox
+                        (info-setup-tabs q)
+                        butbox ))
+        (iup-set-str-attribute i "MARGIN" "4x4")
+        (iup-set-int i "GAP" 0)
+
+        (set dlg (iup-dialog i))
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" $"About FFmatch")
+        (iup-set-str-attribute dlg "RASTERSIZE" "660x400")
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-attribute-handle dlg "DEFAULTENTER" (iup-box-ok-btn butbox))
+        (iup-set-attribute-handle dlg "DEFAULTESC" (iup-box-ok-btn butbox))
+
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
+
+        (close dlg)
+        (iup-close-queue q) )
+
+(defun info-setup-tabs (q) net info-setup-tabs)
+(defnet info-setup-tabs (q @wid)
+        (set @wid (iup-tabs (info-setup-page1 q) (info-setup-page2 q) (info-setup-page3 q) (info-setup-page4 q)))
+        (iup-set-str-attribute @wid "TABTITLE0" $"Version")
+        (iup-set-str-attribute @wid "TABTITLE1" $"Authors")
+        (iup-set-str-attribute @wid "TABTITLE2" "Lavc")
+        (iup-set-str-attribute @wid "TABTITLE3" $"License")
+        (iup-set-bool @wid "EXPAND" true) )
+
+(defun info-setup-page1 (q) net info-setup-page1)
+(defnet info-setup-page1 (q @wid)
+        (deflocal i img remote-version vbox)
+
+        (set i (iup-label))
+        (iup-set-str-attribute i "EXPAND" "VERTICAL")
+        (set img (iup-image-rgba (pix-load-static "128x128/emblem-videos.png")))
+        (iup-set-attribute-handle i "IMAGE" img)
+        (queue-put q img)
+
+        (set remote-version (remote-version-cached))
+
+        (set vbox (iup-vbox
+                (iup-fill)
+                (iup-label
+                        "FFmatch version: " (date->version (compile-time)) " (" (csysbits) "-bit)" )
+                (if (< (compile-time) remote-version)
+                        (iup-link (+ (url-home-page) "/code/ffmatch/index.html") $"There is an update" ": " (date->version remote-version))
+                        (iup-label $"There are no updates") )
+                (iup-label
+                        $"Selected language" ": " <(languages) (lang)> nl
+                        ;$"Sound" ": " (if <_kv "enabled-sound"> $"enabled" $"disabled") nl
+                        "GC version: " (gc-version) nl
+                        "GMP version: " (gmp-version) nl
+                        "IUP version: " (iup-version) nl
+                        "IUP system: " (iup-get-global "SYSTEM") nl
+                        (if (clinux) (+ "GTK version: " (iup-get-global "GTKVERSION") nl) "")
+                        "libavcodec version: " (av-codec-version) "/" (av-avcodec-version) nl
+                        "VLFeat version: " (vl-version) nl )
+                (iup-fill) ))
+        (iup-set-int vbox "GAP" 0)
+
+        (set @wid (iup-hbox (iup-fill) i vbox (iup-fill)))
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
+        (iup-set-int @wid "GAP" 40) )
+
+(defun info-setup-page2 (q) net info-setup-page2)
+(defnet info-setup-page2 (q @wid)
+        (set @wid (iup-vbox
+                (iup-label "FFmatch " $"was coded in TreeP by" " Frank Sinapsi")
+                (iup-link (url-home-page))
+                (iup-label "\n" $"Please report bugs to")
+                (iup-link "mailto:fsinapsi@yahoo.it" "fsinapsi@yahoo.it")
+                (iup-label "\n" $"Source code of" " " "TreeP")
+                (iup-link "https://github.com/fsinapsi/TreeP")
+                (iup-label "\n" $"Source code of" " " "FFmatch")
+                (iup-link "https://github.com/fsinapsi/ffmatch") ))
+        (iup-set-str-attribute @wid "MARGIN" "20x20") )
+
+(defun info-setup-page3 (q) net info-setup-page3)
+(defnet info-setup-page3 (q @wid)
+        (deflocal s c a)
+
+        (set @wid (iup-text))
+        (iup-set-bool @wid "MULTILINE" true)
+        (iup-set-bool @wid "READONLY" true)
+        (iup-set-bool @wid "EXPAND" true)
+        (iup-set-bool @wid "WORDWRAP" true)
+        (iup-set-str-attribute @wid "PADDING" "2x0")
+        (set a (array 0))
+        (for c in (av-avcodec-list) do
+                (if (= <c 0> (cmacro AVMEDIA_TYPE_VIDEO))
+                then    (array-append a c) ))
+        (sort a (funptr less1))
+        (set s (+ "Configuration:" nl
+                  nl
+                  (av-avcodec-configuration) nl
+                  nl
+                  "Video codecs (" (length a) "):" nl ))
+        (for c in a do
+                (inc s nl <c 1> " (" <c 2> ")") )
+        (iup-set-str-attribute @wid "VALUE" s)
+        (iup-set-int @wid "VISIBLELINES" 1)
+        (iup-set-int @wid "VISIBLECOLUMNS" 1)
+        (iup-set-int @wid "CARETPOS" 0) )
+
+(defun info-setup-page4 (q) net info-setup-page4)
+(defnet info-setup-page4 (q @wid)
+        (set @wid (iup-text))
+        (iup-set-bool @wid "MULTILINE" true)
+        (iup-set-bool @wid "READONLY" true)
+        (iup-set-bool @wid "EXPAND" true)
+        (iup-set-bool @wid "WORDWRAP" false)
+        (iup-set-str-attribute @wid "PADDING" "2x0")
+        (iup-set-str-attribute @wid "VALUE" (+
+                (if (= (lang) 1)
+                "FFmatch è un software libero: puoi ridistribuirlo e/o\n" \
+                "modificarlo secondo i termini della GNU General Public License\n" \
+                "come pubblicata da Free Software Foundation, versione 3 della\n" \
+                "licenza o (a tua scelta) qualsiasi versione successiva.\n" \
+                "\n" \
+                "FFmatch è distribuito nella speranza che sia utile, ma\n" \
+                "SENZA ALCUNA GARANZIA; senza nemmeno la garanzia implicita di\n" \
+                "COMMERCIABILITÀ o IDONEITÀ PER UNO SCOPO PARTICOLARE.\n" \
+                "Vedere la GNU General Public License per maggiori dettagli."
+
+                "FFmatch is free software: you can redistribute it and/or modify it\n" \
+                "under the terms of the GNU General Public License as published by the\n" \
+                "Free Software Foundation, either version 3 of the License, or\n" \
+                "(at your option) any later version.\n" \
+                "\n" \
+                "FFmatch is distributed in the hope that it will be useful, but\n" \
+                "WITHOUT ANY WARRANTY; without even the implied warranty of\n" \
+                "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n" \
+                "See the GNU General Public License for more details." )
+                nl
+                "----------------------------------------------------------" nl
+                nl
+                (license-gpl3) ))
+        (iup-set-int @wid "VISIBLELINES" 1)
+        (iup-set-int @wid "VISIBLECOLUMNS" 1)
+        (iup-set-int @wid "CARETPOS" 0) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

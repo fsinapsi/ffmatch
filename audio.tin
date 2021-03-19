@@ -8,98 +8,115 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet audio (info)
-        (deflocal audio-info win vb w)
+(defnet audio-cb (self)
+        (deflocal audio-info q vbox dlg)
 
         (set audio-info (assoc))
-        (set <info "audio-info"> audio-info)
+        (set <_kv "audio-info"> audio-info)
 
-        (set win (gtk-window-new))
-        (set <audio-info "w-win"> win)
-        (gtk-window-set-transient-for win <info "w-win">)
-        (gtk-window-set-modal win true)
-        (gtk-window-set-title win $"Audio tracks")
-        (gtk-container-set-border-width win 10)
-        (gtk-signal-connect win "destroy" (netptr audio-destroy) info)
+        (set q (queue))
 
-        (set vb (gtk-vbox-new false 10))
-        (gtk-container-add win vb)
+        (set vbox (iup-vbox
+                        (audio-setup-open 1 q)
+                        (audio-setup-label 1)
+                        (iup-horizontal-separator)
+                        (audio-setup-open 2 q)
+                        (audio-setup-label 2)
+                        (iup-horizontal-separator)
+                        (audio-setup-gauge)
+                        (iup-horizontal-separator)
+                        (audio-setup-bottom q) ))
+        (iup-set-str-attribute vbox "MARGIN" "4x4")
+        (iup-set-int vbox "GAP" 0)
 
-                (audio-setup-entry info audio-info 1 w)
-                (gtk-box-pack-start vb w false false 0)
+        (set dlg (iup-dialog vbox))
+        (set <audio-info "dlg"> dlg)
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" $"Audio tracks")
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-attribute-handle dlg "DEFAULTESC" <audio-info "btn-ok">)
 
-                (audio-setup-entry info audio-info 2 w)
-                (gtk-box-pack-start vb w false false 0)
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
 
-                (audio-setup-buttons win info audio-info w)
-                (gtk-box-pack-end vb w false false 0)
+        (close dlg)
+        (iup-close-queue q)
+        (assoc-clr _kv "audio-info") )
 
-        (gtk-window-set-default-size win 640 10)
-        (gtk-window-set-position win (cmacro GTK_WIN_POS_CENTER_ON_PARENT))
-        (gtk-widget-show-all win) )
+(defun audio-setup-open (which q) net audio-setup-open)
+(defnet audio-setup-open (which q @wid)
+        (deflocal but text)
 
-(defnet audio-setup-entry (info audio-info which @w)
-        (deflocal w)
+        (set but (iup-button-icon (+ $"select audio" ' ' which)
+                (if (= which 1)
+                    (netptr audio-open1-cb)
+                    (netptr audio-open2-cb) )
+                (pix-load-static "16x16/document-open-5.png")
+                q ))
 
-        (set @w (gtk-hbox-new false 8))
+        (set text (iup-text))
+        (set <_kv "audio-info" (+ "text" which)> text)
+        (iup-set-bool text "READONLY" true)
+        (iup-set-int text "VISIBLECOLUMNS" 30)
 
-        (gtk-box-pack-start @w (gtk-iconed-button
-                (pix-load-static "icons/16x16/document-open-5.png")
-                (+ $"select audio" ' ' which)
-                (netptr audio-open)
-                (cons info which) ) false false 0 )
+        (set @wid (iup-hbox but text))
+        (iup-set-int @wid "GAP" 3)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
 
-        (set w (gtk-entry-new))
-        (gtk-box-pack-start @w w true true 0)
-        (gtk-editable-set-editable w false)
-        (set <audio-info (+ "w-entry" which)> w)
+(defun audio-setup-label (which) net audio-setup-label)
+(defnet audio-setup-label (which @wid)
+        (deflocal label)
 
-        (set w (gtk-label-new ""))
-        (gtk-box-pack-start @w w false false 0)
-        (set <audio-info (+ "w-label" which)> w) )
+        (set label (iup-label))
+        (set <_kv "audio-info" (+ "label" which)> label)
+        (iup-set-bool label "EXPAND" true)
+        (iup-set-str-attribute label "ALIGNMENT" "ARIGHT")
 
-(defnet audio-setup-buttons (win info audio-info @w)
-        (deflocal w i)
+        (set @wid (iup-hbox label))
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
 
-        (set @w (gtk-hbox-new false 6))
+(defun audio-setup-gauge () net audio-setup-gauge)
+(defnet audio-setup-gauge (@wid)
+        (deflocal gauge)
 
-        (set w (gtk-combo-box-text-new))
-        (gtk-box-pack-start @w w false false 0)
+        (set gauge (iup-gauge))
+        (set <_kv "audio-info" "gauge"> gauge)
+        (iup-set-bool gauge "EXPAND" true)
+
+        (set @wid (iup-hbox gauge))
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+(defun audio-setup-bottom (q) net audio-setup-bottom)
+(defnet audio-setup-bottom (q @wid)
+        (deflocal audio-info l1 l2 btn-save btn-ok i)
+
+        (set audio-info <_kv "audio-info">)
+
+        (set l1 (iup-list))
+        (set <audio-info "combo1"> l1)
+        (iup-set-bool l1 "DROPDOWN" true)
+        (iup-set-bool l1 "EDITBOX" true)
+        (iup-set-str-attribute l1 "MASK" "(/d+/.?/d*|/./d+)")
         (for i in (framerates) do
-                (gtk-combo-box-text-append-text w (+ "" (approx3 i) " fps")) )
-        (set <audio-info "w-combo-fps"> w)
+                (iup-set-str-attribute l1 (+ (for-pos) 1) (approx3 i)) )
+        (iup-set-str-attribute l1 "VALUE" (approx3 <(framerates) 0>))
 
-        (set w (gtk-combo-box-text-new))
-        (gtk-box-pack-start @w w false false 0)
-        (for i in [ "video 1 + audio 2" "video 2 + audio 1" ] do
-                (gtk-combo-box-text-append-text w i) )
-        (gtk-combo-box-set-active w 0)
-        (set <audio-info "w-combo-which"> w)
+        (set l2 (iup-list))
+        (set <audio-info "combo2"> l2)
+        (iup-set-bool l2 "DROPDOWN" true)
+        (iup-set-str-attribute l2 1 "video 1 + audio 2")
+        (iup-set-str-attribute l2 2 "video 2 + audio 1")
+        (iup-set-int l2 "VALUE" (if (>= (width <_kv "av1">) (width <_kv "av2">)) 1 2))
 
-        (gtk-box-pack-start @w (gtk-iconed-button
-                (pix-load-static "icons/16x16/document-save-5.png")
-                $"save track as..."
-                (netptr audio-save-as)
-                info ) false false 0 )
+        (set btn-save (iup-button-icon $"save track as..." (netptr audio-save-as-cb) (pix-load-static "16x16/document-save-5.png") q))
+        (set <audio-info "btn-save"> btn-save)
+        (iup-set-bool btn-save "ACTIVE" false)
 
-        (gtk-box-pack-end @w (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-cancel-3.png")
-                $"Close"
-                (netptr gtk-close-win)
-                win ) false false 0 ))
+        (set btn-ok (iup-button-icon-ok (netptr iup-cancel-cb) q))
+        (set <audio-info "btn-ok"> btn-ok)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet audio-destroy (info)
-        (assoc-clr info "audio-info") )
+        (set @wid (iup-hbox l1 l2 btn-save (iup-fill) btn-ok))
+        (iup-set-int @wid "GAP" 3)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -111,92 +128,41 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet audio-open (info)
-        (deflocal which audio-info win vb hb fc path btn i)
+(defnet audio-open1-cb (self)
+        (audio-open-low self 1) )
 
-        (set which (cdr info))
-        (set info (car info))
-        (set audio-info <info "audio-info">)
+(defnet audio-open2-cb (self)
+        (audio-open-low self 2) )
 
-        (set win (gtk-window-new))
-        (gtk-window-set-transient-for win <audio-info "w-win">)
-        (gtk-window-set-modal win true)
-        (gtk-window-set-title win (+ $"Select audio" ' ' which))
-        (gtk-container-set-border-width win 8)
+(defnet audio-open-low (self which)
+        (deflocal audio-info duration path f i j)
 
-        (set vb (gtk-vbox-new false 10))
-        (gtk-container-add win vb)
+        (opt    (set path (cfg-get "audio-path"))
+                (if (not (stringp path))
+                then    (set path (cfg-get "path")) )
+                (set path (iup-choose-file-open self (+ $"Select audio" ' ' which) path undef true))
+                (stringp path)
+                (set f (fopenro path))
+                (<> f undef)
+                (cfg-set "audio-path" path)
+                (set audio-info <_kv "audio-info">)
+                (alt    (audio-open-wav f which audio-info duration)
+                        (audio-open-compressed f which audio-info duration)
+                        (seq    (close f)
+                                (iup-error60 self (+ path ": audio format not recognized"))
+                                (fail) ))
+                (close f)
+                (iup-set-str-attribute <audio-info (+ "text" which)> "VALUE" (fullpath->name path))
+                (set j (/ (av-approximated-number-of-frames <_kv (+ "av" which)>) duration))
+                (for i in (framerates) rev do
+                        (if (>= (/ (min i j) (max i j)) 0.9991)
+                        then    (iup-set-str-attribute <audio-info "combo1"> "VALUE" (approx3 i)) ))
+                (set <audio-info (+ "duration" which)> duration)
+                (set <audio-info (+ "path" which)> path)
+                (iup-set-bool <audio-info "btn-save"> "ACTIVE" (stringp <audio-info (+ "path" (- 3 which))>)) ))
 
-        (set fc (gtk-file-chooser-widget-new (cmacro GTK_FILE_CHOOSER_ACTION_OPEN)))
-        (gtk-box-pack-start vb fc true true 0)
-        (gtk-file-chooser-set-show-hidden fc true)
-
-        (set path (cfg-get "audio-path"))
-        (if (not (stringp path))
-        then    (set path (cfg-get "path")) )
-        (repeat until (= path undef)
-                (alt    (seq    (pathexists path)
-                                (if (isdir path)
-                                then    (gtk-file-chooser-set-current-folder fc path)
-                                else    (gtk-file-chooser-select-filename fc path) )
-                                (clr path) )
-                        (seq    (rtrim path '/')
-                                (search "/" path i (maxint))
-                                (set path (sub 0 (+ i 1) path)) )
-                        (clr path) ))
-
-        (set hb (gtk-hbox-new false 6))
-        (gtk-box-pack-start vb hb false false 0)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-cancel-3.png")
-                $"Cancel"
-                (netptr gtk-close-win)
-                win ) false false 0 )
-
-        (set i (list fc win which info))
-
-        (gtk-signal-connect fc "file-activated" (netptr audio-open-ok) i)
-
-        (set btn (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-apply.png")
-                "Ok"
-                (netptr audio-open-ok)
-                i ))
-        (gtk-box-pack-end hb btn false false 0)
-
-        (gtk-window-set-default-size win (fc-width) (fc-height))
-        (gtk-widget-show-all win) )
-
-(defnet audio-open-ok (info)
-        (deflocal path win which f audio-info duration i j)
-
-        (set path (gtk-file-chooser-get-filename <info 0>))
-        (pathexists path)
-        (not (isdir path))
-        (set win <info 1>)
-        (set which <info 2>)
-        (set info <info 3>)
-        (set f (fopenro path))
-        (<> f undef)
-        (cfg-set "audio-path" path)
-        (set audio-info <info "audio-info">)
-        (alt    (audio-open-ok-wav f win which audio-info duration)
-                (audio-open-ok-compressed f win which audio-info duration)
-                (seq    (close f)
-                        (gtk-message-error win (+ path ": audio format not recognized"))
-                        (fail) ))
-        (close f win)
-        (gtk-entry-set-text <audio-info (+ "w-entry" which)> (fullpath->name path))
-        (set j (/ (av-approximated-number-of-frames <info (+ "av" which)>) duration))
-        (for i in (framerates) do
-                (if (>= (/ (min i j) (max i j)) 0.98)
-                then    (gtk-combo-box-set-active <audio-info "w-combo-fps"> (for-pos)) ))
-        (set <audio-info (+ "duration" which)> duration)
-        (set <audio-info (+ "path" which)> path) )
-
-(defnet audio-open-ok-wav (f win which audio-info @duration)
-        (deflocal ch freq offset smplsize smpl)
+(defnet audio-open-wav (f which audio-info @duration)
+        (deflocal ch freq smplsize bps offset smpl)
 
         (fsetpos 0 f)
         (= (freadstr f 4) "RIFF")
@@ -209,6 +175,7 @@
         (set freq (freaduint-le f 32))
         (skip (freaduint-le f 32))
         (set smplsize (freaduint-le f 16))
+        (set bps (freaduint-le f 16))
         (fsetpos (+ offset 20) f)
         (while (<> (freadstr f 4) "data") do
                 (fsetpos (+ (fpos f) (freaduint-le f 32)) f) )
@@ -217,28 +184,30 @@
         (set smpl (div (- (length f) offset) smplsize))
         (> smpl 0)
         (set @duration (/ smpl freq))
-        (gtk-label-set-text <audio-info (+ "w-label" which)>
-                "WAVE " ch "ch " freq "Hz "
+        (iup-set-str-attribute <audio-info (+ "label" which)> "TITLE"
+                "WAVE " ch "ch " freq "Hz " bps "bps "
                 (date-s2hhmmss @duration) )
         (set <audio-info (+ "codec" which)> "WAV")
         (set <audio-info (+ "mode" which)> ch)
         (set <audio-info (+ "frequency" which)> freq)
         (set <audio-info (+ "smplsize" which)> smplsize)
+        (set <audio-info (+ "bps" which)> bps)
         (set <audio-info (+ "smpl" which)> smpl)
         (set <audio-info (+ "ts" which)> offset) )
 
-(defnet audio-open-ok-compressed (f win which audio-info @duration)
-        (deflocal w pb aud a n i)
+(defnet audio-open-compressed (f which audio-info @duration)
+        (deflocal pb aud a n i)
 
+        (set pb <audio-info "gauge">)
         (fsetpos 0 f)
-        (audio-progress win w pb)
         (set aud (aud-create f))
         (set n 0)
         (set i (* (length f) 2))
         (opt*   (aud-parse-step aud)
                 (inc n)
                 (if (= (% n 4000) 1)
-                then    (audio-progress-update pb (/ (fpos f) i)) ))
+                then    (iup-set-double pb "VALUE" (/ (fpos f) i))
+                        (iup-flush) ))
         (close aud)
         (fsetpos 0 f)
         (set aud (aud-create f))
@@ -250,8 +219,9 @@
                 (set <a i 0> (aud-duration aud))
                 (set <a i 1> (- (fpos f) (aud-buf-act aud)))
                 (if (= (% i 4000) 1)
-                then    (audio-progress-update pb (+ (/ i n 2) 0.5)) ))
-        (close w)
+                then    (iup-set-double pb "VALUE" (+ (/ i n 2) 0.5))
+                        (iup-flush) ))
+        (iup-set-double pb "VALUE" 0)
         (if (or (= (aud-codec aud) undef) (< n 5)
                 (< (/ (- <a (- n 1) 1> (aud-initial-skip aud) (aud-internal-skip aud))
                       (length f) )
@@ -259,7 +229,7 @@
         then    (close aud)
                 (fail) )
         (set @duration (aud-duration aud))
-        (gtk-label-set-text <audio-info (+ "w-label" which)>
+        (iup-set-str-attribute <audio-info (+ "label" which)> "TITLE"
                 (aud-codec aud) ' '
                 (aud-mode aud) ' '
                 (aud-frequency aud) "Hz "
@@ -268,11 +238,12 @@
         (set <audio-info (+ "mode" which)> (aud-mode aud))
         (set <audio-info (+ "frequency" which)> (aud-frequency aud))
         (assoc-clr audio-info (+ "smplsize" which))
+        (assoc-clr audio-info (+ "bps" which))
         (assoc-clr audio-info (+ "smpl" which))
         (set <audio-info (+ "ts" which)> a)
         (if (or (> (aud-initial-skip aud) 0) (> (aud-internal-skip aud) 0))
-        then    (gtk-message-warning win $"It seems like the audio track contains "\
-                                          "extraneous data. Please fix it.") )
+        then    (iup-warning60 <audio-info "dlg"> $"It seems like the audio track contains "\
+                                                   "extraneous data. Please fix it.") )
         (close aud) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -285,156 +256,102 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet audio-save-as (info)
-        (deflocal audio-info parent fps which win vb hb fc path i)
+(defnet audio-save-as-cb (self)
+        (opt (audio-save-as-low self)) )
 
-        (set audio-info <info "audio-info">)
-        (set parent <audio-info "w-win">)
-        (set fps <(framerates) (gtk-combo-box-get-active <audio-info "w-combo-fps">)>)
-        (if (not (rationalp fps))
-        then    (gtk-message-warning parent $"Please, select a frame rate")
+(defnet audio-save-as-low (self)
+        (deflocal audio-info dlg fps which path g)
+
+        (set audio-info <_kv "audio-info">)
+        (set dlg <audio-info "dlg">)
+        (set fps (str->num (iup-get-str-attribute <audio-info "combo1"> "VALUE")))
+        (if (or (not (rationalp fps)) (<= fps 0))
+        then    (iup-warning60 dlg $"Please, select a valid frame rate")
                 (fail) )
-        (set which (+ (gtk-combo-box-get-active <audio-info "w-combo-which">) 1))
-        (in which 1 .. 2)
-        (if (or (= <audio-info "path1"> undef) (= <audio-info "path2"> undef))
-        then    (gtk-message-warning parent $"Please, select both audio tracks")
-                (fail) )
+        (case fps of
+                23.976  (set fps (/ 24000 1001))
+                29.97   (set fps (/ 30000 1001)) )
+        (set which (iup-get-int <audio-info "combo2"> "VALUE"))
         (if (or (<> <audio-info "codec1"> <audio-info "codec2">)
                 (<> <audio-info "mode1"> <audio-info "mode2">)
                 (<> <audio-info "frequency1"> <audio-info "frequency2">)
-                (<> <audio-info "smplsize1"> <audio-info "smplsize2">) )
-        then    (gtk-message-warning parent $"Audio tracks are not compatible")
+                (<> <audio-info "smplsize1"> <audio-info "smplsize2">)
+                (<> <audio-info "bps1"> <audio-info "bps2">) )
+        then    (iup-warning60 dlg $"Audio tracks are not compatible")
                 (fail) )
-        (audio-save-as-check-duration info audio-info parent fps)
+        (audio-save-as-check-duration audio-info dlg fps)
+        (set path (iup-choose-file-save dlg
+                (+ $"Save audio track" ' ' (- 3 which) ' ' $"for video" ' ' which ' ' $"as...")
+                (cfg-get "audio-path")
+                (+ $"to-mux" "." (utf8-tolower <audio-info "codec1">))
+                true ))
+        (stringp path)
 
-        (set win (gtk-window-new))
-        (gtk-window-set-transient-for win parent)
-        (gtk-window-set-modal win true)
-        (gtk-window-set-title win (+ $"Save audio track" ' ' (- 3 which) ' ' $"for video" ' ' which ' ' $"as..."))
-        (gtk-container-set-border-width win 8)
+        (set g (fcreate path))
+        (if (= g undef)
+        then    (iup-error60 dlg (+ $"Creation of file `" path $"' failed."))
+                (fail) )
 
-        (set vb (gtk-vbox-new false 10))
-        (gtk-container-add win vb)
+        (alt    (audio-save-as-ok-low audio-info dlg fps which g)
+                (seq    (close g)
+                        (remove path)
+                        (fail) ))
+        (close g)
+        (iup-info60 dlg (+ $"Audio track successfully saved as `" path "'.")) )
 
-        (set fc (gtk-file-chooser-widget-new (cmacro GTK_FILE_CHOOSER_ACTION_SAVE)))
-        (gtk-box-pack-start vb fc true true 0)
-        (gtk-file-chooser-set-show-hidden fc true)
-
-        (set path (cfg-get "audio-path"))
-        (opt    (not (isdir path))
-                (search "/" path i (maxint))
-                (set path (sub 0 (+ i 1) path)) )
-        (repeat until (= path undef)
-                (alt    (seq    (pathexists path)
-                                (gtk-file-chooser-set-current-folder fc path)
-                                (clr path) )
-                        (seq    (rtrim path '/')
-                                (search "/" path i (maxint))
-                                (set path (sub 0 (+ i 1) path)) )
-                        (clr path) ))
-
-        (set hb (gtk-hbox-new false 6))
-        (gtk-box-pack-start vb hb false false 0)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-cancel-3.png")
-                $"Cancel"
-                (netptr gtk-close-win)
-                win ) false false 0 )
-
-        (set i (list fc win fps which info))
-
-        (gtk-signal-connect fc "file-activated" (netptr audio-save-as-ok) i)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-apply.png")
-                "Ok"
-                (netptr audio-save-as-ok)
-                i ) false false 0 )
-
-        (gtk-window-set-default-size win (fc-width) (fc-height))
-        (gtk-widget-show-all win) )
-
-(defnet audio-save-as-check-duration (info audio-info parent fps)
+(defnet audio-save-as-check-duration (audio-info dlg fps)
         (deflocal v1 v2 a1 a2 in1 in2)
 
-        (set v1 (/ (av-approximated-number-of-frames <info "av1">) fps))
+        (set v1 (/ (av-approximated-number-of-frames <_kv "av1">) fps))
         (set a1 <audio-info "duration1">)
         (set in1 (< (/ (min a1 v1) (max a1 v1)) 0.98))
-        (set v2 (/ (av-approximated-number-of-frames <info "av2">) fps))
+        (set v2 (/ (av-approximated-number-of-frames <_kv "av2">) fps))
         (set a2 <audio-info "duration2">)
         (set in2 (< (/ (min a2 v2) (max a2 v2)) 0.98))
         (if (or in1 in2)
-        then    (gtk-question parent (+ $"It seems like stream lengths are inconsistent:" nl
-                        (if in1 (+      $"duration of video" " 1: " (date-s2hhmmss v1) nl
-                                        $"duration of audio" " 1: " (date-s2hhmmss a1) nl ) "" )
-                        (if in2 (+      $"duration of video" " 2: " (date-s2hhmmss v2) nl
-                                        $"duration of audio" " 2: " (date-s2hhmmss a2) nl ) "" )
-                                        $"Do you want to continue?" ))))
+        then    (iup-confirm60 dlg (+ $"It seems like stream lengths are inconsistent:" nl
+                        (if in1 (+    $"duration of video" " 1: " (date-s2hhmmss v1) nl
+                                      $"duration of audio" " 1: " (date-s2hhmmss a1) nl ) "" )
+                        (if in2 (+    $"duration of video" " 2: " (date-s2hhmmss v2) nl
+                                      $"duration of audio" " 2: " (date-s2hhmmss a2) nl ) "" )
+                                      $"Do you want to continue?" ))))
 
-(defnet audio-save-as-ok (info)
-        (deflocal audio-info path win fps which w pb g)
-
-        (set path (gtk-file-chooser-get-filename <info 0>))
-        (stringp path)
-        (not (isdir path))
-        (set win <info 1>)
-        (set fps <info 2>)
-        (set which <info 3>)
-        (set info <info 4>)
-        (if (pathexists path)
-        then    (gtk-question win (+ $"File `" path $"' exists." nl
-                                     $"Do you want to overwrite it?" )))
-        (set g (fcreate path))
-        (if (= g undef)
-        then    (gtk-message-error win (+ "Creation of file `" path "' failed."))
-                (fail) )
-        (close win)
-        (set audio-info <info "audio-info">)
-        (set win <audio-info "w-win">)
-        (audio-progress win w pb)
-        (alt    (audio-save-as-ok-basic info audio-info win fps which pb g)
-                (seq    (close w g)
-                        (remove path)
-                        (fail) ))
-        (close w g)
-        (gtk-message-info win (+ $"Audio track successfully saved as `" path "'.")) )
-
-(defnet audio-save-as-ok-basic (info audio-info win fps which pb g)
+(defnet audio-save-as-ok-low (audio-info dlg fps which g)
         (deflocal f1 f2 buf)
 
         (set buf <audio-info "path1">)
         (set f1 (fopenro buf))
         (if (= f1 undef)
-        then    (gtk-message-error win (+ "Cannot open `" buf "'."))
+        then    (iup-error60 dlg (+ "Cannot open `" buf "'."))
                 (fail) )
         (set buf <audio-info "path2">)
         (set f2 (fopenro buf))
         (if (= f2 undef)
         then    (close f1)
-                (gtk-message-error win (+ "Cannot open `" buf "'."))
+                (iup-error60 dlg (+ "Cannot open `" buf "'."))
                 (fail) )
         (set buf (raw 65536))
-        (alt    (audio-save-as-ok-basic-basic info audio-info fps which pb g f1 f2 buf)
+        (alt    (audio-save-as-ok-low-low audio-info fps which g f1 f2 buf)
                 (seq    (close buf f1 f2)
-                        (gtk-message-error win $"I/O error.")
+                        (iup-error60 dlg $"I/O error.")
                         (fail) ))
         (close buf f1 f2) )
 
-(defnet audio-save-as-ok-basic-basic (info audio-info fps which pb g f1 f2 buf)
-        (deflocal f a1 a2 a smpl1 smpl2 smpl map p q n ts last-ts err pf freq smplsize i)
+(defnet audio-save-as-ok-low-low (audio-info fps which g f1 f2 buf)
+        (deflocal pb f a1 a2 a smpl1 smpl2 smpl map p q n ts last-ts err pf freq smplsize i)
 
-        (set i (cfg-get (key-map <info "av1">
-                                 <info "av2">
-                                 (fullpath->name <info "path1">)
-                                 (fullpath->name <info "path2">) )))
+        (set pb <audio-info "gauge">)
+        (set i (cfg-get (key-map <_kv "av1">
+                                 <_kv "av2">
+                                 (fullpath->name <_kv "path1">)
+                                 (fullpath->name <_kv "path2">) )))
         (set map (map-create <i 0> <i 1>))
         (for i in <i 2> do
                 (set p <i 0>)
                 (set q <i 1>)
                 (set n <i 2>)
-                (map-bind-basic (car map) p q n)
-                (map-bind-basic (cdr map) q p n) )
+                (map-bind-low (car map) p q n)
+                (map-bind-low (cdr map) q p n) )
         (set a1 <audio-info "ts1">)
         (set a2 <audio-info "ts2">)
         (set smpl1 <audio-info "smpl1">)
@@ -476,7 +393,8 @@
                                 (set q (rint (* (- (/ q fps) err) freq)))
                                 (set pf (min (+ q (min (rint (* n freq)) (- smpl1 (* ts freq)))) smpl))
                                 (if (> pf q)
-                                then    (audio-progress-update pb (/ ts last-ts))
+                                then    (iup-set-double pb "VALUE" (/ ts last-ts))
+                                        (iup-flush)
                                         (fsetpos (+ a (* q smplsize)) f)
                                         (filecopy-basic f g (* (- pf q) smplsize) buf)
                                         (inc ts (/ (- pf q) freq)) ))
@@ -489,7 +407,8 @@
                         (set p (/ (+ <i 1> 1) fps))
                         (set n (- p ts))
                         (if (> n 0)
-                        then    (audio-progress-update pb (/ ts last-ts))
+                        then    (iup-set-double pb "VALUE" (/ ts last-ts))
+                                (iup-flush)
                                 (set q <i 2>)
                                 (if (= q undef)
                                 then    (set q <i 0>)
@@ -506,7 +425,8 @@
                                 (audio-save-as-ok-search (+ q n) a n)
                                 (filecopy-basic f g (- <n 1> pf) buf)
                                 (set ts (+ ts <n 0> -q)) )
-                        (set err (- p ts)) )))
+                        (set err (- p ts)) ))
+        (iup-set-double pb "VALUE" 0) )
 
 (defnet audio-save-as-ok-search (t a @x)
         (deflocal p q i)
@@ -523,34 +443,6 @@
                         (abs (- t <a q 0>)) )
                 then    (dec q) ))
         (set @x <a q>) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet audio-progress (parent @w @pb)
-        (set @w (gtk-window-new))
-        (gtk-signal-connect @w "delete-event" (netptr gtk-dont-delete))
-        (gtk-window-set-transient-for @w parent)
-        (gtk-window-set-modal @w true)
-        (gtk-window-set-resizable @w false)
-        (gtk-window-set-title @w "Work in progress...")
-        (gtk-container-set-border-width @w 10)
-        (set @pb (gtk-progress-bar-new))
-        (gtk-container-add @w @pb)
-        (gtk-widget-show-all @w)
-        (gtk-flush) )
-
-(defnet audio-progress-update (pb x)
-        (gtk-progress-bar-set-fraction pb x)
-        (gtk-progress-bar-set-text pb (sprint (rint (* x 100)) "%"))
-        (gtk-flush) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -8,179 +8,63 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-setup (info)
-        (deflocal win vb hb w)
+(defnet gui ()
+        (deflocal dlg x y w h w-corr h-corr)
 
-        (set <info "abort"> false)
-        (set <info "supervision"> false)
+        (set x (cfg-get "win-main-position"))
+        (if (= x undef)
+        then    (set x (cmacro IUP_CENTER))
+                (set y (cmacro IUP_CENTER))
+        else    (set y (max 0 (cdr x)))
+                (set x (max 0 (car x))) )
+        (set w (cfg-get-num "win-main-width"))
+        (set h (cfg-get-num "win-main-height"))
+        (if (not (integerp w))
+        then    (set w (fc-width)) )
+        (if (not (integerp h))
+        then    (set h (fc-height)) )
 
-        (set win (gtk-window-new (cmacro GTK_WINDOW_TOPLEVEL)))
-        (gtk-window-set-title win (+ "FFmatch (" (version) ")"))
-        (gtk-container-set-border-width win 4)
-        (gtk-signal-connect win "delete-event" (netptr gui-delete) info)
-        (gtk-signal-connect win "destroy" (netptr gtk-destroy))
+        ;(print w "x" h "+" x "+" y nl)
 
-        (set <info "w-win"> win)
+        (set dlg (iup-dialog (gui-setup-main)))
 
-        (set vb (gtk-vbox-new false 5))
-        (gtk-container-add win vb)
+        (set <_kv "dlg"> dlg)
+        (iup-set-attribute-handle undef "PARENTDIALOG" dlg)
+        (iup-set-str-attribute dlg "TITLE" (+ "FFmatch (" (date->version (compile-time)) ")"))
+        (iup-set-attribute-handle dlg "MENU" (gui-setup-menu))
+        (iup-set-callback dlg "CLOSE_CB" (netptr gui-close-cb))
+        ;(iup-set-callback dlg "DROPFILES_CB" (netptr gui-dropfiles-cb))
+        (iup-set-callback dlg "K_ANY" (netptr gui-kb-cb))
+        (iup-set-callback dlg "RESIZE_CB" (netptr gui-resize-cb))
+        (iup-set-bool dlg "FULLSCREEN" false)
 
-                (gui-setup-menu-bar info w)
-                (gtk-box-pack-start vb w false false 0)
+        (gui-update)
 
-                (gui-setup-toolbar info w)
-                (gtk-box-pack-start vb w false false 0)
+        (iup-set-str-attribute dlg "RASTERSIZE" (sprint w "x" h))
+        (iup-show-xy dlg x y)
+        (set w-corr (- w (iup-get-int dlg "RASTERSIZE")))
+        (set h-corr (- h (iup-get-int2 dlg "RASTERSIZE")))
+        (iup-set-str-attribute dlg "USERSIZE")
 
-                (set hb (gtk-hbox-new false 5))
-                (gtk-box-pack-start vb hb true true 0)
+        (gui-update-image)
 
-                        (gui-setup-image info w)
-                        (gtk-box-pack-start hb w false false 0)
+        (iup-main-loop)
 
-                        (gui-setup-text info w)
-                        (gtk-box-pack-start hb w true true 0)
+        (set x (iup-get-int dlg "SCREENPOSITION"))
+        (set y (iup-get-int2 dlg "SCREENPOSITION"))
+        (set w (+ (iup-get-int dlg "RASTERSIZE") w-corr))
+        (set h (+ (iup-get-int2 dlg "RASTERSIZE") h-corr))
 
-        (gtk-window-set-default-size win (min 860 (- (gtk-width) 20)) 10)
-        (gtk-window-set-position win (cmacro GTK_WIN_POS_CENTER))
-        (gtk-widget-show-all win)
-        (gui-update info) )
+        ;(print w "x" h "+" x "+" y nl)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        (sqlite3-begin _db)
+        (alt    (seq    (cfg-set "win-main-width" w)
+                        (cfg-set "win-main-height" h)
+                        (cfg-set "win-main-position" (cons x y))
+                        (sqlite3-end _db) )
+                (sqlite3-rollback _db) )
 
-(defnet gui-setup-menu-bar (info @w)
-        (deflocal menu-info item menu i)
-
-        (set menu-info (assoc))
-        (set @w (gtk-menu-bar-new))
-        (set <info "w-menu"> @w)
-        (set <info "w-menu-bar"> menu-info)
-
-        (set item (gtk-menu-item-new "File"))
-
-        (set menu (gtk-menu-new))
-
-                (set i (gtk-menu-item-new $"Select movie 1"))
-                (gtk-signal-connect i "activate" (netptr gui-open-file1) info)
-                (gtk-menu-shell-append menu i)
-
-                (set i (gtk-menu-item-new $"Select movie 2"))
-                (gtk-signal-connect i "activate" (netptr gui-open-file2) info)
-                (gtk-menu-shell-append menu i)
-
-                (set i (gtk-menu-item-new $"Swap order"))
-                (gtk-signal-connect i "activate" (netptr gui-swap-order) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "swap-order"> i)
-
-                (set i (gtk-menu-item-new $"Save top text as..."))
-                (gtk-signal-connect i "activate" (netptr gui-save-text) info 1)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "save-text1"> i)
-
-                (set i (gtk-menu-item-new $"Save bottom text as..."))
-                (gtk-signal-connect i "activate" (netptr gui-save-text) info 2)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "save-text2"> i)
-
-                (set i (gtk-menu-item-new $"Save frame 1 as..."))
-                (gtk-signal-connect i "activate" (netptr supervision-save-frame) info 1)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "save-frame1"> i)
-
-                (set i (gtk-menu-item-new $"Save frame 2 as..."))
-                (gtk-signal-connect i "activate" (netptr supervision-save-frame) info 2)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "save-frame2"> i)
-
-                (set i (gtk-menu-item-new $"Preferences"))
-                (gtk-signal-connect i "activate" (netptr cfg) info)
-                (gtk-menu-shell-append menu i)
-
-                (set i (gtk-menu-item-new $"Exit"))
-                (gtk-signal-connect i "activate" (netptr gui-exit) info)
-                (gtk-menu-shell-append menu i)
-
-        (gtk-menu-item-set-submenu item menu)
-        (gtk-menu-shell-append @w item)
-
-        (set item (gtk-menu-item-new $"Clear"))
-
-        (set menu (gtk-menu-new))
-
-                (set i (gtk-menu-item-new $"Clear \"scd\" data 1"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-scd1) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "clear-scd1"> i)
-
-                (set i (gtk-menu-item-new $"Clear \"scd\" data 2"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-scd2) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "clear-scd2"> i)
-
-                (set i (gtk-menu-item-new $"Clear \"sift check\" data"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-sck) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "clear-sck"> i)
-
-                (set i (gtk-menu-item-new $"Clear failed checks"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-failed-sck) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "clear-failed-sck"> i)
-
-                (set i (gtk-menu-item-new $"Clear \"mapping\" data"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-map) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "clear-map"> i)
-
-                (set i (gtk-menu-item-new $"Clear obsolete paths"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-paths) info)
-                (gtk-menu-shell-append menu i)
-
-                (set i (gtk-menu-item-new $"Clear obsolete data"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-data-and-vacuum) info)
-                (gtk-menu-shell-append menu i)
-
-                (set i (gtk-menu-item-new $"Clear top text"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-text1) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "clear-text1"> i)
-
-                (set i (gtk-menu-item-new $"Clear bottom text"))
-                (gtk-signal-connect i "activate" (netptr gui-clear-text2) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "clear-text2"> i)
-
-        (gtk-menu-item-set-submenu item menu)
-        (gtk-menu-shell-append @w item)
-
-        (set item (gtk-menu-item-new "Misc"))
-
-        (set menu (gtk-menu-new))
-
-                (set i (gtk-menu-item-new $"Print selected movie names"))
-                (gtk-signal-connect i "activate" (netptr gui-print-selected) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "print-selected"> i)
-
-                (set i (gtk-menu-item-new $"Report failed checks"))
-                (gtk-signal-connect i "activate" (netptr gui-report-failed) info)
-                (gtk-menu-shell-append menu i)
-                (set <menu-info "report-failed"> i)
-
-                (set i (gtk-menu-item-new $"Restore default parameters"))
-                (gtk-signal-connect i "activate" (netptr gui-restore-default) info)
-                (gtk-menu-shell-append menu i)
-
-        (gtk-menu-item-set-submenu item menu)
-        (gtk-menu-shell-append @w item) )
+        (close dlg) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -192,68 +76,152 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-setup-toolbar (info @w)
-        (deflocal btn-info)
+(defnet gui-close-cb (self)
+        (if (= <_kv "th"> undef)
+        then    (iup-exit-loop) ))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-kb-cb (dlg c)
+        (if (<> <_kv "th"> undef)
+        then    (if (= c (cmacro K_ESC))
+                then    (gui-abort-low dlg) )
+                (fail) )
+        (case c of
+                (cmacro K_cQ)           (iup-exit-loop)
+                (cmacro K_cP)           (cfg-cb dlg)
+                (cmacro K_cPlus)        (gui-zoom-in-cb dlg)
+                (cmacro K_cMinus)       (gui-zoom-out-cb dlg)
+                (cmacro K_c0)           (gui-zoom-zero-cb dlg)
+                default                 (fail) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun gui-setup-main () net gui-setup-main)
+(defnet gui-setup-main (@wid)
+        (set @wid (iup-vbox (gui-setup-toolbar) (gui-setup-body)))
+        (iup-set-str-attribute @wid "MARGIN" "2x2") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun gui-setup-menu () net  gui-setup-menu)
+(defnet gui-setup-menu (@menu)
+        (set <_kv "menu"> (assoc))
+        (set @menu (iup-menu
+                (gui-setup-submenu "&File" (iup-menu
+                        ;(gui-setup-menu-item (+ $"Select movie 1" (if (cmingw) "\t" "\t\t") "Ctrl O") (netptr gui-open1-cb))
+                        ;(gui-setup-menu-item (+ $"Select movie 2" (if (cmingw) "\t" "\t\t") "Ctrl O") (netptr gui-open2-cb))
+                        (gui-setup-menu-item $"Select movie 1" (netptr gui-open1-cb))
+                        (gui-setup-menu-item $"Select movie 2" (netptr gui-open2-cb))
+                        (iup-separator)
+                        (gui-setup-menu-item-low (+ "Zoom in" (if (cmingw) "\t" "\t\t\t\t\t") "Ctrl +") (netptr gui-zoom-in-cb) undef)
+                        (gui-setup-menu-item-low (+ "Zoom out" (if (cmingw) "\t" "\t\t\t\t") "Ctrl -") (netptr gui-zoom-out-cb) undef)
+                        (gui-setup-menu-item-low (+ "No zoom" (if (cmingw) "\t" "\t\t\t\t\t") "Ctrl 0") (netptr gui-zoom-zero-cb) undef)
+                        (iup-separator)
+                        (gui-setup-menu-item-low $"Swap order" (netptr gui-swap-order-cb) "swap-order")
+                        (iup-separator)
+                        (gui-setup-menu-item-low $"Save top text as..." (netptr gui-save-text1-cb) "save-text1")
+                        (gui-setup-menu-item-low $"Save bottom text as..." (netptr gui-save-text2-cb) "save-text2")
+                        (gui-setup-menu-item-low $"Save frame 1 as..." (netptr gui-save-frame1-cb) "save-frame1")
+                        (gui-setup-menu-item-low $"Save frame 2 as..." (netptr gui-save-frame2-cb) "save-frame2")
+                        (iup-separator)
+                        (gui-setup-menu-item (+ "&" $"Preferences" (if (cmingw) "\t" "\t\t\t\t") "Ctrl P") (netptr cfg-cb))
+                        (iup-separator)
+                        (gui-setup-menu-item (+ "&" $"Exit" (if (cmingw) "\t" "\t\t\t\t\t\t") "Ctrl Q") (netptr iup-cancel-cb)) ))
+                (gui-setup-submenu (+ "&" $"Clear") (iup-menu
+                        (gui-setup-menu-item-low $"Clear \"scd\" data 1" (netptr gui-clear-scd1-cb) "clear-scd1")
+                        (gui-setup-menu-item-low $"Clear \"scd\" data 2" (netptr gui-clear-scd2-cb) "clear-scd2")
+                        (gui-setup-menu-item-low $"Clear \"sift check\" data" (netptr gui-clear-sck-cb) "clear-sck")
+                        (gui-setup-menu-item-low $"Clear failed checks" (netptr gui-clear-failed-sck-cb) "clear-failed-sck")
+                        (gui-setup-menu-item-low $"Clear \"mapping\" data" (netptr gui-clear-map-cb) "clear-map")
+                        (iup-separator)
+                        (gui-setup-menu-item $"Clear obsolete paths" (netptr gui-clear-paths-cb))
+                        (gui-setup-menu-item $"Clear obsolete data" (netptr gui-clear-data-and-vacuum-cb))
+                        (iup-separator)
+                        (gui-setup-menu-item-low $"Clear top text" (netptr gui-clear-text1-cb) "clear-text1")
+                        (gui-setup-menu-item-low $"Clear bottom text" (netptr gui-clear-text2-cb) "clear-text2") ))
+                (gui-setup-submenu "&Misc" (iup-menu
+                        (gui-setup-menu-item-low $"Print selected movie names" (netptr gui-print-selected-cb) "print-selected")
+                        (gui-setup-menu-item-low $"Report failed checks" (netptr gui-report-failed-cb) "report-failed")
+                        (gui-setup-menu-item $"Restore default parameters" (netptr gui-restore-default-cb)) ))
+                (gui-setup-submenu (+ "&" $"Help") (iup-menu
+                        (gui-setup-menu-item $"About FFmatch" (netptr info-cb)) ))))
+        (set <_kv "menu" "widget"> @menu) )
+
+(defun gui-setup-submenu (title menu) net gui-setup-submenu)
+(defnet gui-setup-submenu (title menu @submenu)
+        (set @submenu (iup-submenu title menu)) )
+
+(defun gui-setup-menu-item (title cback)
+        (gui-setup-menu-item-low title cback undef) )
+
+(defun gui-setup-menu-item-low (title cback item-name) net gui-setup-menu-item-low)
+(defnet gui-setup-menu-item-low (title cback item-name @item)
+        (set @item (iup-item title))
+        (iup-set-callback @item "ACTION" cback)
+        (if (stringp item-name)
+        then    (set <_kv "menu" item-name> @item) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun gui-setup-toolbar () net gui-setup-toolbar)
+(defnet gui-setup-toolbar (@wid)
+        (deflocal q btn-info btn1 btn2 btn3 btn4 btn5 btn6)
+
+        (set q <_kv "da-chiudere">)
         (set btn-info (assoc))
-        (set <info "w-toolbar"> btn-info)
-        (set @w (gtk-hbox-new false 0))
-
-        (gui-setup-button info $"select movie 1" @w
-                (pix-load-static "icons/22x22/document-open-5.png")
-                (netptr gui-open-file1)
-                btn-info
-                "open1" )
-
-        (gui-setup-button info $"select movie 2" @w
-                (pix-load-static "icons/22x22/document-open-5.png")
-                (netptr gui-open-file2)
-                btn-info
-                "open2" )
-
-        (gui-setup-button info $"start" @w
-                (pix-load-static "icons/22x22/system-run-3.png")
-                (netptr gui-start-main)
-                btn-info
-                "start" )
-
-        (gui-setup-button info $"abort" @w
-                (pix-load-static "icons/22x22/process-stop-2.png")
-                (netptr gui-abort)
-                btn-info
-                "abort" )
-
-        (gui-setup-button info $"audio tracks" @w
-                (pix-load-static "icons/22x22/audio-headset.png")
-                (netptr audio)
-                btn-info
-                "audio" )
-
-        (gui-setup-button info $"preferences" @w
-                (pix-load-static "icons/22x22/configure-2.png")
-                (netptr cfg)
-                btn-info
-                "prefs" ))
-
-(defnet gui-setup-button (info tip box pix net btn-info key)
-        (gui-setup-button-basic info tip box pix net btn-info key false) )
-
-(defnet gui-setup-toggle-button (info tip box pix net btn-info key)
-        (gui-setup-button-basic info tip box pix net btn-info key true) )
-
-(defnet gui-setup-button-basic (info tip box pix net btn-info key toggle)
-        (deflocal btn)
-
-        (if toggle
-        then    (set btn (gtk-toggle-button-new))
-        else    (set btn (gtk-button-new)) )
-        (gtk-box-pack-start box btn false false 0)
-        (gtk-container-add btn (gtk-image-new-from-pixbuf pix))
-        (gtk-signal-connect btn (if toggle "toggled" "clicked") net info)
-        (if (<> tip undef)
-        then    (gtk-widget-set-tooltip-text btn tip) )
-        (if (<> btn-info undef)
-        then    (set <btn-info key> btn) ))
+        (set <_kv "toolbar"> btn-info)
+        (set btn1 (iup-button-icon undef (netptr gui-open1-cb) (pix-load-static "22x22/document-open-5.png") q))
+        (set btn2 (iup-button-icon undef (netptr gui-open2-cb) (pix-load-static "22x22/document-open-5.png") q))
+        (set btn3 (iup-button-icon undef (netptr gui-start-cb) (pix-load-static "22x22/system-run-3.png") q))
+        (set btn4 (iup-button-icon undef (netptr gui-abort-cb) (pix-load-static "22x22/process-stop-2.png") q))
+        (set btn5 (iup-button-icon undef (netptr audio-cb) (pix-load-static "22x22/speaker3.png") q))
+        (set btn6 (iup-button-icon undef (netptr cfg-cb) (pix-load-static "22x22/configure-2.png") q))
+        (iup-set-str-attribute btn1 "TIP" $"select movie 1")
+        (iup-set-str-attribute btn2 "TIP" $"select movie 2")
+        (iup-set-str-attribute btn3 "TIP" $"start")
+        (iup-set-str-attribute btn4 "TIP" $"abort")
+        (iup-set-str-attribute btn5 "TIP" $"audio tracks")
+        (iup-set-str-attribute btn6 "TIP" $"preferences")
+        (set <btn-info "open1"> btn1)
+        (set <btn-info "open2"> btn2)
+        (set <btn-info "start"> btn3)
+        (set <btn-info "abort"> btn4)
+        (set <btn-info "audio"> btn5)
+        (set <btn-info "prefs"> btn6)
+        (set @wid (iup-hbox btn1 btn2 btn3 btn4 btn5 btn6)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -265,15 +233,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-setup-image (info @w)
-        (deflocal pix)
-
-        (set @w (gtk-image-new (w) (h)))
-        (set <info "w-image"> @w)
-        (set pix (pix-create (w) (h)))
-        (set <info "pix"> pix)
-        (pix-logo pix)
-        (gtk-image-set-from-pixbuf @w pix) )
+(defun gui-setup-body () net gui-setup-body)
+(defnet gui-setup-body (@wid)
+        (set @wid (iup-hbox (gui-setup-image) (gui-setup-text)))
+        (iup-set-str-attribute @wid "MARGIN" "0x0") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -285,146 +248,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-setup-text (info @w)
-        (deflocal vb hb w text)
+(defun gui-setup-image () net gui-setup-image)
+(defnet gui-setup-image (@wid)
+        (deflocal lbl img pix)
 
-        (set @w (gtk-vbox-new false (space)))
-
-        (set w (gtk-scrolled-window-new undef undef))
-        (gtk-box-pack-start @w w true true 0)
-        (gtk-scrolled-window-set-policy w
-                (cmacro GTK_POLICY_AUTOMATIC)
-                (cmacro GTK_POLICY_AUTOMATIC) )
-
-        (set text (gtk-text-view-new))
-        (gtk-container-add w text)
-        (gtk-text-view-set-editable text false)
-        (gtk-text-view-set-cursor-visible text false)
-        (gtk-text-view-set-wrap-mode text (cmacro GTK_WRAP_NONE))
-        (set <info "w-text1"> text)
-
-        (set vb (gtk-vbox-new false 6))
-        (gtk-box-pack-start @w vb false false 0)
-        (set <info "w-supervision-toolbar"> vb)
-
-        (set hb (gtk-hbox-new false 0))
-        (gtk-box-pack-start vb hb false false 0)
-
-                (set w (gtk-combo-box-text-new))
-                (gtk-box-pack-start hb w false false 0)
-                (set text (array 0))
-                (gtk-signal-connect w "changed" (netptr supervision-goto) info w text)
-                (array-append text [ 1 1 0 ])
-                (gtk-combo-box-text-append-text w "(000001)")
-                (set <info "a-combo-goto"> text)
-                (set <info "w-combo-goto"> w)
-
-                (set w (gtk-spin-button-new-with-range 1 100000 1))
-                (gtk-spin-button-set-value w 0)
-                (gtk-spin-button-set-numeric w true)
-                (gtk-box-pack-start hb w true true 4)
-                (gtk-signal-connect w "value-changed" (netptr supervision-pix-with-check) info)
-                (set <info "w-spin1"> w)
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/go-first-view.png")
-                        (netptr supervision-left-first)
-                        undef undef )
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/go-previous-view.png")
-                        (netptr supervision-left-double)
-                        undef undef )
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/go-previous-7.png")
-                        (netptr supervision-left)
-                        undef undef )
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/go-next-7.png")
-                        (netptr supervision-right)
-                        undef undef )
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/go-next-view.png")
-                        (netptr supervision-right-double)
-                        undef undef )
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/go-last-view.png")
-                        (netptr supervision-right-last)
-                        undef undef )
-
-                (set w (gtk-spin-button-new-with-range 1 100000 1))
-                (gtk-spin-button-set-value w 0)
-                (gtk-spin-button-set-numeric w true)
-                (gtk-box-pack-start hb w true true 4)
-                (gtk-signal-connect w "value-changed" (netptr supervision-pix-with-check) info)
-                (set <info "w-spin2"> w)
-
-        (set hb (gtk-hbox-new false 0))
-        (gtk-box-pack-start vb hb false false 0)
-
-                (set w (gtk-spin-button-new-with-range 0 1 0.01))
-                (gtk-spin-button-set-value w 0.3)
-                (gtk-spin-button-set-numeric w true)
-                (gtk-box-pack-start hb w false false 4)
-                (set <info "w-scd-spin1"> w)
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/arrow-left-3.png")
-                        (netptr supervision-scd-left1)
-                        undef undef )
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/arrow-right-3.png")
-                        (netptr supervision-scd-right1)
-                        undef undef )
-
-                (gtk-box-pack-start hb (gtk-label-new "") false false 16)
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/palm-pilot-sync.png")
-                        (netptr supervision-sync)
-                        undef undef )
-
-                (set w (gtk-spin-button-new-with-range 0 1 0.01))
-                (gtk-spin-button-set-value w 0.3)
-                (gtk-spin-button-set-numeric w true)
-                (gtk-box-pack-start hb w false false 4)
-                (set <info "w-scd-spin2"> w)
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/arrow-left-3.png")
-                        (netptr supervision-scd-left2)
-                        undef undef )
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/arrow-right-3.png")
-                        (netptr supervision-scd-right2)
-                        undef undef )
-
-                (gtk-box-pack-start hb (gtk-label-new "") true false 0)
-
-                (gui-setup-button info undef hb
-                        (pix-load-static "icons/16x16/archive-insert-2.png")
-                        (netptr supervision-force)
-                        undef undef )
-
-        (set w (gtk-scrolled-window-new undef undef))
-        (gtk-box-pack-start @w w true true 0)
-        (gtk-scrolled-window-set-policy w
-                (cmacro GTK_POLICY_AUTOMATIC)
-                (cmacro GTK_POLICY_AUTOMATIC) )
-        (set <info "w-adj2"> w)
-
-        (set text (gtk-text-view-new))
-        (gtk-container-add w text)
-        (gtk-text-view-set-editable text false)
-        (gtk-text-view-set-cursor-visible text false)
-        (gtk-text-view-set-wrap-mode text (cmacro GTK_WRAP_NONE))
-        (set <info "w-text2"> text) )
+        (set lbl (iup-label))
+        (iup-set-str-attribute lbl "ALIGNMENT" "ACENTER:ACENTER")
+        (iup-set-str-attribute lbl "EXPAND" "YES")
+        (set pix (pix-create 1 1))
+        (pix-clear pix)
+        (set <_kv "pix"> pix)
+        (set img (iup-image-rgba pix))
+        (set <_kv "img"> img)
+        (iup-set-attribute-handle lbl "IMAGE" img)
+        (set @wid (iup-scroll-box lbl))
+        (set <_kv "sbx"> @wid) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -436,11 +274,90 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-delete (e info)
-        (<> <info "th"> undef) )
+(defun gui-setup-text () net gui-setup-text)
+(defnet gui-setup-text (@wid)
+        (set @wid (iup-vbox (gui-setup-text-low 1) (gui-setup-text-toolbar) (gui-setup-text-low 2)))
+        (iup-set-str-attribute @wid "EXPAND" "VERTICAL")
+        (iup-set-str-attribute @wid "MARGIN" "0x0") )
 
-(defnet gui-exit (info)
-        (close <info "w-win">) )
+(defun gui-setup-text-low (which) net gui-setup-text-low)
+(defnet gui-setup-text-low (which @wid)
+        (set @wid (iup-text))
+        (set <_kv (+ "text" which)> @wid)
+        (iup-set-bool @wid "MULTILINE" true)
+        (iup-set-bool @wid "READONLY" (cmingw))
+        (iup-set-bool @wid "CANFOCUS" false)
+        (iup-set-bool @wid "EXPAND" true)
+        (iup-set-bool @wid "WORDWRAP" false)
+        (iup-set-bool @wid "FORMATTING" true)
+        (iup-set-bool @wid "APPENDNEWLINE" false)
+        (iup-set-str-attribute @wid "PADDING" "2x0")
+        ;(iup-set-str-attribute @wid "FONT" font)
+        (iup-set-str-attribute @wid "VALUE" "")
+        (iup-set-int @wid "VISIBLELINES" 1)
+        (iup-set-int @wid "VISIBLECOLUMNS" 1) )
+
+(defun gui-setup-text-toolbar () net gui-setup-text-toolbar)
+(defnet gui-setup-text-toolbar (@wid)
+        (set @wid (iup-vbox (gui-setup-text-toolbar1) (gui-setup-text-toolbar2)))
+        (set <_kv "supervision-toolbar"> @wid)
+        (iup-set-bool @wid "EXPAND" false)
+        (iup-set-str-attribute @wid "MARGIN" "0x5") )
+
+(defun gui-setup-text-toolbar1 () net gui-setup-text-toolbar1)
+(defnet gui-setup-text-toolbar1 (@wid)
+        (deflocal q btn1 btn2 btn3 btn4 btn5 btn6 spin1 spin2 l)
+
+        (set q <_kv "da-chiudere">)
+        (set btn1 (iup-button-icon undef (netptr gui-left-first-cb) (pix-load-static "16x16/go-first-view.png") q))
+        (set btn2 (iup-button-icon undef (netptr gui-left-double-cb) (pix-load-static "16x16/go-previous-view.png") q))
+        (set btn3 (iup-button-icon undef (netptr gui-left-cb) (pix-load-static "16x16/go-previous-7.png") q))
+        (set btn4 (iup-button-icon undef (netptr gui-right-cb) (pix-load-static "16x16/go-next-7.png") q))
+        (set btn5 (iup-button-icon undef (netptr gui-right-double-cb) (pix-load-static "16x16/go-next-view.png") q))
+        (set btn6 (iup-button-icon undef (netptr gui-right-last-cb) (pix-load-static "16x16/go-last-view.png") q))
+
+        (set spin1 (iup-text-spin 1 1 1))
+        (set spin2 (iup-text-spin 1 1 1))
+        (iup-set-str-attribute spin1 "EXPAND" "HORIZONTAL")
+        (iup-set-str-attribute spin2 "EXPAND" "HORIZONTAL")
+        (set <_kv "spin1"> spin1)
+        (set <_kv "spin2"> spin2)
+        (iup-set-callback spin1 "VALUECHANGED_CB" (netptr gui-spin-cb))
+        (iup-set-callback spin2 "VALUECHANGED_CB" (netptr gui-spin-cb))
+
+        (set l (iup-list))
+        (iup-set-bool l "DROPDOWN" true)
+        (iup-set-callback l "ACTION" (netptr gui-combo-goto-cb))
+        (iup-set-str-attribute l 1 "(000001)")
+        ;(iup-set-int l "VALUE" 1)
+        (set <_kv "a-combo-goto"> (array default [ 1 1 0 ] 1))
+        (set <_kv "w-combo-goto"> l)
+
+        (set @wid (iup-hbox l spin1 btn1 btn2 btn3 btn4 btn5 btn6 spin2))
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
+        (iup-set-bool @wid "EXPAND" true) )
+
+(defun gui-setup-text-toolbar2 () net gui-setup-text-toolbar2)
+(defnet gui-setup-text-toolbar2 (@wid)
+        (deflocal q btn1 btn2 btn3 btn4 btn5 btn6 btn7 spin1 spin2)
+
+        (set q <_kv "da-chiudere">)
+        (set btn1 (iup-button-icon undef (netptr gui-scd-left1-cb) (pix-load-static "16x16/arrow-left-3.png") q))
+        (set btn2 (iup-button-icon undef (netptr gui-scd-right1-cb) (pix-load-static "16x16/arrow-right-3.png") q))
+        (set btn3 (iup-button-icon undef (netptr gui-sync1-cb) (pix-load-static "16x16/palm-pilot-sync.png") q))
+        (set btn4 (iup-button-icon undef (netptr gui-scd-left2-cb) (pix-load-static "16x16/arrow-left-3.png") q))
+        (set btn5 (iup-button-icon undef (netptr gui-scd-right2-cb) (pix-load-static "16x16/arrow-right-3.png") q))
+        (set btn6 (iup-button-icon undef (netptr gui-sync2-cb) (pix-load-static "16x16/palm-pilot-sync.png") q))
+        (set btn7 (iup-button-icon undef (netptr gui-force-cb) (pix-load-static "16x16/archive-insert-2.png") q))
+
+        (set spin1 (iup-text-spin-ratio 0 1 0.3 0.01))
+        (set spin2 (iup-text-spin-ratio 0 1 0.3 0.01))
+        (set <_kv "scd-spin1"> spin1)
+        (set <_kv "scd-spin2"> spin2)
+
+        (set @wid (iup-hbox spin1 btn1 btn2 btn3 (iup-fill) spin2 btn4 btn5 btn6 (iup-fill) btn7))
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
+        (iup-set-bool @wid "EXPAND" true) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -452,56 +369,142 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-update (info)
+(defnet gui-draw-image ()
+        (deflocal sbx lbl img)
+
+        (set sbx <_kv "sbx">)
+        (set lbl <sbx 0>)
+        (set img (iup-image-rgba <_kv "pix">))
+        (iup-set-attribute-handle lbl "IMAGE" img)
+        (close <_kv "img">)
+        (set <_kv "img"> img)
+        (iup-refresh lbl)
+        (iup-refresh sbx)
+        (iup-redraw lbl)
+        (iup-flush) )
+
+(defnet gui-update-image ()
+        (deflocal default-info pix av1 av2 pix1 pix2 err a sy)
+
+        (set default-info <_kv "default">)
+        (set pix <_kv "pix">)
+        (set av1 <_kv "av1">)
+        (set av2 <_kv "av2">)
+        (if (or (= av1 undef) (= av2 undef))
+        then    (pix-logo pix)
+        else    (pix-create-pixfrm pix av1 av2 pix1 pix2)
+                (alt    (seq    (av-read-frame av1 pix1 (iup-get-int <_kv "spin1"> "SPINVALUE"))
+                                (pix-gamma pix1 (cfg-get-or-default-num "filter-gamma1" default-info))
+                                (if (cfg-get-or-default "filter-mirror1" default-info)
+                                then    (pix-hflip pix1) )
+                                (if (cfg-get-or-default "filter-flip1" default-info)
+                                then    (pix-vflip pix1) )
+                                (set err false) )
+                        (set err true) )
+                (opt    (set a (cfg-get-or-default-num "filter-rotate1" default-info))
+                        (<> a 0)
+                        (set a (pix-rotate pix1 a))
+                        (close pix1)
+                        (set pix1 a) )
+                (if err
+                then    (pix-error pix1) )
+                (alt    (seq    (av-read-frame av2 pix2 (iup-get-int <_kv "spin2"> "SPINVALUE"))
+                                (pix-gamma pix2 (cfg-get-or-default-num "filter-gamma2" default-info))
+                                (if (cfg-get-or-default "filter-mirror2" default-info)
+                                then    (pix-hflip pix2) )
+                                (if (cfg-get-or-default "filter-flip2" default-info)
+                                then    (pix-vflip pix2) )
+                                (set err false) )
+                        (set err true) )
+                (opt    (set a (cfg-get-or-default-num "filter-rotate2" default-info))
+                        (<> a 0)
+                        (set a (pix-rotate pix2 a))
+                        (close pix2)
+                        (set pix2 a) )
+                (if err
+                then    (pix-error pix2) )
+                (pix-clear pix)
+                (set sy (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
+                (pix-draw-pix pix (/ (- (width pix) (width pix1)) 2) sy pix1)
+                (pix-draw-pix pix (/ (- (width pix) (width pix2)) 2) (+ sy (height pix1) (space)) pix2)
+                (close pix1 pix2) )
+        (gui-draw-image) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-disable-menu ()
+        (iup-set-bool <_kv "menu" "widget"> "ACTIVE" false) )
+
+(defnet gui-enable-menu ()
+        (iup-set-bool <_kv "menu" "widget"> "ACTIVE" true) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-update ()
         (deflocal menu-info btn-info av1 av2 name1 name2 running
                   supervision map-exists i)
 
-        (set menu-info <info "w-menu-bar">)
-        (set btn-info <info "w-toolbar">)
-        (set av1 <info "av1">)
-        (set av2 <info "av2">)
-        (set running (<> <info "th"> undef))
+        (set menu-info <_kv "menu">)
+        (iup-set-bool <menu-info "widget"> "ACTIVE" true)
+        (set btn-info <_kv "toolbar">)
+        (set av1 <_kv "av1">)
+        (set av2 <_kv "av2">)
+        (set running (<> <_kv "th"> undef))
         (set supervision (and (not running) (<> av1 undef) (<> av2 undef)))
-        (if (and supervision (not <info "supervision">))
-        then    (supervision-pix info) )
-        (set <info "supervision"> supervision)
+        (set <_kv "supervision"> supervision)
         (set map-exists false)
         (if (not running)
-        then    (set name1 (fullpath->name <info "path1">))
-                (set name2 (fullpath->name <info "path2">))
+        then    (set name1 (fullpath->name <_kv "path1">))
+                (set name2 (fullpath->name <_kv "path2">))
                 (set map-exists (cfg-exists (key-map av1 av2 name1 name2)))
-                (gtk-widget-set-sensitive <menu-info "swap-order"> supervision)
-                (gtk-widget-set-sensitive <menu-info "clear-scd1">
+                (iup-set-bool <menu-info "swap-order"> "ACTIVE" supervision)
+                (iup-set-bool <menu-info "clear-scd1"> "ACTIVE"
                         (if (= av1 undef) false (cfg-exists (key-scd av1 name1))) )
-                (gtk-widget-set-sensitive <menu-info "clear-scd2">
+                (iup-set-bool <menu-info "clear-scd2"> "ACTIVE"
                         (if (= av2 undef) false (cfg-exists (key-scd av2 name2))) )
                 (set i (if (or (= av1 undef) (= av2 undef))
                                 false
                                 (cfg-exists (key-sck av1 av2 name1 name2)) ))
-                (gtk-widget-set-sensitive <menu-info "clear-sck"> i)
-                (gtk-widget-set-sensitive <menu-info "clear-failed-sck"> i)
-                (gtk-widget-set-sensitive <menu-info "report-failed"> i)
-                (gtk-widget-set-sensitive <menu-info "clear-map">
+                (iup-set-bool <menu-info "clear-sck"> "ACTIVE" i)
+                (iup-set-bool <menu-info "clear-failed-sck"> "ACTIVE" i)
+                (iup-set-bool <menu-info "report-failed"> "ACTIVE" i)
+                (iup-set-bool <menu-info "clear-map"> "ACTIVE"
                         (if (or (= av1 undef) (= av2 undef)) false map-exists) )
-                (set i (> (length <info "w-text1">) 0))
-                (gtk-widget-set-sensitive <menu-info "save-text1"> i)
-                (gtk-widget-set-sensitive <menu-info "clear-text1"> i)
-                (set i (> (length <info "w-text2">) 0))
-                (gtk-widget-set-sensitive <menu-info "save-text2"> i)
-                (gtk-widget-set-sensitive <menu-info "clear-text2"> i)
-                (gtk-widget-set-sensitive <menu-info "save-frame1"> supervision)
-                (gtk-widget-set-sensitive <menu-info "save-frame2"> supervision)
-                (gtk-widget-set-sensitive <menu-info "print-selected">
+                (set i (> (iup-get-int <_kv "text1"> "COUNT") 0))
+                (iup-set-bool <menu-info "save-text1"> "ACTIVE" i)
+                (iup-set-bool <menu-info "clear-text1"> "ACTIVE" i)
+                (set i (> (iup-get-int <_kv "text2"> "COUNT") 0))
+                (iup-set-bool <menu-info "save-text2"> "ACTIVE" i)
+                (iup-set-bool <menu-info "clear-text2"> "ACTIVE" i)
+                (iup-set-bool <menu-info "save-frame1"> "ACTIVE" supervision)
+                (iup-set-bool <menu-info "save-frame2"> "ACTIVE" supervision)
+                (iup-set-bool <menu-info "print-selected"> "ACTIVE"
                         (or (<> av1 undef) (<> av2 undef)) ))
-        (gtk-widget-set-sensitive <info "w-menu"> (not running))
-        (gtk-widget-set-sensitive <info "w-supervision-toolbar"> (and (not running) supervision))
-        (gtk-widget-set-sensitive <btn-info "open1"> (not running))
-        (gtk-widget-set-sensitive <btn-info "open2"> (not running))
-        (gtk-widget-set-sensitive <btn-info "start"> supervision)
-        (gtk-widget-set-sensitive <btn-info "abort">
-                (and running (not <info "abort">)) )
-        (gtk-widget-set-sensitive <btn-info "audio"> map-exists)
-        (gtk-widget-set-sensitive <btn-info "prefs"> (not running)) )
+        (iup-set-bool <menu-info "widget"> "ACTIVE" (not running))
+        (iup-set-bool <_kv "supervision-toolbar"> "ACTIVE" (and (not running) supervision))
+        (iup-set-bool <btn-info "open1"> "ACTIVE" (not running))
+        (iup-set-bool <btn-info "open2"> "ACTIVE" (not running))
+        (iup-set-bool <btn-info "start"> "ACTIVE" supervision)
+        (iup-set-bool <btn-info "abort"> "ACTIVE"
+                (and running (not <_kv "abort">)) )
+        (iup-set-bool <btn-info "audio"> "ACTIVE" map-exists)
+        (iup-set-bool <btn-info "prefs"> "ACTIVE" (not running)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -513,21 +516,49 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-report (info)
+(defnet gui-resize-cb (dlg w h)
+        (opt    (= <_kv "th"> undef)
+                (iup-post-call (netptr gui-resize-post))) )
+
+(defnet gui-resize-post ()
+        (deflocal sbx lbl w h mag pix)
+
+        (set sbx <_kv "sbx">)
+        (set lbl <sbx 0>)
+        (set w (iup-get-int sbx "RASTERSIZE"))
+        (set h (iup-get-int2 sbx "RASTERSIZE"))
+        ;(print w " x " h nl)
+        (set mag (pow (zoom-step) <_kv "zoom-level">))
+        (set pix (pix-create (* w mag) (* h mag)))
+        (pixp pix)
+        (close <_kv "pix">)
+        (set <_kv "pix"> pix)
+        (gui-update-image) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-report ()
         (deflocal text1 ab cb av1 av2 name1 name2 k sck map p q n i)
 
-        (set text1 <info "w-text1">)
-        (set ab <info "a-combo-goto">)
-        (set cb <info "w-combo-goto">)
+        (set text1 <_kv "text1">)
+        (set ab <_kv "a-combo-goto">)
+        (set cb <_kv "w-combo-goto">)
         (while (> (length ab) 0) do
-                (array-remove ab 0)
-                (gtk-combo-box-text-remove cb 0) )
-        (alt    (seq    (set av1 <info "av1">)
+                (array-remove ab 0) )
+        (alt    (seq    (set av1 <_kv "av1">)
                         (<> av1 undef)
-                        (set av2 <info "av2">)
+                        (set av2 <_kv "av2">)
                         (<> av2 undef)
-                        (set name1 (fullpath->name <info "path1">))
-                        (set name2 (fullpath->name <info "path2">))
+                        (set name1 (fullpath->name <_kv "path1">))
+                        (set name2 (fullpath->name <_kv "path2">))
                         (set k (cfg-get (key-map av1 av2 name1 name2)))
                         (<> k undef)
                         (set sck (cfg-get (key-sck av1 av2 name1 name2)))
@@ -537,22 +568,25 @@
                                 (set p <i 0>)
                                 (set q <i 1>)
                                 (set n <i 2>)
-                                (map-bind-basic (car map) p q n)
-                                (map-bind-basic (cdr map) q p n) )
-                        (map-report-basic (cons text1 ab)
+                                (map-bind-low (car map) p q n)
+                                (map-bind-low (cdr map) q p n) )
+                        (map-report-low (cons text1 ab)
                                 map name1 name2
                                 (/ <sck 3> <sck 2>)
                                 (/ <sck 5> <sck 4>)
                                 (length <sck 0>) <sck 1> ))
-                (gtk-text-buffer-set-text text1 "") )
+                (iup-set-str-attribute text1 "VALUE" "") )
         (if (= (length ab) 0)
         then    (array-append ab [ 1 1 0 ]) )
+        (set p 1)
         (for i in ab do
                 (set n <i 2>)
-                (gtk-combo-box-text-append-text cb
+                (iup-set-str-attribute cb p
                         (+ <[ "(" "[" "-" "[" ] n>
                            (int->str <i 0> 6 '0')
-                           <[ ")" "-" "]" "]" ] n> ))))
+                           <[ ")" "-" "]" "]" ] n> ))
+                (inc p) )
+        (iup-set-str-attribute cb p) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -564,128 +598,38 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-open-file1 (info)
-        (gui-open-file info 1) )
+(defnet gui-print-info-on-selected-file (which)
+        (deflocal text2 path av vidx ar)
 
-(defnet gui-open-file2 (info)
-        (gui-open-file info 2) )
-
-(defnet gui-open-file (info which)
-        (deflocal win vb hb fc path btn i)
-
-        (set win (gtk-window-new))
-        (gtk-window-set-transient-for win <info "w-win">)
-        (gtk-window-set-modal win true)
-        (gtk-window-set-title win (+ $"Select movie " which))
-        (gtk-container-set-border-width win 8)
-
-        (set vb (gtk-vbox-new false 10))
-        (gtk-container-add win vb)
-
-        (set fc (gtk-file-chooser-widget-new (cmacro GTK_FILE_CHOOSER_ACTION_OPEN)))
-        (gtk-box-pack-start vb fc true true 0)
-        (gtk-file-chooser-set-show-hidden fc true)
-
-        (set path (cfg-get "path"))
-        (repeat until (= path undef)
-                (alt    (seq    (pathexists path)
-                                (if (isdir path)
-                                then    (gtk-file-chooser-set-current-folder fc path)
-                                else    (gtk-file-chooser-select-filename fc path) )
-                                (clr path) )
-                        (seq    (rtrim path '/')
-                                (search "/" path i (maxint))
-                                (set path (sub 0 (+ i 1) path)) )
-                        (clr path) ))
-
-        (set hb (gtk-hbox-new false 6))
-        (gtk-box-pack-start vb hb false false 0)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-cancel-3.png")
-                $"Cancel"
-                (netptr gtk-close-win)
-                win ) false false 0 )
-
-        (set i (list fc win which info))
-
-        (gtk-signal-connect fc "file-activated" (netptr gui-open-file-ok) i)
-
-        (set btn (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-apply.png")
-                "Ok"
-                (netptr gui-open-file-ok)
-                i ))
-        (gtk-box-pack-end hb btn false false 0)
-
-        (opt    (gui-open-file-combo fc btn i)
-                (gtk-box-pack-start hb i false false 0) )
-
-        (gtk-window-set-default-size win (fc-width) (fc-height))
-        (gtk-widget-show-all win) )
-
-(defnet gui-open-file-combo (fc btn @w)
-        (deflocal a i)
-
-        (set a (array 0))
-        (sqlite3-exec-data _db (netptr gui-open-file-combo-cback) a
-                "SELECT path,name FROM paths ORDER BY name" )
-        (> (length a) 0)
-
-        (set @w (gtk-combo-box-text-new))
-        (gtk-signal-connect @w "changed" (netptr gui-open-file-combo-selection) @w a fc btn)
-
-        (for i in 1 .. (length a) do
-                (gtk-combo-box-text-append-text @w (str-ellipsize-middle <a (for-pos) 0> 50)) ))
-
-(defnet gui-open-file-combo-cback (a path name)
-        (if (pathexists path)
-        then    (array-append a (cons name path)) ))
-
-(defnet gui-open-file-combo-selection (cb a fc btn)
-        (gtk-file-chooser-select-filename fc (cdr <a (gtk-combo-box-get-active cb)>))
-        ;(gtk-button-clicked btn)
-        )
-
-(defnet gui-open-file-ok (info)
-        (deflocal path name win which av n)
-
-        (set path (gtk-file-chooser-get-filename <info 0>))
-        (pathexists path)
-        (not (isdir path))
-        (set win <info 1>)
-        (set which <info 2>)
-        (set info <info 3>)
-        (set av (av-avformat-open-input path))
-        (alt    (seq    (<> av undef)
-                        (set n (av-r-frame-rate av (av-video-stream-idx av)))
-                        (rationalp n)
-                        (> n 0)
-                        (set n (av-approximated-number-of-frames av))
-                        (integerp n)
-                        (>= n 3) )
-                (seq    (close av)
-                        (gtk-message-error win (+ path $": movie not supported"))
-                        (fail) ))
-        (close win)
-        (set name (fullpath->name path))
-        (gtk-text-buffer-append <info "w-text2">
-                (+ $"selected movie " which ": `" name "'" nl) )
-        (gtk-adjustment-set-value <info "w-adj2"> (maxint))
-        (close <info (+ "av" which)>)
-        (set <info (+ "path" which)> path)
-        (set <info (+ "av" which)> av)
-        (gtk-spin-button-set-range <info (+ "w-spin" which)> 1 (- n 2))
-        (supervision-clear info)
-        (if <info "supervision">
-        then    (supervision-pix info) )
-        (cfg-set "path" path)
-        (opt (sqlite3-exec _db undef
-                "INSERT INTO paths VALUES('"
-                (sqlite3-escape-strings path) "','"
-                (sqlite3-escape-strings name) "')" ))
-        (gui-report info)
-        (gui-update info) )
+        (set text2 <_kv "text2">)
+        (set path <_kv (+ "path" which)>)
+        (set av <_kv (+ "av" which)>)
+        (if (and (stringp path) (<> av undef))
+        then    (set vidx (av-video-stream-idx av))
+                (set ar (av-sample-aspect-ratio av vidx))
+                (iup-text-append-and-go-end text2
+                        (+ $"selected movie" " " which ": " ))
+                (iup-text-append-and-go-end-color text2 (blue)
+                        (+ (fullpath->name path) nl) )
+                (iup-text-append-and-go-end text2
+                        (+ $"resolution" ": ") )
+                (iup-text-append-and-go-end-color text2 (blue)
+                        (sprint (width av) " x " (height av) nl) )
+                (if (and (> ar 0) (<> ar 1))
+                then    (iup-text-append-and-go-end text2
+                                (+ $"display resolution" ": ") )
+                        (iup-text-append-and-go-end-color text2 (blue)
+                            (if (< ar 1)
+                                (sprint (width av) " x " (rint (/ (height av) ar)) nl)
+                                (sprint (rint (* (width av) ar)) " x " (height av) nl) )))
+                (iup-text-append-and-go-end text2 (+ $"approximate number of frames" ": "))
+                (iup-text-append-and-go-end-color text2 (blue)
+                        (sprint (- (av-approximated-number-of-frames av) 2) nl) )
+                (iup-text-append-and-go-end text2 "codec: ")
+                (iup-text-append-and-go-end-color text2 (blue) (av-codec-id av vidx))
+                (iup-text-append-and-go-end text2 " (decoder: ")
+                (iup-text-append-and-go-end-color text2 (blue) (av-codec-name av vidx))
+                (iup-text-append-and-go-end text2 (+ ")" nl nl)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -697,75 +641,471 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-save-text (info which)
-        (deflocal win vb hb fc path i)
+(defnet gui-open1-cb (self)
+        (gui-open-low self 1) )
 
-        (set win (gtk-window-new))
-        (gtk-window-set-transient-for win <info "w-win">)
-        (gtk-window-set-modal win true)
-        (gtk-window-set-title win (+ "Save" ' ' <[ "top" "bottom" ] (- which 1)> " text as..."))
-        (gtk-container-set-border-width win 8)
+(defnet gui-open2-cb (self)
+        (gui-open-low self 2) )
 
-        (set vb (gtk-vbox-new false 10))
-        (gtk-container-add win vb)
+(defnet gui-open-low (self which)
+        (deflocal path av n name)
 
-        (set fc (gtk-file-chooser-widget-new (cmacro GTK_FILE_CHOOSER_ACTION_SAVE)))
-        (gtk-box-pack-start vb fc true true 0)
-        (gtk-file-chooser-set-show-hidden fc true)
+        (gui-disable-menu)
+        (opt    (set path (iup-choose-file-open self (+ $"Select movie " which) (cfg-get "path") undef true))
+                (stringp path)
+                (cfg-set "path" path)
+                (set av (if (cfg-get-or-default "cuvid-enabled" <_kv "default">) (av-avformat-open-input-cuvid path) (av-avformat-open-input path)))
+                (alt    (seq    (<> av undef)
+                                (set n (av-r-frame-rate av (av-video-stream-idx av)))
+                                (rationalp n)
+                                (> n 0)
+                                (set n (av-approximated-number-of-frames av))
+                                (integerp n)
+                                (>= n 3) )
+                        (seq    (close av)
+                                (iup-error60 self (+ path $": movie not supported"))
+                                (fail) ))
+                (set name (fullpath->name path))
+                (set <_kv (+ "path" which)> path)
+                (close <_kv (+ "av" which)>)
+                (set <_kv (+ "av" which)> av)
+                (iup-set-int <_kv (+ "spin" which)> "SPINMAX" (- n 2))
+                (iup-set-int <_kv (+ "spin" which)> "SPINVALUE" 1)
+                (opt (sqlite3-exec _db undef
+                        "INSERT INTO paths VALUES('"
+                        (sqlite3-escape-strings path) "','"
+                        (sqlite3-escape-strings name) "')" ))
+                (gui-print-info-on-selected-file which)
+                (gui-report)
+                (gui-update-image) )
+        (gui-update) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-zoom-in-cb (self)
+        (gui-zoom-low 1) )
+
+(defnet gui-zoom-out-cb (self)
+        (gui-zoom-low -1) )
+
+(defnet gui-zoom-zero-cb (self)
+        (deflocal incr)
+
+        (set incr <_kv "zoom-level">)
+        (if (<> incr 0)
+        then    (gui-zoom-low -incr) ))
+
+(defnet gui-zoom-low (incr)
+        (opt    (= <_kv "zoom-lock"> undef)
+                (set <_kv "zoom-lock"> 0)
+                (opt (gui-zoom-low-low incr))
+                (assoc-clr _kv "zoom-lock") ))
+
+(defnet gui-zoom-low-low (incr)
+        (deflocal pix w h)
+
+        (set pix <_kv "pix">)
+        (set w (width pix))
+        (set h (height pix))
+        (if (or (and (> incr 0) (or (>= w 4000) (>= h 6000)))
+                (and (< incr 0) (or (<= w 40) (<= h 80))) )
+        then    (iup-text-append-and-go-end <_kv "text2"> (+ "zoom in/out: limit reached" nl))
+        else    (assoc-inc _kv "zoom-level" incr)
+                (gui-resize-post)
+                (set pix <_kv "pix">)
+                (set w (width pix))
+                (set h (height pix)) )
+        (iup-text-append-and-go-end <_kv "text2"> (+
+                "zoom level: " <_kv "zoom-level"> nl
+                "display area: " w " x " h nl nl ))
+        (gui-update) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-spin-cb (self)
+        (gui-update-image) )
+
+(defnet gui-combo-goto-cb (self)
+        (opt (gui-combo-goto-low)) )
+
+(defnet gui-combo-goto-low ()
+        (deflocal a spin1 spin2)
+
+        (set a (iup-get-int <_kv "w-combo-goto"> "VALUE"))
+        (> a 0)
+        (set a <_kv "a-combo-goto" (- a 1)>)
+        (set spin1 <_kv "spin1">)
+        (set spin2 <_kv "spin2">)
+        (or (<> <a 0> (iup-get-int spin1 "SPINVALUE"))
+            (<> <a 1> (iup-get-int spin2 "SPINVALUE")) )
+        (iup-set-int spin1 "SPINVALUE" <a 0>)
+        (iup-set-int spin2 "SPINVALUE" <a 1>)
+        (gui-update-image) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-left-cb (self)
+        (gui-sync-skip-low -1) )
+
+(defnet gui-right-cb (self)
+        (gui-sync-skip-low 1) )
+
+(defnet gui-left-double-cb (self)
+        (gui-sync-skip-low -(cfg-get-or-default-num "supervision-skip-double" <_kv "default">)) )
+
+(defnet gui-right-double-cb (self)
+        (gui-sync-skip-low (cfg-get-or-default-num "supervision-skip-double" <_kv "default">)) )
+
+(defnet gui-left-first-cb (self)
+        (deflocal n c i t p done pirr)
+
+        (set n (iup-get-int <_kv "spin1"> "SPINVALUE"))
+        (set c 1)
+        (set done false)
+        (set pirr false)
+        (for i in <_kv "a-combo-goto"> do
+                (set t <i 2>)
+                (if (or (= t 1) (= t 3) (and (= t 0) (not pirr)))
+                then    (set p <i 0>)
+                        (if (> p n)
+                        then    (set done true)
+                        else    (set c p) ))
+                until done
+                (set pirr (= t 0)) )
+        (gui-sync-skip-low (- c n)) )
+
+(defnet gui-right-last-cb (self)
+        (deflocal n c i t p done pirr)
+
+        (set n (iup-get-int <_kv "spin1"> "SPINVALUE"))
+        (set c (- (av-approximated-number-of-frames <_kv "av1">) 2))
+        (set done false)
+        (set pirr false)
+        (for i in <_kv "a-combo-goto"> rev do
+                (set t <i 2>)
+                (if (or (= t 2) (= t 3) (and (= t 0) (not pirr)))
+                then    (set p <i 0>)
+                        (if (< p n)
+                        then    (set done true)
+                        else    (set c p) ))
+                until done
+                (set pirr (= t 0)) )
+        (gui-sync-skip-low (- c n)) )
+
+(defnet gui-sync-skip-low (n)
+        (opt (gui-sync-skip-low-low n)) )
+
+(defnet gui-sync-skip-low-low (n)
+        (deflocal av1 av2 spin1 spin2 n1 n2 c)
+
+        (<> n 0)
+        (set av1 <_kv "av1">)
+        (set av2 <_kv "av2">)
+        (set spin1 <_kv "spin1">)
+        (set spin2 <_kv "spin2">)
+        (set n1 (+ n (iup-get-int spin1 "SPINVALUE")))
+        (set n2 (+ n (iup-get-int spin2 "SPINVALUE")))
+        (set c (min n1 n2))
+        (if (< c 1)
+        then    (set c (- 1 c))
+                (inc n1 c)
+                (inc n2 c) )
+        (set c (min (- (av-approximated-number-of-frames av1) n1) (- (av-approximated-number-of-frames av2) n2)))
+        (if (< c 2)
+        then    (inc c -2)
+                (inc n1 c)
+                (inc n2 c) )
+        (iup-set-int spin1 "SPINVALUE" n1)
+        (iup-set-int spin2 "SPINVALUE" n2)
+        (gui-update-image) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-sync1-cb (self)
+        (opt (gui-sync1-low)) )
+
+(defnet gui-sync1-low ()
+        (deflocal map spin1 spin2 n1 n2 p q n u ut prv i)
+
+        (set i (cfg-get (key-map <_kv "av1">
+                                 <_kv "av2">
+                                 (fullpath->name <_kv "path1">)
+                                 (fullpath->name <_kv "path2">) )))
+        (<> i undef)
+        (set map (map-create <i 0> <i 1>))
+        (set spin1 <_kv "spin1">)
+        (set spin2 <_kv "spin2">)
+        (set n1 (iup-get-int spin1 "SPINVALUE"))
+        (set n2 (iup-get-int spin2 "SPINVALUE"))
+        (for i in <i 2> do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (in n1 p .. (+ p n -1))
+                then    (set n (+ n1 q -p))
+                        (<> n n2)
+                        (iup-set-int spin2 "SPINVALUE" n)
+                        (gui-update-image)
+                        (fail) )
+                (map-bind-low (car map) p q n)
+                (map-bind-low (cdr map) q p n) )
+        (set u (map-undef-low (car map) (cdr map)))
+        (set ut (queue-get u))
+        (for i in (car map) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (= n undef)
+                then    (if (and (= p <ut 0>) (= q <ut 1>))
+                        then    (if (in n1 p .. q)
+                                then    (set n (min (max (+ <ut 2> n1 -p) <ut 2>) <ut 3>))
+                                        (if (= n n2)
+                                        then    (set n (min (max (+ <ut 3> n1 -q) <ut 2>) <ut 3>)) )
+                                        (<> n n2)
+                                        (iup-set-int spin2 "SPINVALUE" n)
+                                        (gui-update-image)
+                                        (fail) )
+                                (set ut (queue-get u))
+                        else    (if (in n1 p .. q)
+                                then    (set n (if (= prv undef) 1 prv))
+                                        (<> n n2)
+                                        (iup-set-int spin2 "SPINVALUE" n)
+                                        (gui-update-image)
+                                        (fail) ))
+                        (clr prv)
+                else    (set prv (+ n q -p)) )))
+
+(defnet gui-sync2-cb (self)
+        (opt (gui-sync2-low)) )
+
+(defnet gui-sync2-low ()
+        (iup-info60 <_kv "dlg"> "sync2: to do") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-force-cb (self)
+        (opt (gui-force-low self)) )
+
+(defnet gui-force-low (self)
+        (deflocal key k a map n1 n2 d p q n i)
+
+        (set key (key-map <_kv "av1">
+                          <_kv "av2">
+                          (fullpath->name <_kv "path1">)
+                          (fullpath->name <_kv "path2">) ))
+        (set k (cfg-get key))
+        (<> k undef)
+        (set a <k 2>)
+        (set n1 (iup-get-int <_kv "spin1"> "SPINVALUE"))
+        (set n2 (iup-get-int <_kv "spin2"> "SPINVALUE"))
+        (set map (map-create <k 0> <k 1>))
+        (for i in a do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (in n1 p .. (+ p n -1))
+                then    (set d (for-pos))
+                        (if (= (+ n1 q -p) n2)
+                        then    (iup-confirm60 self (sprint n1 $" is actually linked to " n2 "." nl
+                                                            $"Do you want to remove the link?" ))
+                                (array-remove a d)
+                                (cfg-set key k)
+                                (gui-report)
+                                (gui-update)
+                                (if (= n1 p)
+                                then    (for i in <_kv "a-combo-goto"> do
+                                                (if (and (= <i 0> (+ n1 n)) (in <i 2> [ 1 3 ]))
+                                                then    (iup-set-int <_kv "w-combo-goto"> "VALUE" (+ (for-pos) 1)) )))
+                                (if (= n1 (+ p n -1))
+                                then    (for i in <_kv "a-combo-goto"> do
+                                                (if (and (= <i 0> (- n1 n)) (in <i 2> [ 2 3 ]))
+                                                then    (iup-set-int <_kv "w-combo-goto"> "VALUE" (+ (for-pos) 1)) )))
+                                (fail) )
+                else    (map-bind-low (car map) p q n)
+                        (map-bind-low (cdr map) q p n) ))
+        (set p false)
+        (for i in (map-undef-low (car map) (cdr map)) do
+                (set p (in n1 <i 0> .. <i 1>))
+                until p )
+        (if (not p)
+        then    (iup-warning60 self (+ $"Can't link " n1 $" to " n2))
+                (fail) )
+        (if (not (in n2 <i 2> .. <i 3>))
+        then    (iup-warning60 self (+ $"At the moment " n1 $" can only be mapped in ["
+                        (int->str <i 2> 6 '0') "-" (int->str <i 3> 6 '0') "]." ))
+                (fail) )
+        (iup-confirm60 self (sprint n1 $" will be linked to " n2 ". " $"Are you sure?"
+                                    (if (integerp d) $"\nNOTE: a previously established link will be removed." "") ))
+        (if (integerp d)
+        then    (array-remove a d) )
+        (array-append a (list n1 n2 1))
+        (cfg-set key k)
+        (gui-report)
+        (gui-update)
+        (for i in <_kv "a-combo-goto"> do
+                (if (= <i 0> n1)
+                then    (iup-set-int <_kv "w-combo-goto"> "VALUE" (+ (for-pos) 1)) )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-scd-left1-cb (self)
+        (gui-scd-move-low 1 true) )
+
+(defnet gui-scd-right1-cb (self)
+        (gui-scd-move-low 1 false) )
+
+(defnet gui-scd-left2-cb (self)
+        (gui-scd-move-low 2 true) )
+
+(defnet gui-scd-right2-cb (self)
+        (gui-scd-move-low 2 false) )
+
+(defnet gui-scd-move-low (which left)
+        (opt (gui-scd-move-low-low which left)) )
+
+(defnet gui-scd-move-low-low (which left)
+        (deflocal av scd thres sp o n)
+
+        (set av <_kv (+ "av" which)>)
+        (set scd (cfg-get (key-scd av (fullpath->name <_kv (+ "path" which)>))))
+        (listp scd)
+        (set scd <scd 4>)
+        (set thres (iup-text-spin-ratio-val <_kv (+ "scd-spin" which)>))
+        (set sp <_kv (+ "spin" which)>)
+        (set o (iup-get-int sp "SPINVALUE"))
+        (if left
+        then    (for n in 1 .. (- o 1) rev do
+                        (if (>= <scd n> thres)
+                        then    (iup-set-int sp "SPINVALUE" n)
+                                (gui-update-image)
+                                (fail) ))
+        else    (for n in (+ o 1) .. (- (av-approximated-number-of-frames av) 2) do
+                        (if (>= <scd n> thres)
+                        then    (iup-set-int sp "SPINVALUE" n)
+                                (gui-update-image)
+                                (fail) ))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-clear-text1-cb (self)
+        (iup-text-set-and-go-home <_kv "text1"> "")
+        (gui-update) )
+
+(defnet gui-clear-text2-cb (self)
+        (iup-text-set-and-go-home <_kv "text2"> "")
+        (gui-update) )
+
+(defnet gui-print-selected-cb (self)
+        (gui-print-info-on-selected-file 1)
+        (gui-print-info-on-selected-file 2)
+        (gui-update) )
+
+(defnet gui-restore-default-cb (self)
+        (opt (gui-restore-default-low self)) )
+
+(defnet gui-restore-default-low (self)
+        (deflocal i)
+
+        (iup-confirm60 self (+ $"Default parameters will be restored." nl $"Are you sure?"))
+        (sqlite3-begin _db)
+        (alt    (seq    (for i in (default-parameters) do
+                                (cfg-set (car i) (cdr i)) )
+                        (sqlite3-end _db)
+                        (gui-update-image) )
+                (seq    (sqlite3-rollback _db)
+                        (iup-error60 self "errore nel salvataggio configurazione") )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-save-text1-cb (self)
+        (opt (gui-save-text-low self 1)) )
+
+(defnet gui-save-text2-cb (self)
+        (opt (gui-save-text-low self 2)) )
+
+(defnet gui-save-text-low (self which)
+        (deflocal path f s)
 
         (set path (cfg-get "save-path"))
-        (repeat until (= path undef)
-                (alt    (seq    (pathexists path)
-                                (if (isdir path)
-                                then    (gtk-file-chooser-set-current-folder fc path)
-                                else    (gtk-file-chooser-select-filename fc path) )
-                                (clr path) )
-                        (seq    (rtrim path '/')
-                                (search "/" path i (maxint))
-                                (set path (sub 0 (+ i 1) path)) )
-                        (clr path) ))
-
-        (set hb (gtk-hbox-new false 6))
-        (gtk-box-pack-start vb hb false false 0)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-cancel-3.png")
-                $"Cancel"
-                (netptr gtk-close-win)
-                win ) false false 0 )
-
-        (set i (list fc win which info))
-
-        (gtk-signal-connect fc "file-activated" (netptr gui-save-text-ok) i)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-apply.png")
-                "Ok"
-                (netptr gui-save-text-ok)
-                i ) false false 0 )
-
-        (gtk-window-set-default-size win (fc-width) (fc-height))
-        (gtk-widget-show-all win) )
-
-(defnet gui-save-text-ok (info)
-        (deflocal path win which f s)
-
-        (set path (gtk-file-chooser-get-filename <info 0>))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ "Save" ' ' <[ "top" "bottom" ] (- which 1)> " text as...")
+                path
+                "info.txt"
+                true ))
         (stringp path)
-        (not (isdir path))
-        (set win <info 1>)
-        (set which <info 2>)
-        (set info <info 3>)
-        (if (pathexists path)
-        then    (gtk-question win (+ $"File `" path $"' exists." nl
-                                     $"Do you want to overwrite it?" )))
+
         (set f (fcreate path))
         (if (= f undef)
-        then    (gtk-message-error win (+ $"Creation of file `" path $"' failed."))
+        then    (iup-error60 self (+ $"Creation of file `" path $"' failed."))
                 (fail) )
-        (close win)
         (cfg-set "save-path" path)
-        (set s (gtk-text-buffer-get-text <info (+ "w-text" which)>))
+        (set s (iup-get-str-attribute <_kv (+ "text" which)> "VALUE"))
         (if (<> (utf8-length s) (length s))
         then    (set s (+ (utf8-bom) s)) )
         (fprint f
@@ -787,32 +1127,34 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-swap-order (info)
-        (deflocal av1 av2 path1 path2 n1 n2)
+(defnet gui-save-frame1-cb (self)
+        (opt (gui-save-frame-low self 1)) )
 
-        (set av1 <info "av1">)
-        (<> av1 undef)
-        (set av2 <info "av2">)
-        (<> av2 undef)
-        (set path1 <info "path1">)
-        (set path2 <info "path2">)
-        (set <info "av1"> av2)
-        (set <info "av2"> av1)
-        (set <info "path1"> path2)
-        (set <info "path2"> path1)
-        (set path1 <info "w-spin1">)
-        (set path2 <info "w-spin2">)
-        (set n1 (gtk-spin-button-get-value path1))
-        (set n2 (gtk-spin-button-get-value path2))
-        (gtk-spin-button-set-range path1 1 (- (av-approximated-number-of-frames av2) 2))
-        (gtk-spin-button-set-range path2 1 (- (av-approximated-number-of-frames av1) 2))
-        (gtk-spin-button-set-value path1 n2)
-        (gtk-spin-button-set-value path2 n1)
-        (if <info "supervision">
-        then    (supervision-clear info)
-                (supervision-pix info) )
-        (gui-report info)
-        (gui-print-selected info) )
+(defnet gui-save-frame2-cb (self)
+        (opt (gui-save-frame-low self 2)) )
+
+(defnet gui-save-frame-low (self which)
+        (deflocal path av pix)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ $"Save frame " which $" as...")
+                path
+                "frame.png"
+                true ))
+        (stringp path)
+
+        (cfg-set "save-path" path)
+        (set av <_kv (+ "av" which)>)
+        (set pix (pix-create (width av) (height av)))
+        (alt    (av-read-frame av pix (iup-get-int <_kv (+ "spin" which)> "SPINVALUE"))
+                (pix-clear pix) )
+        (if (rmatch case path ".jpg" ".jpeg")
+        then    (pix-save-jpg pix path)
+        else    (pix-save-png pix path) )
+        (close pix) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -824,119 +1166,131 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-clear-scd1 (info)
+(defnet gui-swap-order-cb (self)
+        (opt (gui-swap-order-low self)) )
+
+(defnet gui-swap-order-low (self)
+        (deflocal a1 a2 p1 p2 n1 n2)
+
+        (set a1 <_kv "av1">)
+        (<> a1 undef)
+        (set a2 <_kv "av2">)
+        (<> a2 undef)
+        (set p1 <_kv "path1">)
+        (set p2 <_kv "path2">)
+        (set <_kv "av1"> a2)
+        (set <_kv "av2"> a1)
+        (set <_kv "path1"> p2)
+        (set <_kv "path2"> p1)
+        (set p1 <_kv "spin1">)
+        (set p2 <_kv "spin2">)
+        (set n1 (iup-get-int p1 "SPINVALUE"))
+        (set n2 (iup-get-int p2 "SPINVALUE"))
+        (set a1 (iup-get-int p1 "SPINMAX"))
+        (set a2 (iup-get-int p2 "SPINMAX"))
+        (iup-set-int p1 "SPINMAX" a2)
+        (iup-set-int p2 "SPINMAX" a1)
+        (iup-set-int p1 "SPINVALUE" n2)
+        (iup-set-int p2 "SPINVALUE" n1)
+        (gui-report)
+        (gui-print-selected-cb self)
+        (gui-update-image) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-clear-scd1-cb (self)
+        (opt (gui-clear-scd-low self 1)) )
+
+(defnet gui-clear-scd2-cb (self)
+        (opt (gui-clear-scd-low self 2)) )
+
+(defnet gui-clear-scd-low (self which)
         (deflocal av key)
 
-        (set av <info "av1">)
+        (set av <_kv (+ "av" which)>)
         (<> av undef)
-        (set key (key-scd av (fullpath->name <info "path1">)))
+        (set key (key-scd av (fullpath->name <_kv (+ "path" which)>)))
         (truep (cfg-exists key))
-        (gtk-question <info "w-win">
-                (+ $"The \"scd\" data for movie 1 will be deleted." nl $"Are you sure?") )
+        (iup-confirm60 self
+                (+ $"The \"scd\" data for movie" ' ' which ' ' $"will be deleted." nl $"Are you sure?") )
         (cfg-clr key)
-        (gui-update info) )
+        (gui-update) )
 
-(defnet gui-clear-scd2 (info)
-        (deflocal av key)
+(defnet gui-clear-sck-cb (self)
+        (opt (gui-clear-sck-low self)) )
 
-        (set av <info "av2">)
-        (<> av undef)
-        (set key (key-scd av (fullpath->name <info "path2">)))
-        (truep (cfg-exists key))
-        (gtk-question <info "w-win">
-                (+ $"The \"scd\" data for movie 2 will be deleted." nl $"Are you sure?") )
-        (cfg-clr key)
-        (gui-update info) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet gui-clear-sck (info)
+(defnet gui-clear-sck-low (self)
         (deflocal av1 av2 key)
 
-        (set av1 <info "av1">)
+        (set av1 <_kv "av1">)
         (<> av1 undef)
-        (set av2 <info "av2">)
+        (set av2 <_kv "av2">)
         (<> av2 undef)
         (set key (key-sck av1 av2
-                (fullpath->name <info "path1">)
-                (fullpath->name <info "path2">) ))
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) ))
         (truep (cfg-exists key))
-        (gtk-question <info "w-win">
+        (iup-confirm60 self
                 (+ $"The \"sift check\" data will be deleted." nl $"Are you sure?") )
         (cfg-clr key)
-        (gui-update info) )
+        (gui-update) )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defnet gui-clear-failed-sck-cb (self)
+        (opt (gui-clear-failed-sck-low self)) )
 
-(defnet gui-clear-failed-sck (info)
-        (deflocal win av1 av2 key sck cache i)
+(defnet gui-clear-failed-sck-low (self)
+        (deflocal av1 av2 key sck cache i)
 
-        (set av1 <info "av1">)
+        (set av1 <_kv "av1">)
         (<> av1 undef)
-        (set av2 <info "av2">)
+        (set av2 <_kv "av2">)
         (<> av2 undef)
         (set key (key-sck av1 av2
-                (fullpath->name <info "path1">)
-                (fullpath->name <info "path2">) ))
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) ))
         (set sck (cfg-get key))
         (<> sck undef)
-        (set win <info "w-win">)
         (set cache <sck 0>)
         (set i (- (length cache) <sck 1>))
         (if (= i 0)
-        then    (gtk-message-info win $"There are no failed checks.")
+        then    (iup-info60 self $"There are no failed checks.")
                 (fail) )
-        (gtk-question win (+ (if (= i 1) $"1 failed check will be deleted."
-                (+ "" i $" failed checks will be deleted." )) nl $"Are you sure?" ))
+        (iup-confirm60 self (+ (if (= i 1) $"1 failed check will be deleted."
+                (sprint i $" failed checks will be deleted." )) nl $"Are you sure?" ))
         (for i in cache do
                 (if (booleanp (cdr i))
                 then    (if (not (cdr i))
                         then    (assoc-clr cache (car i)) )))
         (cfg-set key sck)
-        (gui-report info) )
+        (gui-report) )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defnet gui-clear-map-cb (self)
+        (opt (gui-clear-map-low self)) )
 
-(defnet gui-clear-map (info)
+(defnet gui-clear-map-low (self)
         (deflocal av1 av2 key)
 
-        (set av1 <info "av1">)
+        (set av1 <_kv "av1">)
         (<> av1 undef)
-        (set av2 <info "av2">)
+        (set av2 <_kv "av2">)
         (<> av2 undef)
         (set key (key-map av1 av2
-                (fullpath->name <info "path1">)
-                (fullpath->name <info "path2">) ))
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) ))
         (truep (cfg-exists key))
-        (gtk-question <info "w-win">
+        (iup-confirm60 self
                 (+ $"The \"mapping\" data will be deleted." nl $"Are you sure?") )
         (cfg-clr key)
-        (gui-report info)
-        (gui-update info) )
+        (gui-report)
+        (gui-update) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -948,24 +1302,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-clear-paths (info)
-        (deflocal win q l)
+(defnet gui-clear-paths-cb (self)
+        (opt (gui-clear-paths-low self)) )
 
-        (set win <info "w-win">)
+(defnet gui-clear-paths-low (self)
+        (deflocal q l)
+
         (set q (queue))
         (sqlite3-exec-data _db (netptr gui-clear-paths-cback) q
                 "SELECT path FROM paths" )
         (set l (length q))
         (if (= l 0)
-        then    (gtk-message-info win $"There are no obsolete paths.")
+        then    (iup-info60 self $"There are no obsolete paths.")
                 (fail) )
-;(print (sprintl q nl) nl)
-        (gtk-question win (+ "" l " " (if (= l 1) $"obsolete path will be deleted." $"obsolete paths will be deleted.") nl
-                             $"Are you sure?" ))
+        ;(print (sprintl q nl) nl)
+        (iup-confirm60 self (sprint l ' ' (if (= l 1) $"obsolete path will be deleted." $"obsolete paths will be deleted.") nl
+                                    $"Are you sure?" ))
         (sqlite3-exec _db undef
                 "DELETE FROM paths WHERE path IN('"
                 (sprintl q "','") "')" )
-        (gui-update info) )
+        (gui-update) )
 
 (defnet gui-clear-paths-cback (q path)
         (if (not (pathexists path))
@@ -981,10 +1337,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-clear-data-and-vacuum (info)
-        (deflocal win a q l)
+(defnet gui-clear-data-and-vacuum-cb (self)
+        (opt (gui-clear-data-and-vacuum-low self)) )
 
-        (set win <info "w-win">)
+(defnet gui-clear-data-and-vacuum-low (self)
+        (deflocal a q l)
+
         (set a (assoc))
         (set q (queue))
         (set <a undef> true) ; può sembrare strano ma serve
@@ -994,11 +1352,11 @@
                 "SELECT key FROM config" )
         (set l (length q))
         (if (= l 0)
-        then    (gtk-message-info win $"There are no obsolete data.")
+        then    (iup-info60 self $"There are no obsolete data.")
                 (fail) )
-;(gui-clear-data-and-vacuum-tmp q)
-        (gtk-question win (+ (if (= l 1) $"1 obsolete data will be deleted."
-                                (+ "" l $" obsolete data will be deleted.") ) nl
+        ;(gui-clear-data-and-vacuum-tmp q)
+        (iup-confirm60 self (+ (if (= l 1) $"1 obsolete data will be deleted."
+                               (sprint l $" obsolete data will be deleted.") ) nl
                              $"Are you sure?" ))
         (sqlite3-exec _db undef
                 "DELETE FROM config WHERE key IN('"
@@ -1047,120 +1405,80 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-clear-text1 (info)
-        (gtk-text-buffer-set-text <info "w-text1"> "")
-        (gui-update info) )
+(defnet gui-start-cb (self)
+        (opt (gui-start (netptr gui-start-thread))) )
 
-(defnet gui-clear-text2 (info)
-        (gtk-text-buffer-set-text <info "w-text2"> "")
-        (gui-update info) )
+(defnet gui-report-failed-cb (self)
+        (opt (gui-report-failed-low self)) )
 
-(defnet gui-print-selected (info)
-        (deflocal path)
+(defnet gui-report-failed-low (self)
+        (deflocal av1 av2 key sck a i)
 
-        (set path <info "path1">)
-        (if (<> path undef)
-        then    (gtk-text-buffer-append <info "w-text2">
-                        (+ $"selected movie " "1: `" (fullpath->name path) "'" nl) ))
-        (set path <info "path2">)
-        (if (<> path undef)
-        then    (gtk-text-buffer-append <info "w-text2">
-                        (+ $"selected movie " "2: `" (fullpath->name path) "'" nl) ))
-        (gtk-adjustment-set-value <info "w-adj2"> (maxint))
-        (gui-update info) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet gui-report-failed (info)
-        (deflocal win av1 av2 key sck a i)
-
-        (set av1 <info "av1">)
+        (set av1 <_kv "av1">)
         (<> av1 undef)
-        (set av2 <info "av2">)
+        (set av2 <_kv "av2">)
         (<> av2 undef)
         (set key (key-sck av1 av2
-                (fullpath->name <info "path1">)
-                (fullpath->name <info "path2">) ))
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) ))
         (set sck (cfg-get key))
         (<> sck undef)
-        (set win <info "w-win">)
         (set a <sck 0>)
         (set i (- (length a) <sck 1>))
         (if (= i 0)
-        then    (gtk-message-info win $"There are no failed checks.")
+        then    (iup-info60 self $"There are no failed checks.")
                 (fail) )
-        (gtk-text-buffer-set-text <info "w-text2"> "")
-        (gui-start info (netptr gui-start-failed-thread)) )
+        (iup-text-set-and-go-home <_kv "text2"> "")
+        (gui-start (netptr gui-start-failed-thread)) )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defnet gui-start (net)
+        (deflocal th text1 text2 finished req msg)
 
-(defnet gui-restore-default (info)
-        (deflocal win i)
-
-        (set win <info "w-win">)
-        (gtk-question win (+ $"Default parameters will be restored." nl $"Are you sure?"))
-        (sqlite3-begin _db)
-        (alt    (seq    (for i in (default-parameters) do
-                                (cfg-set (car i) (cdr i)) )
-                        (sqlite3-end _db)
-                        (supervision-clear info)
-                        (opt (supervision-pix-with-check info)) )
-                (seq    (sqlite3-rollback _db)
-                        (gtk-message-error win "errore nel salvataggio configurazione") )))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet gui-start-main (info)
-        (gui-start info (netptr gui-start-main-thread)) )
-
-(defnet gui-start (info net)
-        (deflocal th)
-
-        (= <info "th"> undef)
-        (supervision-clear info)
+        (= <_kv "th"> undef)
         (set th (thread-create net
                         (thread-self)
-                        (fullpath->name <info "path1">)
-                        (fullpath->name <info "path2">)
-                        <info "av1">
-                        <info "av2">
-                        <info "pix">
-                        <info "default"> ))
+                        (fullpath->name <_kv "path1">)
+                        (fullpath->name <_kv "path2">)
+                        <_kv "av1">
+                        <_kv "av2">
+                        <_kv "pix">
+                        <_kv "default"> ))
         (<> th undef)
-        (set <info "th"> th)
-        (set <info "start-time"> (now))
-        (set <info "abort"> false)
-        (gui-update info)
-        (gtk-timeout-add (netptr gui-server) 0.05 info th
-                <info "w-text1">
-                <info "w-text2">
-                <info "w-adj2"> ))
+        (set <_kv "th"> th)
+        (set <_kv "start-time"> (now))
+        (set <_kv "abort"> false)
+        (gui-update)
+        (set text1 <_kv "text1">)
+        (set text2 <_kv "text2">)
+        (set finished false)
+        (repeat (opt*   (receivenb msg from th)
+                        (set req (car msg))
+                        (set msg (cdr msg))
+                        (case req of
+                                "d"     (seq    (gui-draw-image)
+                                                (send true to th) )
+                                "c1"    (iup-text-set-and-go-home text1 msg)
+                                "p1"    (iup-text-append-and-go-home text1 msg)
+                                "p1c"   (iup-text-append-and-go-home-color text1 (car msg) (cdr msg))
+                                "c2"    (iup-text-set-and-go-end text2 msg)
+                                "p2"    (iup-text-append-and-go-end text2 msg)
+                                "p2c"   (iup-text-append-and-go-end-color text2 (car msg) (cdr msg))
+                                "q"     (seq    (set <_kv "abort"> msg)
+                                                (set finished true) )))
+                until finished
+                (iup-flush)
+                (sleep 0.05) )
+        (iup-text-append-and-go-end text2 (+ "\n" $"elapsed time" ": "
+                (date-s2hhmmss (- (now) <_kv "start-time">)) nl ))
+        (if <_kv "abort">
+        then    (iup-text-append-and-go-end text2 (+ $"Aborted" nl)) )
+        (thread-join th)
+        (assoc-clr _kv "th")
+        (gui-report)
+        (gui-update)
+        (gui-resize-post) )
 
-(defnet gui-start-main-thread (th-main name1 name2 av1 av2 pix default-info)
+(defnet gui-start-thread (th-main name1 name2 av1 av2 pix default-info)
         (deflocal abort scd1 scd2)
 
         (set abort true)
@@ -1177,7 +1495,7 @@
         (opt    (scdscan th-main name1 av1 pix default-info scd1)
                 (scdscan th-main name2 av2 pix default-info scd2)
                 (pix-wip pix)
-                (scdscan-draw-image th-main)
+                (gui-draw-image-th th-main)
                 (set m (match-create name1 name2 av1 av2 scd1 scd2 th-main pix default-info))
                 (map-report m)
                 (set cache (match-cache m))
@@ -1202,68 +1520,38 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-abort (info)
+(defnet gui-draw-image-th (th-main)
+        (deflocal msg)
+
+        (send [ "d" . undef ] to th-main)
+        (receive msg from th-main)
+        (if (not msg)
+        then    (receive msg from th-main)
+                (fail) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-abort-cb (self)
+        (opt (gui-abort-low self)) )
+
+(defnet gui-abort-low (self)
         (deflocal th)
 
-        (not <info "abort">)
-        (set th <info "th">)
+        (not <_kv "abort">)
+        (set th <_kv "th">)
         (<> th undef)
-        (gtk-question <info "w-win">
+        (iup-confirm60 self
                 (+ $"The current operation will be aborted." nl $"Are you sure?") )
-        (set <info "abort"> true)
-        (sendbuf 100 false to th)
-        (gui-update info) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet gui-server (info th w-text1 w-text2 w-adj2)
-        (deflocal finished req msg pix)
-
-        (set finished false)
-        (opt*   (receivenb msg from th)
-                (set req (car msg))
-                (set msg (cdr msg))
-                (case req of
-                        "d"     (seq    (gtk-image-set-from-pixbuf
-                                                <info "w-image">
-                                                <info "pix"> )
-                                        (send true to th) )
-                        "c1"    (gtk-text-buffer-set-text w-text1 msg)
-                        "c1c"   (gtk-text-buffer-set-text-color w-text1 (car msg) (cdr msg))
-                        "c2"    (gtk-text-buffer-set-text w-text2 msg)
-                        "c2c"   (gtk-text-buffer-set-text-color w-text2 (car msg) (cdr msg))
-                        "p1"    (gtk-text-buffer-append w-text1 msg)
-                        "p1c"   (gtk-text-buffer-append-color w-text1 (car msg) (cdr msg))
-                        "p2"    (seq    (gtk-text-buffer-append w-text2 msg)
-                                        (gtk-adjustment-set-value w-adj2 (maxint)) )
-                        "p2c"   (seq    (gtk-text-buffer-append-color w-text2 (car msg) (cdr msg))
-                                        (gtk-adjustment-set-value w-adj2 (maxint)) )
-                        "q"     (seq    (thread-join th)
-                                        (assoc-clr info "th")
-                                        (set <info "abort"> msg)
-                                        (gtk-text-buffer-append w-text1 (+ "\nelapsed time: "
-                                                (date-s2hhmmss (- (now) <info "start-time">)) ))
-                                        (gui-report info)
-                                        (gui-update info)
-                                        (if msg
-                                        then    (gtk-text-buffer-append w-text2 "Aborted\n")
-                                                (gtk-adjustment-set-value w-adj2 (maxint)) )
-                                        (if <info "supervision">
-                                        then    (supervision-pix info)
-                                        else    (set pix <info "pix">)
-                                                (pix-logo pix)
-                                                (gtk-image-set-from-pixbuf
-                                                        <info "w-image"> pix ))
-                                        (set finished true) )))
-        (not finished) )
+        (set <_kv "abort"> true)
+        (sendbuf 100 false to th) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

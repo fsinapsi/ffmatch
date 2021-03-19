@@ -12,7 +12,7 @@
         (deflocal m scd-min-blocks scd-min-avg-block-size thres1 thres2 thres avg1 avg2 alternate i j)
 
         (pix-wip pix)
-        (scdscan-draw-image th-main)
+        (opt (gui-draw-image-th th-main))
 
         (set scd-min-blocks (cfg-get-or-default-num "scd-min-blocks" default-info))
         (set scd-min-avg-block-size (cfg-get-or-default-num "scd-min-avg-block-size" default-info))
@@ -338,8 +338,16 @@
         (set <@m  5> frm2)
         (set <@m 10> (map-create (- (length scd1) 1) (- (length scd2) 1)))
         (set <@m 11> th-main)
-        (set <@m 12> (thread-create (netptr th-sift-features) (thread-self) frm1))
-        (set <@m 13> (thread-create (netptr th-sift-features) (thread-self) frm2))
+        (set <@m 12> (thread-create (netptr th-sift-features) (thread-self) frm1
+                (cfg-get-or-default-num "vlfeat-first-octave-idx" default-info)
+                (cfg-get-or-default-num "vlfeat-nlevels-per-octave" default-info)
+                (cfg-get-or-default-num "vlfeat-peak-threshold" default-info)
+                (cfg-get-or-default-num "vlfeat-edge-threshold" default-info) ))
+        (set <@m 13> (thread-create (netptr th-sift-features) (thread-self) frm2
+                (cfg-get-or-default-num "vlfeat-first-octave-idx" default-info)
+                (cfg-get-or-default-num "vlfeat-nlevels-per-octave" default-info)
+                (cfg-get-or-default-num "vlfeat-peak-threshold" default-info)
+                (cfg-get-or-default-num "vlfeat-edge-threshold" default-info) ))
         (set <@m 14> name1)
         (set <@m 15> name2)
         (set <@m 16> pix1)

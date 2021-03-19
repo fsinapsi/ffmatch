@@ -12,8 +12,10 @@
         (deflocal key)
 
         (pix-wip pix)
-        (scdscan-draw-image th-main)
-        (sendbuf 100 (cons "p2" (+ "scanning `" name "'..." nl)) to th-main)
+        (opt (gui-draw-image-th th-main))
+        (sendbuf 100 (cons "p2" "scanning ") to th-main)
+        (sendbuf 100 (cons "p2c" (cons (blue) name)) to th-main)
+        (sendbuf 100 (cons "p2" "...\n") to th-main)
         (set key (key-scd av name))
         (set @v (cfg-get key))
         (if (<> @v undef)
@@ -32,7 +34,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet scdscan-low (th-main name av pix default-info @v)
-        (deflocal th-read-frame abort l l1 frm pix1 pix2 gamma1 gamma2 idx val frameno t)
+        (deflocal th-read-frame scd-display-enabled abort l l1 frm pix1 pix2 gamma1 gamma2 idx val frameno t)
 
         (av-seek-frame av 0)
 
@@ -64,6 +66,7 @@
         (receive val from th-read-frame)
         (send <frm 1> to th-read-frame)
         (set idx 1)
+        (set scd-display-enabled (cfg-get-or-default "scd-display-enabled" default-info))
         (set abort false)
         (repeat (receive val from th-read-frame)
                 until (not val)
@@ -78,10 +81,11 @@
                 (send <frm (scdscan-succ idx)> to th-read-frame)
                 (set val (pix-scd-histogram <frm (scdscan-prec idx)> <frm idx>))
                 (set <@v frameno> val)
-                (if (>= val 0.3)
-                then    (pix-copy-frames pix <frm (scdscan-prec idx)> <frm idx> pix1 pix2 gamma1 gamma2)
-                        (alt    (scdscan-draw-image th-main)
-                                (set abort true) ))
+                (if scd-display-enabled
+                then    (if (>= val 0.3)
+                        then    (pix-copy-frames pix <frm (scdscan-prec idx)> <frm idx> pix1 pix2 gamma1 gamma2)
+                                (alt    (gui-draw-image-th th-main)
+                                        (set abort true) )))
                 (if (= (% frameno 100) 0)
                 then    (sendbuf 100 (cons "c1" (+ "frame " frameno "/" l " (" (rint (/ frameno (- (now) t)))
                                                    " fps) (" (rint (/ frameno l 0.01)) "%)" ))
@@ -117,25 +121,6 @@
                                 (set res true) )
                         (set res false) )
                 (send res to client) ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet scdscan-draw-image (th-main)
-        (deflocal msg)
-
-        (send [ "d" . undef ] to th-main)
-        (receive msg from th-main)
-        (if (not msg)
-        then    (receive msg from th-main)
-                (fail) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

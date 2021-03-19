@@ -10,12 +10,38 @@
 
 (defun url-home-page () "http://fsinapsi.altervista.org")
 
-(defun compile-time () (cdate))
+(defun compile-time () (date (date-year (cdate)) (date-month (cdate)) (date-day (cdate))))
 
-(defun version ()
-        (+ (int->str (date-day (compile-time)) 2 '0') "-"
-           (int->str (date-month (compile-time)) 2 '0') "-"
-           (int->str (date-year (compile-time)) 4 '0') ))
+(defun date->version (date)
+        (+ (int->str (date-day date) 2 '0') "-"
+           (int->str (date-month date) 2 '0') "-"
+           (int->str (date-year date) 4 '0') ))
+
+(defun remote-version-key () "ffmatch-win64-20")
+
+(defun remote-version () net remote-version)
+(defnet remote-version (@s)
+        (deflocal i)
+
+        (set @s (download-as-string (+ (url-home-page) "/code/ffmatch/index.html")))
+        (stringp @s)
+        (search (remote-version-key) @s i)
+        (set @s (str->date (sub (+ i (- (length (remote-version-key)) 2)) 8 @s)))
+        (datep @s) )
+
+(defun remote-version-cached () net remote-version-cached)
+(defnet remote-version-cached (@s)
+        (deflocal now s)
+
+        (set now (now))
+        (set @s (cfg-get "last-check-for-updates-version"))
+        (set s (- now (cfg-get "last-check-for-updates")))
+        (if (or (= @s undef) (= s undef) (> s (* 60 60 12)))
+        then    (set @s (remote-version))
+                (if (= @s undef)
+                then    (set @s (compile-time)) )
+                (cfg-set "last-check-for-updates-version" @s)
+                (cfg-set "last-check-for-updates" now) ))
 
 (defun gc-version () (gc-version0 (gc-version-major) (gc-version-minor)))
 (defun gc-version0 (maj min)
@@ -119,15 +145,15 @@
 
 (defnet pix-logo (pix)
         (pix-clear-and-copy-pix pix
-                (pix-load-static "icons/128x128/emblem-videos.png") ))
+                (pix-load-static "128x128/emblem-videos.png") ))
 
 (defnet pix-wip (pix)
         (pix-clear-and-copy-pix pix
-                (pix-load-static "icons/80x80/work-in-progress.png") ))
+                (pix-load-static "80x80/work-in-progress.png") ))
 
 (defnet pix-error (pix)
         (pix-clear-and-copy-pix pix
-                (pix-load-static "icons/48x48/dialog-error-4.png") ))
+                (pix-load-static "48x48/dialog-error-4.png") ))
 
 (defnet pix-copy-frames (pix frm1 frm2 pix1 pix2 gamma1 gamma2)
         (deflocal sy)
@@ -140,6 +166,67 @@
         (set sy (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
         (pix-draw-pix pix (/ (- (width pix) (width pix1)) 2) sy pix1)
         (pix-draw-pix pix (/ (- (width pix) (width pix2)) 2) (+ sy (height pix1) (space)) pix2) )
+
+(defnet pix-create-pixfrm (pix av1 av2 @pix1 @pix2)
+        (deflocal default-info w1 h1 w2 h2 ww1 hh1 ww2 hh2 k si co)
+
+        (set default-info <_kv "default">)
+        (set w1 (width av1))
+        (set h1 (height av1))
+        (set w2 (width av2))
+        (set h2 (height av2))
+        (set k (av-sample-aspect-ratio av1 (av-video-stream-idx av1)))
+        (if (> k 0)
+        then    (if (> k 1)
+                then    (set w1 (* w1 k))
+                else    (set h1 (/ h1 k)) ))
+        (set k (av-sample-aspect-ratio av2 (av-video-stream-idx av2)))
+        (if (> k 0)
+        then    (if (> k 1)
+                then    (set w2 (* w2 k))
+                else    (set h2 (/ h2 k)) ))
+        (if (cfg-get-or-default "match-scale" default-info)
+        then    (set k (sqrt (/ (* w1 h1) (* w2 h2))))
+                (set w2 (* w2 k))
+                (set h2 (* h2 k)) )
+        (set k (cfg-get-or-default-num "filter-rotate1" default-info))
+        (if (= k 0)
+        then    (set ww1 w1)
+                (set hh1 h1)
+        else    (if (< k 0)
+                then    (inc k 360) )
+                (if (or (= k 90) (= k 270))
+                then    (set ww1 h1)
+                        (set hh1 w1)
+                else    (if (= k 180)
+                        then    (set ww1 w1)
+                                (set hh1 h1)
+                        else    (set k (* (/ k 180) (* (atan 1) 4)))
+                                (set si (abs (sin k)))
+                                (set co (abs (cos k)))
+                                (set ww1 (+ (* w1 co) (* h1 si)))
+                                (set hh1 (+ (* h1 co) (* w1 si))) )))
+        (set k (cfg-get-or-default-num "filter-rotate2" default-info))
+        (if (= k 0)
+        then    (set ww2 w2)
+                (set hh2 h2)
+        else    (if (< k 0)
+                then    (inc k 360) )
+                (if (or (= k 90) (= k 270))
+                then    (set ww2 h2)
+                        (set hh2 w2)
+                else    (if (= k 180)
+                        then    (set ww2 w2)
+                                (set hh2 h2)
+                        else    (set k (* (/ k 180) (* (atan 1) 4)))
+                                (set si (abs (sin k)))
+                                (set co (abs (cos k)))
+                                (set ww2 (+ (* w2 co) (* h2 si)))
+                                (set hh2 (+ (* h2 co) (* w2 si))) )))
+        (set k (min (/ (- (width pix) (* 2 (space))) (max ww1 ww2))
+                    (/ (- (height pix) (* 3 (space))) (+ hh1 hh2)) ))
+        (set @pix1 (pix-create (max 1 (* k w1)) (max 1 (* k h1))))
+        (set @pix2 (pix-create (max 1 (* k w2)) (max 1 (* k h2)))) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -164,128 +251,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gtk-message-info (parent msg)
-        (if (cli)
-        then    (print "INF: " msg nl)
-        else    (if (cmingw)
-                then    (gtk-message-info--old parent msg)
-                else    (gtk-message-basic parent msg
-                                (pix-load-static "icons/48x48/dialog-information-2.png") ))))
+(defnet da-chiudere (obj)
+        (queue-put <_kv "da-chiudere"> obj) )
 
-(defnet gtk-message-warning (parent msg)
-        (if (cli)
-        then    (print "WRN: " msg nl)
-        else    (if (cmingw)
-                then    (gtk-message-warning--old parent msg)
-                else    (gtk-message-basic parent msg
-                                (pix-load-static "icons/48x48/dialog-important-2.png") ))))
+(defnet quit ()
+        (deflocal obj)
 
-(defnet gtk-message-error (parent msg)
-        (if (cli)
-        then    (print "ERR: " msg nl)
-        else    (if (cmingw)
-                then    (gtk-message-error--old parent msg)
-                else    (gtk-message-basic parent msg
-                                (pix-load-static "icons/48x48/dialog-error-4.png") ))))
-
-(defnet gtk-message-basic (parent msg icon)
-        (deflocal win vb hb)
-
-        (set win (gtk-window-new))
-        (if (<> parent undef)
-        then    (gtk-window-set-transient-for win parent)
-                (gtk-window-set-modal win true) )
-        (gtk-window-set-resizable win false)
-        (gtk-window-set-title win "")
-        (gtk-container-set-border-width win 8)
-        (gtk-signal-connect win "destroy" (netptr gtk-destroy))
-
-        (set vb (gtk-vbox-new false 10))
-        (gtk-container-add win vb)
-
-        (set hb (gtk-hbox-new false 12))
-        (gtk-box-pack-start vb hb false false 0)
-
-                (gtk-box-pack-start hb (gtk-image-new-from-pixbuf icon) false false 0)
-                (gtk-box-pack-start hb (gtk-label-new (str-split msg 60)) true true 0)
-
-        (set hb (gtk-hbox-new false 6))
-        (gtk-box-pack-start vb hb false false 0)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-cancel-3.png")
-                $"Close"
-                (netptr gtk-close-win)
-                win ) false false 0 )
-
-        (gtk-widget-show-all win)
-    ;    (if (<> parent undef)
-    ;    then    (gtk-window-set-position win (cmacro GTK_WIN_POS_CENTER_ON_PARENT)) )
-        (gtk-main) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet gtk-question (parent msg)
-        (if (cmingw)
-        then    (gtk-question--old parent msg)
-        else    (gtk-question--new parent msg) ))
-
-(defnet gtk-question--new (parent msg)
-        (deflocal win vb hb a)
-
-        (set a (array default true 1))
-
-        (set win (gtk-window-new))
-        (if (<> parent undef)
-        then    (gtk-window-set-transient-for win parent)
-                (gtk-window-set-modal win true) )
-        (gtk-window-set-resizable win false)
-        (gtk-window-set-title win "")
-        (gtk-container-set-border-width win 8)
-        (gtk-signal-connect win "destroy" (netptr gtk-destroy))
-
-        (set vb (gtk-vbox-new false 10))
-        (gtk-container-add win vb)
-
-        (set hb (gtk-hbox-new false 12))
-        (gtk-box-pack-start vb hb false false 0)
-
-                (gtk-box-pack-start hb (gtk-image-new-from-pixbuf (pix-load-static "icons/48x48/dialog-question-2.png")) false false 0)
-                (gtk-box-pack-start hb (gtk-label-new (str-split msg 60)) true true 0)
-
-        (set hb (gtk-hbox-new false 6))
-        (gtk-box-pack-start vb hb false false 0)
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-cancel-3.png")
-                $"Cancel"
-                (netptr gtk-close-win)
-                win ) false false 0 )
-
-        (gtk-box-pack-end hb (gtk-iconed-button
-                (pix-load-static "icons/16x16/dialog-apply.png")
-                "Ok"
-                (netptr gtk-question-ok)
-                (cons win a) ) false false 0 )
-
-        (gtk-widget-show-all win)
-    ;    (if (<> parent undef)
-    ;    then    (gtk-window-set-position win (cmacro GTK_WIN_POS_CENTER_ON_PARENT)) )
-        (gtk-main)
-        (not <a 0>) )
-
-(defnet gtk-question-ok (a)
-        (close (car a))
-        (set a (cdr a))
-        (set <a 0> false) )
+        (for obj in <_kv "da-chiudere"> do
+                (close obj) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
