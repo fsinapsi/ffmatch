@@ -64,6 +64,7 @@
                         (iup-label $"There are no updates") )
                 (iup-label
                         $"Selected language" ": " <(languages) (lang)> nl
+                        $"Selected SIFT impl." ": " <(sift-impl) (cfg-get-or-default-num "sift-impl" <_kv "default">)> nl
                         ;$"Sound" ": " (if <_kv "enabled-sound"> $"enabled" $"disabled") nl
                         "GC version: " (gc-version) nl
                         "GMP version: " (gmp-version) nl

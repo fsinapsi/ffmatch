@@ -285,6 +285,7 @@
                     "min-keypoints"
                     "min-keypoints-min-ratio"
                     "min-keypoints-min-ratio-lum"
+                    "sift-impl"
                     "sift-match-threshold"
                     "sift-match-threshold-min-ratio"
                     "sift-agreements-min"
@@ -338,12 +339,14 @@
         (set <@m  5> frm2)
         (set <@m 10> (map-create (- (length scd1) 1) (- (length scd2) 1)))
         (set <@m 11> th-main)
-        (set <@m 12> (thread-create (netptr th-sift-features) (thread-self) frm1
+        (set <@m 12> (thread-create (netptr th-sift-features)
+                <params "sift-impl"> (thread-self) frm1
                 (cfg-get-or-default-num "vlfeat-first-octave-idx" default-info)
                 (cfg-get-or-default-num "vlfeat-nlevels-per-octave" default-info)
                 (cfg-get-or-default-num "vlfeat-peak-threshold" default-info)
                 (cfg-get-or-default-num "vlfeat-edge-threshold" default-info) ))
-        (set <@m 13> (thread-create (netptr th-sift-features) (thread-self) frm2
+        (set <@m 13> (thread-create (netptr th-sift-features)
+                <params "sift-impl"> (thread-self) frm2
                 (cfg-get-or-default-num "vlfeat-first-octave-idx" default-info)
                 (cfg-get-or-default-num "vlfeat-nlevels-per-octave" default-info)
                 (cfg-get-or-default-num "vlfeat-peak-threshold" default-info)

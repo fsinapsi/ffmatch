@@ -166,6 +166,8 @@
                         (gui-setup-menu-item-low $"Clear bottom text" (netptr gui-clear-text2-cb) "clear-text2") ))
                 (gui-setup-submenu "&Misc" (iup-menu
                         (gui-setup-menu-item-low $"Print selected movie names" (netptr gui-print-selected-cb) "print-selected")
+                        (gui-setup-menu-item-low $"Print timestamps movie 1" (netptr gui-print-timestamps1-cb) "print-timestamps1")
+                        (gui-setup-menu-item-low $"Print timestamps movie 2" (netptr gui-print-timestamps2-cb) "print-timestamps2")
                         (gui-setup-menu-item-low $"Report failed checks" (netptr gui-report-failed-cb) "report-failed")
                         (gui-setup-menu-item $"Restore default parameters" (netptr gui-restore-default-cb)) ))
                 (gui-setup-submenu (+ "&" $"Help") (iup-menu
@@ -495,7 +497,9 @@
                 (iup-set-bool <menu-info "save-frame1"> "ACTIVE" supervision)
                 (iup-set-bool <menu-info "save-frame2"> "ACTIVE" supervision)
                 (iup-set-bool <menu-info "print-selected"> "ACTIVE"
-                        (or (<> av1 undef) (<> av2 undef)) ))
+                        (or (<> av1 undef) (<> av2 undef)) )
+                (iup-set-bool <menu-info "print-timestamps1"> "ACTIVE" (<> av1 undef))
+                (iup-set-bool <menu-info "print-timestamps2"> "ACTIVE" (<> av2 undef)) )
         (iup-set-bool <menu-info "widget"> "ACTIVE" (not running))
         (iup-set-bool <_kv "supervision-toolbar"> "ACTIVE" (and (not running) supervision))
         (iup-set-bool <btn-info "open1"> "ACTIVE" (not running))
@@ -599,16 +603,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-print-info-on-selected-file (which)
-        (deflocal text2 path av vidx ar)
+        (deflocal path av text2 vidx ar)
 
-        (set text2 <_kv "text2">)
         (set path <_kv (+ "path" which)>)
         (set av <_kv (+ "av" which)>)
         (if (and (stringp path) (<> av undef))
-        then    (set vidx (av-video-stream-idx av))
+        then    (set text2 <_kv "text2">)
+                (set vidx (av-video-stream-idx av))
                 (set ar (av-sample-aspect-ratio av vidx))
                 (iup-text-append-and-go-end text2
-                        (+ $"selected movie" " " which ": " ))
+                        (+ $"movie" " " which ": " ))
                 (iup-text-append-and-go-end-color text2 (blue)
                         (+ (fullpath->name path) nl) )
                 (iup-text-append-and-go-end text2
@@ -622,6 +626,12 @@
                             (if (< ar 1)
                                 (sprint (width av) " x " (rint (/ (height av) ar)) nl)
                                 (sprint (rint (* (width av) ar)) " x " (height av) nl) )))
+                (iup-text-append-and-go-end text2 "framerate: ")
+                (iup-text-append-and-go-end-color text2 (blue) (approx3 (av-frame-rate av)))
+                (iup-text-append-and-go-end text2 (+ " fps" nl))
+                (iup-text-append-and-go-end text2 (+ $"duration" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (approx3 (* (av-duration av) (av-time-base av))))
+                (iup-text-append-and-go-end text2 (+ " s" nl))
                 (iup-text-append-and-go-end text2 (+ $"approximate number of frames" ": "))
                 (iup-text-append-and-go-end-color text2 (blue)
                         (sprint (- (av-approximated-number-of-frames av) 2) nl) )
@@ -630,6 +640,56 @@
                 (iup-text-append-and-go-end text2 " (decoder: ")
                 (iup-text-append-and-go-end-color text2 (blue) (av-codec-name av vidx))
                 (iup-text-append-and-go-end text2 (+ ")" nl nl)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-print-timestamps (which)
+        (deflocal path av text2 vidx ts ts-prev ts-avg cnt time-base)
+
+        (set path <_kv (+ "path" which)>)
+        (opt    (stringp path)
+                (set av (if (cfg-get-or-default "cuvid-enabled" <_kv "default">) (av-avformat-open-input-cuvid path) (av-avformat-open-input path)))
+                (<> av undef)
+                (set text2 <_kv "text2">)
+                (set vidx (av-video-stream-idx av))
+                (iup-text-set-and-go-home text2 "")
+                (gui-print-info-on-selected-file which)
+
+                (set ts-avg 0)
+                (set cnt 0)
+                (set time-base (av-time-base av vidx))
+
+                (opt*   (av-skip-frame av)
+                        (set ts (* (av-ts av) time-base))
+                        (iup-text-append-and-go-end text2 (+ "[" (int->str (av-frameno av) 6 '0') "] " (approx4 ts)))
+                        (if (rationalp ts-prev)
+                        then    (inc ts-avg (- ts ts-prev))
+                                (inc cnt)
+                                (iup-text-append-and-go-end text2 " (diff: ")
+                                (iup-text-append-and-go-end-color text2 (blue) (approx4 (- ts ts-prev)))
+                                (iup-text-append-and-go-end text2 ")") )
+                        (iup-text-append-and-go-end text2 (+ " " (* (av-frameno2ts av (av-frameno av)) time-base)))
+                                ;(format-num (av-frameno2ts av (av-frameno av)))
+                        (if (not (av-is-frame-recoverable av))
+                        then    (iup-text-append-and-go-end-color text2 (red) " *") )
+                        (iup-text-append-and-go-end text2 nl)
+                        (< (av-frameno av) 50)
+                        (set ts-prev ts) )
+
+                (close av)
+
+                (set ts-avg (/ ts-avg cnt))
+                (iup-text-append-and-go-end text2 "\naverage frame rate: ")
+                (iup-text-append-and-go-end-color text2 (blue) (approx3 (/ 1 ts-avg)))
+                (iup-text-append-and-go-end text2 " fps\n") ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1055,6 +1115,12 @@
         (gui-print-info-on-selected-file 1)
         (gui-print-info-on-selected-file 2)
         (gui-update) )
+
+(defnet gui-print-timestamps1-cb (self)
+        (gui-print-timestamps 1) )
+
+(defnet gui-print-timestamps2-cb (self)
+        (gui-print-timestamps 2) )
 
 (defnet gui-restore-default-cb (self)
         (opt (gui-restore-default-low self)) )

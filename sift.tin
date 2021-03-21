@@ -110,7 +110,9 @@
 (defnet sift-check-enough-keypoints (m filt1 filt2 k1 k2 dlum @score)
         (deflocal matches nx ny bnx bny sumrx sumry deltax deltay avgx avgy rx ry)
 
-        (set matches (vl-sift-match filt1 filt2 0 (match-params m "sift-match-threshold")))
+        (case (match-params m "sift-impl") of
+                0   (set matches (cv-sift-match filt1 filt2 (match-params m "sift-match-threshold")))
+                1   (set matches (vl-sift-match filt1 filt2 0 (match-params m "sift-match-threshold"))) )
         (if (< (/ (length matches) (min k1 k2)) (match-params m "sift-match-threshold-min-ratio"))
         then    (set @score false)
                 (msg-log m (+ "too few matches (" (length matches) " [" k1 "," k2 "])" nl))

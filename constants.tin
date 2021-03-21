@@ -13,6 +13,10 @@
 (defun zoom-step () 1.1)
 (defun space () 10)
 (defun framerates () [ 25 (/ 24000 1001) 24 ])
+(defun sift-impl ()
+        [ "OpenCV"
+          "VLFeat"
+          ])
 (defun default-parameters ()
         [ [ "init-scd-threshold" . 15 ]
           [ "min-scd-threshold" . 3.5 ]
@@ -44,6 +48,7 @@
           [ "match-scale" . true ]
           [ "scd-display-enabled" . true ]
           [ "cuvid-enabled" . false ]
+          [ "sift-impl" . 0 ]
           [ "vlfeat-first-octave-idx" . 0 ]
           [ "vlfeat-nlevels-per-octave" . 3 ]
           [ "vlfeat-peak-threshold" . 0 ]

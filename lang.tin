@@ -173,6 +173,14 @@
 1
 "Stampa i nomi dei filmati selezionati"
 
+"Print timestamps movie 1"
+1
+"Stampa timestamps filmato 1"
+
+"Print timestamps movie 2"
+1
+"Stampa timestamps filmato 2"
+
 "Report failed checks"
 1
 "Riporta i controlli falliti"
@@ -337,9 +345,9 @@
 1
 " dati obsoleti verranno cancellati."
 
-"selected movie"
+"movie"
 1
-"selezionato filmato"
+"filmato"
 
 "resolution"
 1
@@ -348,6 +356,10 @@
 "display resolution"
 1
 "risoluzione di visualizzazione"
+
+"duration"
+1
+"durata"
 
 "The current operation will be aborted."
 1
@@ -464,6 +476,10 @@
 "Selected language"
 1
 "Lingua selezionata"
+
+"Selected SIFT impl."
+1
+"Impl. SIFT selezionata"
 
 "was coded in TreeP by"
 1
