@@ -29,7 +29,7 @@
           [ "min-keypoints" . 60 ]
           [ "min-keypoints-min-ratio" . 0.05 ]
           [ "min-keypoints-min-ratio-lum" . 0.2 ]
-          [ "sift-match-threshold" . 0.40 ]
+          [ "sift-match-threshold" . 0.3 ]
           [ "sift-match-threshold-min-ratio" . 0.02 ]
           [ "sift-agreements-min" . 12000 ]
           [ "sift-proportionality-threshold" . 0.9 ]

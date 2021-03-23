@@ -48,6 +48,8 @@
 
         (gui-update-image)
 
+        (iup-set-callback <_kv "text1"> "BUTTON_CB" (netptr gui-text1-button-cb))
+
         (iup-main-loop)
 
         (set x (iup-get-int dlg "SCREENPOSITION"))
@@ -101,6 +103,10 @@
                 (cmacro K_cPlus)        (gui-zoom-in-cb dlg)
                 (cmacro K_cMinus)       (gui-zoom-out-cb dlg)
                 (cmacro K_c0)           (gui-zoom-zero-cb dlg)
+                (cmacro K_F1)           (gui-open1-cb dlg)
+                (cmacro K_F2)           (gui-open2-cb dlg)
+                (cmacro K_sF1)          (gui-open-path1-cb dlg)
+                (cmacro K_sF2)          (gui-open-path2-cb dlg)
                 default                 (fail) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -133,14 +139,14 @@
         (set <_kv "menu"> (assoc))
         (set @menu (iup-menu
                 (gui-setup-submenu "&File" (iup-menu
-                        ;(gui-setup-menu-item (+ $"Select movie 1" (if (cmingw) "\t" "\t\t") "Ctrl O") (netptr gui-open1-cb))
-                        ;(gui-setup-menu-item (+ $"Select movie 2" (if (cmingw) "\t" "\t\t") "Ctrl O") (netptr gui-open2-cb))
-                        (gui-setup-menu-item $"Select movie 1" (netptr gui-open1-cb))
-                        (gui-setup-menu-item $"Select movie 2" (netptr gui-open2-cb))
+                        (gui-setup-menu-item (+ $"Select movie 1" (if (cmingw) "\t" "\t\t") "F1") (netptr gui-open1-cb))
+                        (gui-setup-menu-item (+ $"Select movie 2" (if (cmingw) "\t" "\t\t") "F2") (netptr gui-open2-cb))
+                        (gui-setup-menu-item (+ $"Select path 1" (if (cmingw) "\t" "\t\t\t") "Shift F1") (netptr gui-open-path1-cb))
+                        (gui-setup-menu-item (+ $"Select path 2" (if (cmingw) "\t" "\t\t\t") "Shift F2") (netptr gui-open-path2-cb))
                         (iup-separator)
-                        (gui-setup-menu-item-low (+ "Zoom in" (if (cmingw) "\t" "\t\t\t\t\t") "Ctrl +") (netptr gui-zoom-in-cb) undef)
-                        (gui-setup-menu-item-low (+ "Zoom out" (if (cmingw) "\t" "\t\t\t\t") "Ctrl -") (netptr gui-zoom-out-cb) undef)
-                        (gui-setup-menu-item-low (+ "No zoom" (if (cmingw) "\t" "\t\t\t\t\t") "Ctrl 0") (netptr gui-zoom-zero-cb) undef)
+                        (gui-setup-menu-item (+ "Zoom in" (if (cmingw) "\t" "\t\t\t\t\t") "Ctrl +") (netptr gui-zoom-in-cb))
+                        (gui-setup-menu-item (+ "Zoom out" (if (cmingw) "\t" "\t\t\t\t") "Ctrl -") (netptr gui-zoom-out-cb))
+                        (gui-setup-menu-item (+ "No zoom" (if (cmingw) "\t" "\t\t\t\t\t") "Ctrl 0") (netptr gui-zoom-zero-cb))
                         (iup-separator)
                         (gui-setup-menu-item-low $"Swap order" (netptr gui-swap-order-cb) "swap-order")
                         (iup-separator)
@@ -166,9 +172,13 @@
                         (gui-setup-menu-item-low $"Clear bottom text" (netptr gui-clear-text2-cb) "clear-text2") ))
                 (gui-setup-submenu "&Misc" (iup-menu
                         (gui-setup-menu-item-low $"Print selected movie names" (netptr gui-print-selected-cb) "print-selected")
+                        (gui-setup-menu-item $"Print the valid paths" (netptr gui-print-valid-paths-cb))
+                        (gui-setup-menu-item $"Print obsolete paths" (netptr gui-print-obsolete-paths-cb))
                         (gui-setup-menu-item-low $"Print timestamps movie 1" (netptr gui-print-timestamps1-cb) "print-timestamps1")
                         (gui-setup-menu-item-low $"Print timestamps movie 2" (netptr gui-print-timestamps2-cb) "print-timestamps2")
+                        (iup-separator)
                         (gui-setup-menu-item-low $"Report failed checks" (netptr gui-report-failed-cb) "report-failed")
+                        (iup-separator)
                         (gui-setup-menu-item $"Restore default parameters" (netptr gui-restore-default-cb)) ))
                 (gui-setup-submenu (+ "&" $"Help") (iup-menu
                         (gui-setup-menu-item $"About FFmatch" (netptr info-cb)) ))))
@@ -308,7 +318,7 @@
 
 (defun gui-setup-text-toolbar1 () net gui-setup-text-toolbar1)
 (defnet gui-setup-text-toolbar1 (@wid)
-        (deflocal q btn1 btn2 btn3 btn4 btn5 btn6 spin1 spin2 l)
+        (deflocal q btn1 btn2 btn3 btn4 btn5 btn6 spin1 spin2 hb)
 
         (set q <_kv "da-chiudere">)
         (set btn1 (iup-button-icon undef (netptr gui-left-first-cb) (pix-load-static "16x16/go-first-view.png") q))
@@ -327,21 +337,19 @@
         (iup-set-callback spin1 "VALUECHANGED_CB" (netptr gui-spin-cb))
         (iup-set-callback spin2 "VALUECHANGED_CB" (netptr gui-spin-cb))
 
-        (set l (iup-list))
-        (iup-set-bool l "DROPDOWN" true)
-        (iup-set-callback l "ACTION" (netptr gui-combo-goto-cb))
-        (iup-set-str-attribute l 1 "(000001)")
-        ;(iup-set-int l "VALUE" 1)
         (set <_kv "a-combo-goto"> (array default [ 1 1 0 ] 1))
-        (set <_kv "w-combo-goto"> l)
 
-        (set @wid (iup-hbox l spin1 btn1 btn2 btn3 btn4 btn5 btn6 spin2))
+        (set hb (iup-hbox btn1 btn2 btn3 btn4 btn5 btn6))
+        (iup-set-int hb "GAP" 0)
+
+        (set @wid (iup-hbox spin1 hb spin2))
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
+        (iup-set-int @wid "GAP" 4)
         (iup-set-bool @wid "EXPAND" true) )
 
 (defun gui-setup-text-toolbar2 () net gui-setup-text-toolbar2)
 (defnet gui-setup-text-toolbar2 (@wid)
-        (deflocal q btn1 btn2 btn3 btn4 btn5 btn6 btn7 spin1 spin2)
+        (deflocal q btn1 btn2 btn3 btn4 btn5 btn6 btn7 spin1 spin2 hb1 hb2)
 
         (set q <_kv "da-chiudere">)
         (set btn1 (iup-button-icon undef (netptr gui-scd-left1-cb) (pix-load-static "16x16/arrow-left-3.png") q))
@@ -357,8 +365,15 @@
         (set <_kv "scd-spin1"> spin1)
         (set <_kv "scd-spin2"> spin2)
 
-        (set @wid (iup-hbox spin1 btn1 btn2 btn3 (iup-fill) spin2 btn4 btn5 btn6 (iup-fill) btn7))
+        (set hb1 (iup-hbox btn1 btn2 btn3))
+        (iup-set-int hb1 "GAP" 0)
+
+        (set hb2 (iup-hbox btn4 btn5 btn6))
+        (iup-set-int hb2 "GAP" 0)
+
+        (set @wid (iup-hbox spin1 hb1 (iup-label "        ") spin2 hb2 (iup-label "        ") btn7))
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
+        (iup-set-int @wid "GAP" 4)
         (iup-set-bool @wid "EXPAND" true) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -443,9 +458,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-disable-menu ()
+        (iup-set-bool <_kv "dlg"> "SIMULATEMODAL" true)
         (iup-set-bool <_kv "menu" "widget"> "ACTIVE" false) )
 
 (defnet gui-enable-menu ()
+        (iup-set-bool <_kv "dlg"> "SIMULATEMODAL" false)
         (iup-set-bool <_kv "menu" "widget"> "ACTIVE" true) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -463,7 +480,6 @@
                   supervision map-exists i)
 
         (set menu-info <_kv "menu">)
-        (iup-set-bool <menu-info "widget"> "ACTIVE" true)
         (set btn-info <_kv "toolbar">)
         (set av1 <_kv "av1">)
         (set av2 <_kv "av2">)
@@ -508,7 +524,8 @@
         (iup-set-bool <btn-info "abort"> "ACTIVE"
                 (and running (not <_kv "abort">)) )
         (iup-set-bool <btn-info "audio"> "ACTIVE" map-exists)
-        (iup-set-bool <btn-info "prefs"> "ACTIVE" (not running)) )
+        (iup-set-bool <btn-info "prefs"> "ACTIVE" (not running))
+        (gui-enable-menu) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -550,11 +567,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-report ()
-        (deflocal text1 ab cb av1 av2 name1 name2 k sck map p q n i)
+        (deflocal text1 ab av1 av2 name1 name2 k sck map p q n i)
 
         (set text1 <_kv "text1">)
         (set ab <_kv "a-combo-goto">)
-        (set cb <_kv "w-combo-goto">)
         (while (> (length ab) 0) do
                 (array-remove ab 0) )
         (alt    (seq    (set av1 <_kv "av1">)
@@ -581,16 +597,7 @@
                                 (length <sck 0>) <sck 1> ))
                 (iup-set-str-attribute text1 "VALUE" "") )
         (if (= (length ab) 0)
-        then    (array-append ab [ 1 1 0 ]) )
-        (set p 1)
-        (for i in ab do
-                (set n <i 2>)
-                (iup-set-str-attribute cb p
-                        (+ <[ "(" "[" "-" "[" ] n>
-                           (int->str <i 0> 6 '0')
-                           <[ ")" "-" "]" "]" ] n> ))
-                (inc p) )
-        (iup-set-str-attribute cb p) )
+        then    (array-append ab [ 1 1 0 ]) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -660,7 +667,7 @@
                 (<> av undef)
                 (set text2 <_kv "text2">)
                 (set vidx (av-video-stream-idx av))
-                (iup-text-set-and-go-home text2 "")
+                (iup-text-clear text2)
                 (gui-print-info-on-selected-file which)
 
                 (set ts-avg 0)
@@ -750,6 +757,62 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defnet gui-open-path1-cb (self)
+        (gui-open-path-low self 1) )
+
+(defnet gui-open-path2-cb (self)
+        (gui-open-path-low self 2) )
+
+(defnet gui-open-path-low (self which)
+        (deflocal a i path av n)
+
+        (gui-disable-menu)
+        (opt    (set a (cons (queue) (queue)))
+                (sqlite3-exec-data _db (netptr gui-open-path-cback) a
+                        "SELECT path,name FROM paths ORDER BY path" )
+                (if (= (length (cdr a)) 0)
+                then    (iup-warning60 self $"There are no valid paths.")
+                        (fail) )
+                (set i (iup-choose-menu (cdr a)))
+                (integerp i)
+                (set path <(car a) i>)
+                (set av (if (cfg-get-or-default "cuvid-enabled" <_kv "default">) (av-avformat-open-input-cuvid path) (av-avformat-open-input path)))
+                (alt    (seq    (<> av undef)
+                                (set n (av-r-frame-rate av (av-video-stream-idx av)))
+                                (rationalp n)
+                                (> n 0)
+                                (set n (av-approximated-number-of-frames av))
+                                (integerp n)
+                                (>= n 3) )
+                        (seq    (close av)
+                                (iup-error60 self (+ path $": movie not supported"))
+                                (fail) ))
+                (cfg-set "path" path)
+                (set <_kv (+ "path" which)> path)
+                (close <_kv (+ "av" which)>)
+                (set <_kv (+ "av" which)> av)
+                (iup-set-int <_kv (+ "spin" which)> "SPINMAX" (- n 2))
+                (iup-set-int <_kv (+ "spin" which)> "SPINVALUE" 1)
+                (gui-print-info-on-selected-file which)
+                (gui-report)
+                (gui-update-image) )
+        (gui-update) )
+
+(defnet gui-open-path-cback (a path name)
+        (if (pathexists path)
+        then    (queue-put (car a) path)
+                (queue-put (cdr a) name) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defnet gui-zoom-in-cb (self)
         (gui-zoom-low 1) )
 
@@ -801,22 +864,48 @@
 (defnet gui-spin-cb (self)
         (gui-update-image) )
 
-(defnet gui-combo-goto-cb (self)
-        (opt (gui-combo-goto-low)) )
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-combo-goto-low ()
-        (deflocal a spin1 spin2)
+(defnet gui-text1-button-cb (self btn prs x y status)
+        (opt    (= <_kv "th"> undef)
+                (= btn (cmacro IUP_BUTTON1))
+                (= prs 0)
+                (gui-text1-button-cb-low self x y)) )
 
-        (set a (iup-get-int <_kv "w-combo-goto"> "VALUE"))
-        (> a 0)
-        (set a <_kv "a-combo-goto" (- a 1)>)
-        (set spin1 <_kv "spin1">)
-        (set spin2 <_kv "spin2">)
-        (or (<> <a 0> (iup-get-int spin1 "SPINVALUE"))
-            (<> <a 1> (iup-get-int spin2 "SPINVALUE")) )
-        (iup-set-int spin1 "SPINVALUE" <a 0>)
-        (iup-set-int spin2 "SPINVALUE" <a 1>)
-        (gui-update-image) )
+(defnet gui-text1-button-cb-low (self x y)
+        (deflocal s p i)
+
+        (set s (iup-get-str-attribute self "VALUE"))
+        (set p (iup-convert-xy-to-pos self x y))
+        (opt    (search "\n" (sub 0 p s) i (maxint))
+                (inc i)
+                (set s (sub i (maxint) s))
+                (dec p i) )
+        (= <s 0> '[')
+        (= <s 7> '-')
+        (= <s 14> ']')
+        (set x (str->num (sub 1 6 s)))
+        (integerp x)
+        (set y (str->num (sub 8 6 s)))
+        (integerp y)
+        (alt    (seq    (in p 1 .. 7)
+                        (set i x) )
+                (seq    (in p 8 .. 14)
+                        (set i y) ))
+        (opt    (if (lmatch (sub 15 (maxint) s) "²")
+                then    (iup-set-int <_kv "spin2"> "SPINVALUE" i)
+                        (gui-sync2-low true)
+                else    (iup-set-int <_kv "spin1"> "SPINVALUE" i)
+                        (gui-sync1-low true) ))
+        (iup-set-str-attribute self "SELECTIONPOS" "0:0") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -914,9 +1003,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-sync1-cb (self)
-        (opt (gui-sync1-low)) )
+        (opt (gui-sync1-low false)) )
 
-(defnet gui-sync1-low ()
+(defnet gui-sync1-low (force-update)
         (deflocal map spin1 spin2 n1 n2 p q n u ut prv i)
 
         (set i (cfg-get (key-map <_kv "av1">
@@ -935,7 +1024,7 @@
                 (set n <i 2>)
                 (if (in n1 p .. (+ p n -1))
                 then    (set n (+ n1 q -p))
-                        (<> n n2)
+                        (or force-update (<> n n2))
                         (iup-set-int spin2 "SPINVALUE" n)
                         (gui-update-image)
                         (fail) )
@@ -953,14 +1042,14 @@
                                 then    (set n (min (max (+ <ut 2> n1 -p) <ut 2>) <ut 3>))
                                         (if (= n n2)
                                         then    (set n (min (max (+ <ut 3> n1 -q) <ut 2>) <ut 3>)) )
-                                        (<> n n2)
+                                        (or force-update (<> n n2))
                                         (iup-set-int spin2 "SPINVALUE" n)
                                         (gui-update-image)
                                         (fail) )
                                 (set ut (queue-get u))
                         else    (if (in n1 p .. q)
                                 then    (set n (if (= prv undef) 1 prv))
-                                        (<> n n2)
+                                        (or force-update (<> n n2))
                                         (iup-set-int spin2 "SPINVALUE" n)
                                         (gui-update-image)
                                         (fail) ))
@@ -968,10 +1057,58 @@
                 else    (set prv (+ n q -p)) )))
 
 (defnet gui-sync2-cb (self)
-        (opt (gui-sync2-low)) )
+        (opt (gui-sync2-low false)) )
 
-(defnet gui-sync2-low ()
-        (iup-info60 <_kv "dlg"> "sync2: to do") )
+(defnet gui-sync2-low (force-update)
+        (deflocal map spin1 spin2 n1 n2 p q n u ut prv i)
+
+        (set i (cfg-get (key-map <_kv "av1">
+                                 <_kv "av2">
+                                 (fullpath->name <_kv "path1">)
+                                 (fullpath->name <_kv "path2">) )))
+        (<> i undef)
+        (set map (map-create <i 1> <i 0>))
+        (set spin1 <_kv "spin2">)
+        (set spin2 <_kv "spin1">)
+        (set n1 (iup-get-int spin1 "SPINVALUE"))
+        (set n2 (iup-get-int spin2 "SPINVALUE"))
+        (for i in <i 2> do
+                (set p <i 1>)
+                (set q <i 0>)
+                (set n <i 2>)
+                (if (in n1 p .. (+ p n -1))
+                then    (set n (+ n1 q -p))
+                        (or force-update (<> n n2))
+                        (iup-set-int spin2 "SPINVALUE" n)
+                        (gui-update-image)
+                        (fail) )
+                (map-bind-low (car map) p q n)
+                (map-bind-low (cdr map) q p n) )
+        (set u (map-undef-low (car map) (cdr map)))
+        (set ut (queue-get u))
+        (for i in (car map) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (= n undef)
+                then    (if (and (= p <ut 0>) (= q <ut 1>))
+                        then    (if (in n1 p .. q)
+                                then    (set n (min (max (+ <ut 2> n1 -p) <ut 2>) <ut 3>))
+                                        (if (= n n2)
+                                        then    (set n (min (max (+ <ut 3> n1 -q) <ut 2>) <ut 3>)) )
+                                        (or force-update (<> n n2))
+                                        (iup-set-int spin2 "SPINVALUE" n)
+                                        (gui-update-image)
+                                        (fail) )
+                                (set ut (queue-get u))
+                        else    (if (in n1 p .. q)
+                                then    (set n (if (= prv undef) 1 prv))
+                                        (or force-update (<> n n2))
+                                        (iup-set-int spin2 "SPINVALUE" n)
+                                        (gui-update-image)
+                                        (fail) ))
+                        (clr prv)
+                else    (set prv (+ n q -p)) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1012,14 +1149,6 @@
                                 (cfg-set key k)
                                 (gui-report)
                                 (gui-update)
-                                (if (= n1 p)
-                                then    (for i in <_kv "a-combo-goto"> do
-                                                (if (and (= <i 0> (+ n1 n)) (in <i 2> [ 1 3 ]))
-                                                then    (iup-set-int <_kv "w-combo-goto"> "VALUE" (+ (for-pos) 1)) )))
-                                (if (= n1 (+ p n -1))
-                                then    (for i in <_kv "a-combo-goto"> do
-                                                (if (and (= <i 0> (- n1 n)) (in <i 2> [ 2 3 ]))
-                                                then    (iup-set-int <_kv "w-combo-goto"> "VALUE" (+ (for-pos) 1)) )))
                                 (fail) )
                 else    (map-bind-low (car map) p q n)
                         (map-bind-low (cdr map) q p n) ))
@@ -1041,10 +1170,7 @@
         (array-append a (list n1 n2 1))
         (cfg-set key k)
         (gui-report)
-        (gui-update)
-        (for i in <_kv "a-combo-goto"> do
-                (if (= <i 0> n1)
-                then    (iup-set-int <_kv "w-combo-goto"> "VALUE" (+ (for-pos) 1)) )))
+        (gui-update) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1104,17 +1230,48 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-clear-text1-cb (self)
-        (iup-text-set-and-go-home <_kv "text1"> "")
+        (iup-text-clear <_kv "text1">)
         (gui-update) )
 
 (defnet gui-clear-text2-cb (self)
-        (iup-text-set-and-go-home <_kv "text2"> "")
+        (iup-text-clear <_kv "text2">)
         (gui-update) )
 
 (defnet gui-print-selected-cb (self)
         (gui-print-info-on-selected-file 1)
         (gui-print-info-on-selected-file 2)
         (gui-update) )
+
+(defnet gui-print-valid-paths-cb (self)
+        (gui-print-paths-low false) )
+
+(defnet gui-print-obsolete-paths-cb (self)
+        (gui-print-paths-low true) )
+
+(defnet gui-print-paths-low (obsolete)
+        (deflocal text2 a)
+
+        (set text2 <_kv "text2">)
+        (set a (array 3))
+        (set <a 0 > 0)
+        (set <a 1 > text2)
+        (set <a 2 > obsolete)
+        (iup-text-set-and-go-end text2 (+ (if obsolete $"Obsolete paths" $"Valid paths") ":" nl nl))
+        (sqlite3-exec-data _db (netptr gui-print-paths-cback) a
+                "SELECT path FROM paths ORDER BY path" )
+        (if (= <a 0> 0)
+        then    (iup-text-append-and-go-end text2 (+ (if obsolete $"There are no obsolete paths." $"There are no valid paths.") nl)) )
+        (gui-update) )
+
+(defnet gui-print-paths-cback (a path)
+        (deflocal x)
+
+        (set x (pathexists path))
+        (if <a 2>
+        then    (set x (not x)) )
+        (if x
+        then    (inc <a 0>)
+                (iup-text-append-and-go-end <a 1> (+ "[" (int->str <a 0> 5 '0') "] " path nl)) ))
 
 (defnet gui-print-timestamps1-cb (self)
         (gui-print-timestamps 1) )
@@ -1200,22 +1357,23 @@
         (opt (gui-save-frame-low self 2)) )
 
 (defnet gui-save-frame-low (self which)
-        (deflocal path av pix)
+        (deflocal path n av pix)
 
         (set path (cfg-get "save-path"))
         (if (not (stringp path))
         then    (set path (cfg-get "path")) )
+        (set n (iup-get-int <_kv (+ "spin" which)> "SPINVALUE"))
         (set path (iup-choose-file-save self
                 (+ $"Save frame " which $" as...")
                 path
-                "frame.png"
+                (+ "movie-" which "-frame-" (int->str n 6 '0') ".png")
                 true ))
         (stringp path)
 
         (cfg-set "save-path" path)
         (set av <_kv (+ "av" which)>)
         (set pix (pix-create (width av) (height av)))
-        (alt    (av-read-frame av pix (iup-get-int <_kv (+ "spin" which)> "SPINVALUE"))
+        (alt    (av-read-frame av pix n)
                 (pix-clear pix) )
         (if (rmatch case path ".jpg" ".jpeg")
         then    (pix-save-jpg pix path)
@@ -1494,7 +1652,7 @@
         (if (= i 0)
         then    (iup-info60 self $"There are no failed checks.")
                 (fail) )
-        (iup-text-set-and-go-home <_kv "text2"> "")
+        (iup-text-clear <_kv "text2">)
         (gui-start (netptr gui-start-failed-thread)) )
 
 (defnet gui-start (net)
@@ -1524,8 +1682,9 @@
                                 "d"     (seq    (gui-draw-image)
                                                 (send true to th) )
                                 "c1"    (iup-text-set-and-go-home text1 msg)
-                                "p1"    (iup-text-append-and-go-home text1 msg)
-                                "p1c"   (iup-text-append-and-go-home-color text1 (car msg) (cdr msg))
+                                "p1"    (iup-text-append-and-go-end text1 msg)
+                                "p1c"   (iup-text-append-and-go-end-color text1 (car msg) (cdr msg))
+                                "h1"    (iup-text-append-and-go-home text1 msg)
                                 "c2"    (iup-text-set-and-go-end text2 msg)
                                 "p2"    (iup-text-append-and-go-end text2 msg)
                                 "p2c"   (iup-text-append-and-go-end-color text2 (car msg) (cdr msg))

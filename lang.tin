@@ -145,6 +145,14 @@
 1
 "Seleziona il filmato 2"
 
+"Select path 1"
+1
+"Seleziona il path 1"
+
+"Select path 2"
+1
+"Seleziona il path 2"
+
 "Swap order"
 1
 "Scambia l'ordine"
@@ -168,6 +176,22 @@
 "Exit"
 1
 "Esci"
+
+"Print the valid paths"
+1
+"Stampa i path validi"
+
+"Obsolete paths"
+1
+"Path obsoleti"
+
+"Valid paths"
+1
+"Path validi"
+
+"Print obsolete paths"
+1
+"Stampa i path obsoleti"
 
 "Print selected movie names"
 1
@@ -220,6 +244,10 @@
 "There are no obsolete paths."
 1
 "Non ci sono path obsoleti."
+
+"There are no valid paths."
+1
+"Non ci sono path validi."
 
 "There are no obsolete data."
 1
