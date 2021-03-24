@@ -525,6 +525,10 @@
 1
 "numero approssimato di fotogrammi"
 
+"Draw keypoints"
+1
+"Disegna i keypoints"
+
         )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

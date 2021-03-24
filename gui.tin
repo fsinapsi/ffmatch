@@ -177,6 +177,8 @@
                         (gui-setup-menu-item-low $"Print timestamps movie 1" (netptr gui-print-timestamps1-cb) "print-timestamps1")
                         (gui-setup-menu-item-low $"Print timestamps movie 2" (netptr gui-print-timestamps2-cb) "print-timestamps2")
                         (iup-separator)
+                        (gui-setup-menu-item-low $"Draw keypoints" (netptr gui-draw-keypoints-cb) "draw-keypoints")
+                        (iup-separator)
                         (gui-setup-menu-item-low $"Report failed checks" (netptr gui-report-failed-cb) "report-failed")
                         (iup-separator)
                         (gui-setup-menu-item $"Restore default parameters" (netptr gui-restore-default-cb)) ))
@@ -401,7 +403,10 @@
         (iup-flush) )
 
 (defnet gui-update-image ()
-        (deflocal default-info pix av1 av2 pix1 pix2 err a sy)
+        (gui-update-image-low false) )
+
+(defnet gui-update-image-low (draw-keypoints)
+        (deflocal default-info pix av1 av2 pix1 pix2 err a)
 
         (set default-info <_kv "default">)
         (set pix <_kv "pix">)
@@ -440,10 +445,13 @@
                         (set pix2 a) )
                 (if err
                 then    (pix-error pix2) )
+                (if draw-keypoints
+                then    (skip (cv-sift-features-draw pix1))
+                        (skip (cv-sift-features-draw pix2)) )
                 (pix-clear pix)
-                (set sy (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
-                (pix-draw-pix pix (/ (- (width pix) (width pix1)) 2) sy pix1)
-                (pix-draw-pix pix (/ (- (width pix) (width pix2)) 2) (+ sy (height pix1) (space)) pix2)
+                (set a (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
+                (pix-draw-pix pix (/ (- (width pix) (width pix1)) 2) a pix1)
+                (pix-draw-pix pix (/ (- (width pix) (width pix2)) 2) (+ a (height pix1) (space)) pix2)
                 (close pix1 pix2) )
         (gui-draw-image) )
 
@@ -491,40 +499,41 @@
         then    (set name1 (fullpath->name <_kv "path1">))
                 (set name2 (fullpath->name <_kv "path2">))
                 (set map-exists (cfg-exists (key-map av1 av2 name1 name2)))
-                (iup-set-bool <menu-info "swap-order"> "ACTIVE" supervision)
-                (iup-set-bool <menu-info "clear-scd1"> "ACTIVE"
+                (iup-set-active <menu-info "swap-order"> supervision)
+                (iup-set-active <menu-info "clear-scd1">
                         (if (= av1 undef) false (cfg-exists (key-scd av1 name1))) )
-                (iup-set-bool <menu-info "clear-scd2"> "ACTIVE"
+                (iup-set-active <menu-info "clear-scd2">
                         (if (= av2 undef) false (cfg-exists (key-scd av2 name2))) )
                 (set i (if (or (= av1 undef) (= av2 undef))
                                 false
                                 (cfg-exists (key-sck av1 av2 name1 name2)) ))
-                (iup-set-bool <menu-info "clear-sck"> "ACTIVE" i)
-                (iup-set-bool <menu-info "clear-failed-sck"> "ACTIVE" i)
-                (iup-set-bool <menu-info "report-failed"> "ACTIVE" i)
-                (iup-set-bool <menu-info "clear-map"> "ACTIVE"
+                (iup-set-active <menu-info "clear-sck"> i)
+                (iup-set-active <menu-info "clear-failed-sck"> i)
+                (iup-set-active <menu-info "report-failed"> i)
+                (iup-set-active <menu-info "clear-map">
                         (if (or (= av1 undef) (= av2 undef)) false map-exists) )
                 (set i (> (iup-get-int <_kv "text1"> "COUNT") 0))
-                (iup-set-bool <menu-info "save-text1"> "ACTIVE" i)
-                (iup-set-bool <menu-info "clear-text1"> "ACTIVE" i)
+                (iup-set-active <menu-info "save-text1"> i)
+                (iup-set-active <menu-info "clear-text1"> i)
                 (set i (> (iup-get-int <_kv "text2"> "COUNT") 0))
-                (iup-set-bool <menu-info "save-text2"> "ACTIVE" i)
-                (iup-set-bool <menu-info "clear-text2"> "ACTIVE" i)
-                (iup-set-bool <menu-info "save-frame1"> "ACTIVE" supervision)
-                (iup-set-bool <menu-info "save-frame2"> "ACTIVE" supervision)
-                (iup-set-bool <menu-info "print-selected"> "ACTIVE"
+                (iup-set-active <menu-info "save-text2"> i)
+                (iup-set-active <menu-info "clear-text2"> i)
+                (iup-set-active <menu-info "save-frame1"> supervision)
+                (iup-set-active <menu-info "save-frame2"> supervision)
+                (iup-set-active <menu-info "print-selected">
                         (or (<> av1 undef) (<> av2 undef)) )
-                (iup-set-bool <menu-info "print-timestamps1"> "ACTIVE" (<> av1 undef))
-                (iup-set-bool <menu-info "print-timestamps2"> "ACTIVE" (<> av2 undef)) )
-        (iup-set-bool <menu-info "widget"> "ACTIVE" (not running))
-        (iup-set-bool <_kv "supervision-toolbar"> "ACTIVE" (and (not running) supervision))
-        (iup-set-bool <btn-info "open1"> "ACTIVE" (not running))
-        (iup-set-bool <btn-info "open2"> "ACTIVE" (not running))
-        (iup-set-bool <btn-info "start"> "ACTIVE" supervision)
-        (iup-set-bool <btn-info "abort"> "ACTIVE"
+                (iup-set-active <menu-info "print-timestamps1"> (<> av1 undef))
+                (iup-set-active <menu-info "print-timestamps2"> (<> av2 undef))
+                (iup-set-active <menu-info "draw-keypoints"> (and (<> av1 undef) (<> av2 undef))) )
+        (iup-set-active <menu-info "widget"> (not running))
+        (iup-set-active <_kv "supervision-toolbar"> (and (not running) supervision))
+        (iup-set-active <btn-info "open1"> (not running))
+        (iup-set-active <btn-info "open2"> (not running))
+        (iup-set-active <btn-info "start"> supervision)
+        (iup-set-active <btn-info "abort">
                 (and running (not <_kv "abort">)) )
-        (iup-set-bool <btn-info "audio"> "ACTIVE" map-exists)
-        (iup-set-bool <btn-info "prefs"> "ACTIVE" (not running))
+        (iup-set-active <btn-info "audio"> map-exists)
+        (iup-set-active <btn-info "prefs"> (not running))
         (gui-enable-menu) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -683,8 +692,7 @@
                                 (iup-text-append-and-go-end text2 " (diff: ")
                                 (iup-text-append-and-go-end-color text2 (blue) (approx4 (- ts ts-prev)))
                                 (iup-text-append-and-go-end text2 ")") )
-                        (iup-text-append-and-go-end text2 (+ " " (* (av-frameno2ts av (av-frameno av)) time-base)))
-                                ;(format-num (av-frameno2ts av (av-frameno av)))
+                        (iup-text-append-and-go-end text2 (+ " " (approx4 (av-frameno2ts av (av-frameno av)))))
                         (if (not (av-is-frame-recoverable av))
                         then    (iup-text-append-and-go-end-color text2 (red) " *") )
                         (iup-text-append-and-go-end text2 nl)
@@ -697,6 +705,19 @@
                 (iup-text-append-and-go-end text2 "\naverage frame rate: ")
                 (iup-text-append-and-go-end-color text2 (blue) (approx3 (/ 1 ts-avg)))
                 (iup-text-append-and-go-end text2 " fps\n") ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet gui-draw-keypoints-cb (self)
+        (gui-update-image-low true) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -900,11 +921,9 @@
                         (set i x) )
                 (seq    (in p 8 .. 14)
                         (set i y) ))
-        (opt    (if (lmatch (sub 15 (maxint) s) "²")
-                then    (iup-set-int <_kv "spin2"> "SPINVALUE" i)
-                        (gui-sync2-low true)
-                else    (iup-set-int <_kv "spin1"> "SPINVALUE" i)
-                        (gui-sync1-low true) ))
+        (opt    (set p (if (lmatch (sub 15 (maxint) s) "²") 2 1))
+                (iup-set-int <_kv (+ "spin" p)> "SPINVALUE" i)
+                (gui-sync-low p true) )
         (iup-set-str-attribute self "SELECTIONPOS" "0:0") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1003,78 +1022,29 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-sync1-cb (self)
-        (opt (gui-sync1-low false)) )
-
-(defnet gui-sync1-low (force-update)
-        (deflocal map spin1 spin2 n1 n2 p q n u ut prv i)
-
-        (set i (cfg-get (key-map <_kv "av1">
-                                 <_kv "av2">
-                                 (fullpath->name <_kv "path1">)
-                                 (fullpath->name <_kv "path2">) )))
-        (<> i undef)
-        (set map (map-create <i 0> <i 1>))
-        (set spin1 <_kv "spin1">)
-        (set spin2 <_kv "spin2">)
-        (set n1 (iup-get-int spin1 "SPINVALUE"))
-        (set n2 (iup-get-int spin2 "SPINVALUE"))
-        (for i in <i 2> do
-                (set p <i 0>)
-                (set q <i 1>)
-                (set n <i 2>)
-                (if (in n1 p .. (+ p n -1))
-                then    (set n (+ n1 q -p))
-                        (or force-update (<> n n2))
-                        (iup-set-int spin2 "SPINVALUE" n)
-                        (gui-update-image)
-                        (fail) )
-                (map-bind-low (car map) p q n)
-                (map-bind-low (cdr map) q p n) )
-        (set u (map-undef-low (car map) (cdr map)))
-        (set ut (queue-get u))
-        (for i in (car map) do
-                (set p <i 0>)
-                (set q <i 1>)
-                (set n <i 2>)
-                (if (= n undef)
-                then    (if (and (= p <ut 0>) (= q <ut 1>))
-                        then    (if (in n1 p .. q)
-                                then    (set n (min (max (+ <ut 2> n1 -p) <ut 2>) <ut 3>))
-                                        (if (= n n2)
-                                        then    (set n (min (max (+ <ut 3> n1 -q) <ut 2>) <ut 3>)) )
-                                        (or force-update (<> n n2))
-                                        (iup-set-int spin2 "SPINVALUE" n)
-                                        (gui-update-image)
-                                        (fail) )
-                                (set ut (queue-get u))
-                        else    (if (in n1 p .. q)
-                                then    (set n (if (= prv undef) 1 prv))
-                                        (or force-update (<> n n2))
-                                        (iup-set-int spin2 "SPINVALUE" n)
-                                        (gui-update-image)
-                                        (fail) ))
-                        (clr prv)
-                else    (set prv (+ n q -p)) )))
+        (opt (gui-sync-low 1 false)) )
 
 (defnet gui-sync2-cb (self)
-        (opt (gui-sync2-low false)) )
+        (opt (gui-sync-low 2 false)) )
 
-(defnet gui-sync2-low (force-update)
-        (deflocal map spin1 spin2 n1 n2 p q n u ut prv i)
+(defnet gui-sync-low (which force-update)
+        (deflocal i0 i1 map spin1 spin2 n1 n2 p q n u ut prv i)
 
         (set i (cfg-get (key-map <_kv "av1">
                                  <_kv "av2">
                                  (fullpath->name <_kv "path1">)
                                  (fullpath->name <_kv "path2">) )))
         (<> i undef)
-        (set map (map-create <i 1> <i 0>))
-        (set spin1 <_kv "spin2">)
-        (set spin2 <_kv "spin1">)
+        (set i0 (- which 1))
+        (set i1 (- 2 which))
+        (set map (map-create <i i0> <i i1>))
+        (set spin1 <_kv (+ "spin" which)>)
+        (set spin2 <_kv (+ "spin" (- 3 which))>)
         (set n1 (iup-get-int spin1 "SPINVALUE"))
         (set n2 (iup-get-int spin2 "SPINVALUE"))
         (for i in <i 2> do
-                (set p <i 1>)
-                (set q <i 0>)
+                (set p <i i0>)
+                (set q <i i1>)
                 (set n <i 2>)
                 (if (in n1 p .. (+ p n -1))
                 then    (set n (+ n1 q -p))
