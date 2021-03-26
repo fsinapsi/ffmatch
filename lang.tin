@@ -529,6 +529,66 @@
 1
 "Disegna i keypoints"
 
+"Open project"
+1
+"Apri progetto"
+
+"Save project"
+1
+"Salva progetto"
+
+"open project"
+1
+"apri progetto"
+
+"save project"
+1
+"salva progetto"
+
+"Project name"
+1
+"Nome del progetto"
+
+"Project `"
+1
+"Il progetto `"
+
+"' exists. Do you want to overwrite it?"
+1
+"' esiste. Lo vuoi sovrascrivere?"
+
+"Project successfully saved."
+1
+"Il progetto è stato salvato con successo."
+
+"There are no valid projects."
+1
+"Non ci sono progetti validi."
+
+"Print obsolete projects"
+1
+"Stampa i progetti obsoleti"
+
+"Obsolete projects"
+1
+"Progetti obsoleti"
+
+"There are no obsolete projects."
+1
+"Non ci sono progetti obsoleti."
+
+"Clear obsolete projects"
+1
+"Cancella i progetti obsoleti"
+
+"obsolete project will be deleted."
+1
+"progetto obsoleto verrà cancellato."
+
+"obsolete projects will be deleted."
+1
+"progetti obsoleti verranno cancellati."
+
         )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

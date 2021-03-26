@@ -91,6 +91,15 @@
                                 "name char not null)" )
                 (sqlite3-exec _db undef
                         "CREATE INDEX paths_name ON paths(name)" ))
+        (opt    (sqlite3-exec _db undef
+                        "CREATE TABLE projects(" \
+                                "name char unique not null," \
+                                "path1 char not null," \
+                                "path2 char not null)" )
+                (sqlite3-exec _db undef
+                        "CREATE INDEX projects_path1 ON projects(path1)" )
+                (sqlite3-exec _db undef
+                        "CREATE INDEX projects_path2 ON projects(path2)" ))
         (sqlite3-end _db)
         (set-lang (cfg-get-lang)) )
 

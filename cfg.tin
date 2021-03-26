@@ -366,6 +366,8 @@
         (set hbox2 (iup-hbox
                 (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled") ))
 
+        (iup-set-active hbox2 false)
+
         (set list (iup-list))
         (set <cfg-info "cb-languages"> list)
         (iup-set-bool list "DROPDOWN" true)

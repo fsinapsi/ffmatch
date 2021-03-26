@@ -34,7 +34,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet scdscan-low (th-main name av pix default-info @v)
-        (deflocal th-read-frame scd-display-enabled abort l l1 frm pix1 pix2 gamma1 gamma2 idx val frameno t)
+        (deflocal th-read-frame scd-display-enabled abort l l1 frm hst pix1 pix2 gamma1 gamma2 idx val frameno t)
 
         (av-seek-frame av 0)
 
@@ -45,6 +45,11 @@
         (set <frm 0> (pix-create (width av) (height av)))
         (set <frm 1> (pix-create (width av) (height av)))
         (set <frm 2> (pix-create (width av) (height av)))
+
+        (set hst (array 3))
+        (set <hst 0> (raw 256))
+        (set <hst 1> (raw 256))
+        (set <hst 2> (raw 256))
 
         (set val (min (/ (- (width pix) (* 2 (space))) (width av))
                       (/ (- (height pix) (* 3 (space))) 2 (height av)) ))
@@ -65,6 +70,7 @@
         (send <frm 0> to th-read-frame)
         (receive val from th-read-frame)
         (send <frm 1> to th-read-frame)
+        (pix-scd-histogram-set <frm 0> <hst 0>)
         (set idx 1)
         (set scd-display-enabled (cfg-get-or-default "scd-display-enabled" default-info))
         (set abort false)
@@ -73,13 +79,18 @@
                 (set frameno (av-frameno av))
                 until (>= frameno l1)
                 (if (not (av-is-frame-recoverable av))
-                then    (sendbuf 100 [ "p2" . "irregular timestamps not supported (read the docs)...\n" ] to th-main)
+                then    (sendbuf 100 (cons "p2" (+ "frame # " frameno " is not recoverable by a seek" nl
+                                                   "expected timestamp: " (approx4 (av-frameno2ts av frameno)) " s" nl
+                                                   "detected timestamp: " (approx4 (* (av-ts av) (av-time-base av (av-video-stream-idx av)))) " s"
+                                                   nl
+                                                   "too irregular timestamps not supported (read the docs)..." nl )) to th-main )
                         (set abort true) )
                 (opt    (receivenb abort from th-main)
                         (set abort true) )
                 until abort
                 (send <frm (scdscan-succ idx)> to th-read-frame)
-                (set val (pix-scd-histogram <frm (scdscan-prec idx)> <frm idx>))
+                (pix-scd-histogram-set <frm idx> <hst idx>)
+                (set val (pix-scd-histogram-dist <hst (scdscan-prec idx)> <hst idx>))
                 (set <@v frameno> val)
                 (if scd-display-enabled
                 then    (if (>= val 0.3)
@@ -92,7 +103,7 @@
                                  to th-main ))
                 (set idx (scdscan-succ idx)) )
 
-        (close pix1 pix2 <frm 0> <frm 1> <frm 2>)
+        (close pix1 pix2 <frm 0> <frm 1> <frm 2> <hst 0> <hst 1> <hst 2>)
         (send undef to th-read-frame)
         (thread-join th-read-frame)
         (not abort)
