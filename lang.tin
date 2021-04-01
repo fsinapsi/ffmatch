@@ -549,6 +549,10 @@
 1
 "Nome del progetto"
 
+"Rename project"
+1
+"Rinomina progetto"
+
 "Project `"
 1
 "Il progetto `"
@@ -588,6 +592,38 @@
 "obsolete projects will be deleted."
 1
 "progetti obsoleti verranno cancellati."
+
+"frame # "
+1
+"il frame # "
+
+" is not recoverable by a seek"
+1
+" non è recuperabile con un seek"
+
+"expected timestamp"
+1
+"timestamp atteso"
+
+"detected timestamp"
+1
+"timestamp rilevato"
+
+"too irregular timestamps not supported\n(more info in the guide)"
+1
+"timestamp troppo irregolari non supportati\n(maggiori info nella guida)"
+
+"delay (ms): "
+1
+"ritardo (ms): "
+
+"Import data from cfg"
+1
+"Importa dati da cfg"
+
+"Select cfg"
+1
+"Seleziona cfg"
 
         )
 

@@ -95,10 +95,14 @@
         (iup-set-attribute-handle dlg "DEFAULTENTER" (iup-box-ok-cancel-btn-ok butbox))
         (iup-set-attribute-handle dlg "DEFAULTESC" (iup-box-ok-cancel-btn-cancel butbox))
 
-        (iup-set-bool <cfg-info "sb-sift-scale-pixels"> "ACTIVE" (cfg-get-or-default "sift-scale" default-info))
+        (iup-set-active <cfg-info "sb-sift-scale-pixels"> (cfg-get-or-default "sift-scale" default-info))
         (iup-set-callback <cfg-info "tb-sift-scale"> "ACTION" (netptr cfg-toggled-sift-scale))
         (cfg-combo-sift-impl-cb <cfg-info "cb-sift-impl">)
         (iup-set-callback <cfg-info "cb-sift-impl"> "ACTION" (netptr cfg-combo-sift-impl-cb))
+        (iup-set-active <cfg-info "sb-filter-ar1"> (not (cfg-get-or-default "filter-ar1-auto" default-info)))
+        (iup-set-active <cfg-info "sb-filter-ar2"> (not (cfg-get-or-default "filter-ar2-auto" default-info)))
+        (iup-set-callback <cfg-info "tb-filter-ar1-auto"> "ACTION" (netptr cfg-toggled-fileter-ar1))
+        (iup-set-callback <cfg-info "tb-filter-ar2-auto"> "ACTION" (netptr cfg-toggled-fileter-ar2))
 
         (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
 
@@ -130,6 +134,8 @@
                     "filter-mirror2"
                     "filter-flip1"
                     "filter-flip2"
+                    "filter-ar1-auto"
+                    "filter-ar2-auto"
                     "cuvid-enabled"
                     ] do
                 (cfg-set c (iup-get-bool <cfg-info (+ "tb-" c)> "VALUE")) )
@@ -159,6 +165,8 @@
                     "filter-gamma2"
                     "filter-rotate1"
                     "filter-rotate2"
+                    "filter-ar1"
+                    "filter-ar2"
                     "vlfeat-peak-threshold"
                     "vlfeat-edge-threshold"
                     ] do
@@ -313,10 +321,22 @@
 
 (defun cfg-setup-tabs-page4 (q) net cfg-setup-tabs-page4)
 (defnet cfg-setup-tabs-page4 (q @wid)
-        (deflocal cfg-info default-info hbox1 hbox2)
+        (deflocal cfg-info default-info hbox1 hbox2 hb1 hb2)
 
         (set cfg-info <_kv "cfg-info">)
         (set default-info <_kv "default">)
+
+        (set hb1 (iup-hbox
+            (cfg-setup-toggle "auto" (cfg-get-or-default "filter-ar1-auto" default-info) cfg-info "tb-filter-ar1-auto")
+            (cfg-setup-spin-ratio 0.1 10 (cfg-get-or-default-num "filter-ar1" default-info) 0.01
+            cfg-info "sb-filter-ar1" )))
+        (iup-set-str-attribute hb1 "ALIGNMENT" "ACENTER")
+
+        (set hb2 (iup-hbox
+            (cfg-setup-toggle "auto" (cfg-get-or-default "filter-ar2-auto" default-info) cfg-info "tb-filter-ar2-auto")
+            (cfg-setup-spin-ratio 0.1 10 (cfg-get-or-default-num "filter-ar2" default-info) 0.01
+            cfg-info "sb-filter-ar2" )))
+        (iup-set-str-attribute hb2 "ALIGNMENT" "ACENTER")
 
         (set hbox1 (iup-hbox
                 (cfg-setup-framed-spin-ratio "Gamma 1" 0.01 4
@@ -328,7 +348,8 @@
                     (cfg-get-or-default "filter-flip1" default-info) cfg-info "tb-filter-flip1" )
                 (cfg-setup-framed-spin-ratio "Rotate 1" (- 0.01 360) (- 360 0.01)
                         (cfg-get-or-default-num "filter-rotate1" default-info) 0.01
-                        cfg-info "sb-filter-rotate1" )))
+                        cfg-info "sb-filter-rotate1" )
+                (iup-frame-with-margin "Aspect ratio 1" hb1) ))
         (set hbox2 (iup-hbox
                 (cfg-setup-framed-spin-ratio "Gamma 2" 0.01 4
                         (cfg-get-or-default-num "filter-gamma2" default-info) 0.01
@@ -339,7 +360,8 @@
                     (cfg-get-or-default "filter-flip2" default-info) cfg-info "tb-filter-flip2" )
                 (cfg-setup-framed-spin-ratio "Rotate 2" (- 0.01 360) (- 360 0.01)
                         (cfg-get-or-default-num "filter-rotate2" default-info) 0.01
-                        cfg-info "sb-filter-rotate2" )))
+                        cfg-info "sb-filter-rotate2" )
+                (iup-frame-with-margin "Aspect ratio 2" hb2) ))
 
         (iup-set-int hbox1 "GAP" 5)
         (iup-set-int hbox2 "GAP" 5)
@@ -366,7 +388,7 @@
         (set hbox2 (iup-hbox
                 (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled") ))
 
-        (iup-set-active hbox2 false)
+        ;(iup-set-active hbox2 false)
 
         (set list (iup-list))
         (set <cfg-info "cb-languages"> list)
@@ -421,7 +443,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet cfg-toggled-sift-scale (self)
-        (iup-set-bool <_kv "cfg-info" "sb-sift-scale-pixels"> "ACTIVE" (iup-get-bool self "VALUE")) )
+        (iup-set-active <_kv "cfg-info" "sb-sift-scale-pixels"> (iup-get-bool self "VALUE")) )
+
+(defnet cfg-toggled-fileter-ar1 (self)
+        (iup-set-active <_kv "cfg-info" "sb-filter-ar1"> (not (iup-get-bool self "VALUE"))) )
+
+(defnet cfg-toggled-fileter-ar2 (self)
+        (iup-set-active <_kv "cfg-info" "sb-filter-ar2"> (not (iup-get-bool self "VALUE"))) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -442,7 +470,7 @@
                     "sb-vlfeat-nlevels-per-octave"
                     "sb-vlfeat-peak-threshold"
                     "sb-vlfeat-edge-threshold" ] do
-                (iup-set-bool <cfg-info i> "ACTIVE" vlfeat) ))
+                (iup-set-active <cfg-info i> vlfeat) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

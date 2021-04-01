@@ -11,6 +11,8 @@
 (defglobal _kv _db)
 
 (defnet init ()
+        ;(if (cmingw)
+        ;then    (iup-set-str-global "DEFAULTFONTSIZE" 10) )
         (set _kv (assoc))
         (set <_kv "da-chiudere"> (queue))
         (set <_kv "zoom-level"> 0)

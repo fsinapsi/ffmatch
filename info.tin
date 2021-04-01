@@ -49,7 +49,8 @@
 
         (set i (iup-label))
         (iup-set-str-attribute i "EXPAND" "VERTICAL")
-        (set img (iup-image-rgba (pix-load-static "128x128/emblem-videos.png")))
+        ;(set img (iup-image-rgba (pix-load-static "128x128/emblem-videos.png")))
+        (set img (iup-image-rgba (pix-load-static "logo.png")))
         (iup-set-attribute-handle i "IMAGE" img)
         (queue-put q img)
 
@@ -71,6 +72,7 @@
                         "IUP version: " (iup-version) nl
                         "IUP system: " (iup-get-global "SYSTEM") nl
                         (if (clinux) (+ "GTK version: " (iup-get-global "GTKVERSION") nl) "")
+                        "IUP DEFAULTFONT: " (iup-get-global "DEFAULTFONT") nl
                         "libavcodec version: " (av-codec-version) "/" (av-avcodec-version) nl
                         "VLFeat version: " (vl-version) nl )
                 (iup-fill) ))

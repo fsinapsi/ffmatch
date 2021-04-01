@@ -150,6 +150,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun av-my-aspect-ratio (which av) net av-my-aspect-ratio)
+(defnet av-my-aspect-ratio (which av @ar)
+        (deflocal default-info)
+
+        (set default-info <_kv "default">)
+        (set @ar (if (cfg-get-or-default (+ "filter-ar" which "-auto") default-info)
+            (av-sample-aspect-ratio av (av-video-stream-idx av))
+            (/ (cfg-get-or-default-num (+ "filter-ar" which) <_kv "default">)
+               (/ (width av) (height av)) ))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defnet pix-clear (pix)
         (pix-draw-box pix 0 0 (maxint) (maxint) (pix-color 0 0 0 0)) )
 
@@ -162,7 +182,9 @@
 
 (defnet pix-logo (pix)
         (pix-clear-and-copy-pix pix
-                (pix-load-static "128x128/emblem-videos.png") ))
+                ;(pix-load-static "128x128/emblem-videos.png")
+                (pix-load-static "logo.png")
+                ))
 
 (defnet pix-wip (pix)
         (pix-clear-and-copy-pix pix
@@ -192,12 +214,12 @@
         (set h1 (height av1))
         (set w2 (width av2))
         (set h2 (height av2))
-        (set k (av-sample-aspect-ratio av1 (av-video-stream-idx av1)))
+        (set k (av-my-aspect-ratio 1 av1))
         (if (> k 0)
         then    (if (> k 1)
                 then    (set w1 (* w1 k))
                 else    (set h1 (/ h1 k)) ))
-        (set k (av-sample-aspect-ratio av2 (av-video-stream-idx av2)))
+        (set k (av-my-aspect-ratio 2 av2))
         (if (> k 0)
         then    (if (> k 1)
                 then    (set w2 (* w2 k))

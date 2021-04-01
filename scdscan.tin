@@ -34,7 +34,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet scdscan-low (th-main name av pix default-info @v)
-        (deflocal th-read-frame scd-display-enabled abort l l1 frm hst pix1 pix2 gamma1 gamma2 idx val frameno t)
+        (deflocal th-read-frame scd-display-enabled abort l l1 frm hst pix1 pix2 gamma1 gamma2 idx val frameno last-frameno-displayed t)
 
         (av-seek-frame av 0)
 
@@ -73,17 +73,18 @@
         (pix-scd-histogram-set <frm 0> <hst 0>)
         (set idx 1)
         (set scd-display-enabled (cfg-get-or-default "scd-display-enabled" default-info))
+        (set last-frameno-displayed -100)
         (set abort false)
         (repeat (receive val from th-read-frame)
                 until (not val)
                 (set frameno (av-frameno av))
                 until (>= frameno l1)
                 (if (not (av-is-frame-recoverable av))
-                then    (sendbuf 100 (cons "p2" (+ "frame # " frameno " is not recoverable by a seek" nl
-                                                   "expected timestamp: " (approx4 (av-frameno2ts av frameno)) " s" nl
-                                                   "detected timestamp: " (approx4 (* (av-ts av) (av-time-base av (av-video-stream-idx av)))) " s"
-                                                   nl
-                                                   "too irregular timestamps not supported (read the docs)..." nl )) to th-main )
+                then    (sendbuf 100 (cons "p2" (+ $"frame # " frameno $" is not recoverable by a seek" nl
+                                                   $"expected timestamp" ": " (approx4 (av-frameno2ts av frameno)) " s" nl
+                                                   $"detected timestamp" ": " (approx4 (* (av-ts av) (av-time-base av (av-video-stream-idx av)))) " s"
+                                                   nl )) to th-main )
+                        (sendbuf 100 (cons "p2c" (cons (red) (+ $"too irregular timestamps not supported\n(more info in the guide)" nl ))) to th-main)
                         (set abort true) )
                 (opt    (receivenb abort from th-main)
                         (set abort true) )
@@ -94,9 +95,11 @@
                 (set <@v frameno> val)
                 (if scd-display-enabled
                 then    (if (>= val 0.3)
-                        then    (pix-copy-frames pix <frm (scdscan-prec idx)> <frm idx> pix1 pix2 gamma1 gamma2)
-                                (alt    (gui-draw-image-th th-main)
-                                        (set abort true) )))
+                        then    (if (>= (- frameno last-frameno-displayed) 30)
+                                then    (set last-frameno-displayed frameno)
+                                        (pix-copy-frames pix <frm (scdscan-prec idx)> <frm idx> pix1 pix2 gamma1 gamma2)
+                                        (alt    (gui-draw-image-th th-main)
+                                                (set abort true) ))))
                 (if (= (% frameno 100) 0)
                 then    (sendbuf 100 (cons "c1" (+ "frame " frameno "/" l " (" (rint (/ frameno (- (now) t)))
                                                    " fps) (" (rint (/ frameno l 0.01)) "%)" ))

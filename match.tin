@@ -303,8 +303,8 @@
                 (set <params k> (cfg-get-or-default k default-info)) )
         (set pix1 (cfg-get-or-default "sift-scale" default-info))
         (set pix2 (cfg-get-or-default-num "sift-scale-pixels" default-info))
-        (set frm1 (match-create-frm av1 pix1 pix2))
-        (set frm2 (match-create-frm av2 pix1 pix2))
+        (set frm1 (match-create-frm 1 av1 pix1 pix2))
+        (set frm2 (match-create-frm 2 av2 pix1 pix2))
         (set k (min (/ (- (width pix) (* 2 (space))) (max (width frm1) (width frm2)))
                     (/ (- (height pix) (* 3 (space))) (+ (height frm1) (height frm2))) ))
         (set pix1 (pix-create (* k (width frm1)) (* k (height frm1))))
@@ -366,13 +366,13 @@
         then    (for k in <k 2> do
                         (map-bind @m <k 0> <k 1> <k 2>) )))
 
-(defun match-create-frm (av sift-scale sift-scale-pixels) net match-create-frm)
-(defnet match-create-frm (av sift-scale sift-scale-pixels @frm)
+(defun match-create-frm (which av sift-scale sift-scale-pixels) net match-create-frm)
+(defnet match-create-frm (which av sift-scale sift-scale-pixels @frm)
         (deflocal w h k)
 
         (set w (width av))
         (set h (height av))
-        (set k (av-sample-aspect-ratio av (av-video-stream-idx av)))
+        (set k (av-my-aspect-ratio which av))
         (if (> k 0)
         then    (set w (* w k)) )
         (if sift-scale

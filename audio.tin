@@ -44,7 +44,9 @@
 
 (defun audio-setup-open (which q) net audio-setup-open)
 (defnet audio-setup-open (which q @wid)
-        (deflocal but text)
+        (deflocal audio-info but text spin)
+
+        (set audio-info <_kv "audio-info">)
 
         (set but (iup-button-icon (+ $"select audio" ' ' which)
                 (if (= which 1)
@@ -54,11 +56,15 @@
                 q ))
 
         (set text (iup-text))
-        (set <_kv "audio-info" (+ "text" which)> text)
+        (set <audio-info (+ "text" which)> text)
         (iup-set-bool text "READONLY" true)
         (iup-set-int text "VISIBLECOLUMNS" 30)
 
-        (set @wid (iup-hbox but text))
+        (set spin (iup-text-spin -3000 3000 (audio-setup-open-delay which)))
+        (set <audio-info (+ "sb-delay" which)> spin)
+        (iup-set-active spin false)
+
+        (set @wid (iup-hbox but text (iup-label $"delay (ms): ") spin))
         (iup-set-int @wid "GAP" 3)
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
 
@@ -69,7 +75,8 @@
         (set label (iup-label))
         (set <_kv "audio-info" (+ "label" which)> label)
         (iup-set-bool label "EXPAND" true)
-        (iup-set-str-attribute label "ALIGNMENT" "ARIGHT")
+        ;(iup-set-str-attribute label "ALIGNMENT" "ARIGHT")
+        (iup-set-str-attribute label "ALIGNMENT" "ACENTER")
 
         (set @wid (iup-hbox label))
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
@@ -109,7 +116,7 @@
 
         (set btn-save (iup-button-icon $"save track as..." (netptr audio-save-as-cb) (pix-load-static "16x16/document-save-5.png") q))
         (set <audio-info "btn-save"> btn-save)
-        (iup-set-bool btn-save "ACTIVE" false)
+        (iup-set-active btn-save false)
 
         (set btn-ok (iup-button-icon-ok (netptr iup-cancel-cb) q))
         (set <audio-info "btn-ok"> btn-ok)
@@ -117,6 +124,37 @@
         (set @wid (iup-hbox l1 l2 btn-save (iup-fill) btn-ok))
         (iup-set-int @wid "GAP" 3)
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun audio-setup-open-delay (which) 0)
+
+(defun audio-setup-open-delay- (which) net audio-setup-open-delay)
+(defnet audio-setup-open-delay (which @t)
+        (deflocal av aidx i)
+
+        (alt    (seq    (set av (av-avformat-open-input <_kv (+ "path" which)>))
+                        (<> av undef)
+                        (for i in 0 .. (- (av-nb-streams av) 1) do
+                                (if (= (av-codec-type av i) (cmacro AVMEDIA_TYPE_AUDIO))
+                                then    (set aidx i) )
+                                until (integerp aidx) )
+                        (if (not (integerp aidx))
+                        then    (close av)
+                                (fail) )
+                        (set @t (rint (* (- (* (av-first-ts av aidx) (av-time-base av aidx))
+                                            (* (av-first-ts av) (av-time-base av (av-video-stream-idx av))) )
+                                         1000 )))
+                        (close av) )
+                (set @t 0) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -159,7 +197,8 @@
                         then    (iup-set-str-attribute <audio-info "combo1"> "VALUE" (approx3 i)) ))
                 (set <audio-info (+ "duration" which)> duration)
                 (set <audio-info (+ "path" which)> path)
-                (iup-set-bool <audio-info "btn-save"> "ACTIVE" (stringp <audio-info (+ "path" (- 3 which))>)) ))
+                (iup-set-active <audio-info (+ "sb-delay" which)> (= <audio-info (+ "codec" which)> "WAV"))
+                (iup-set-active <audio-info "btn-save"> (stringp <audio-info (+ "path" (- 3 which))>)) ))
 
 (defnet audio-open-wav (f which audio-info @duration)
         (deflocal ch freq smplsize bps offset smpl)
@@ -338,7 +377,7 @@
         (close buf f1 f2) )
 
 (defnet audio-save-as-ok-low-low (audio-info fps which g f1 f2 buf)
-        (deflocal pb f a1 a2 a smpl1 smpl2 smpl map p q n ts last-ts err pf freq smplsize i)
+        (deflocal pb f a1 a2 a smpl1 smpl2 delay1 delay2 smpl delay map p q n ts last-ts err pf freq smplsize i j)
 
         (set pb <audio-info "gauge">)
         (set i (cfg-get (key-map <_kv "av1">
@@ -354,8 +393,12 @@
                 (map-bind-low (cdr map) q p n) )
         (set a1 <audio-info "ts1">)
         (set a2 <audio-info "ts2">)
+        (set freq <audio-info "frequency1">)
+        (set smplsize <audio-info "smplsize1">)
         (set smpl1 <audio-info "smpl1">)
         (set smpl2 <audio-info "smpl2">)
+        (set delay1 (rint (* (/ (iup-get-int <audio-info "sb-delay1"> "VALUE") 1000) freq)))
+        (set delay2 (rint (* (/ (iup-get-int <audio-info "sb-delay2"> "VALUE") 1000) freq)))
         (if (= which 1)
         then    (set map (car map))
         else    (set map (cdr map))
@@ -367,14 +410,15 @@
                 (set a2 i)
                 (set i smpl1)
                 (set smpl1 smpl2)
-                (set smpl2 i) )
+                (set smpl2 i)
+                (set i delay1)
+                (set delay1 delay2)
+                (set delay2 i) )
         (set last-ts (/ (+ <map -1 1> 1) fps))
         (set ts 0)
         (set err 0)
         (if (= <audio-info "codec1"> "WAV")
-        then    (set freq <audio-info "frequency1">)
-                (set smplsize <audio-info "smplsize1">)
-                (filecopy-basic f1 g a1 buf)
+        then    (filecopy-basic f1 g a1 buf)
                 (for i in map do
                         (set p (/ (+ <i 1> 1) fps))
                         (set n (- p ts))
@@ -385,19 +429,34 @@
                                         (set f f1)
                                         (set a a1)
                                         (set smpl smpl1)
+                                        (set delay delay1)
                                 else    (set f f2)
                                         (set a a2)
-                                        (set smpl smpl2) )
+                                        (set smpl smpl2)
+                                        (set delay delay2) )
                                 (if (= <i 0> 1)
                                 then    (dec q) )
                                 (set q (rint (* (- (/ q fps) err) freq)))
-                                (set pf (min (+ q (min (rint (* n freq)) (- smpl1 (* ts freq)))) smpl))
-                                (if (> pf q)
+                                (set pf (- (min (+ q (min (rint (* n freq)) (- smpl1 (* ts freq)))) smpl) q))
+                                (if (> pf 0)
                                 then    (iup-set-double pb "VALUE" (/ ts last-ts))
                                         (iup-flush)
-                                        (fsetpos (+ a (* q smplsize)) f)
-                                        (filecopy-basic f g (* (- pf q) smplsize) buf)
-                                        (inc ts (/ (- pf q) freq)) ))
+                                        (dec q delay)
+                                        (inc ts (/ pf freq))
+
+                                        ; devo copiare esattamente pf campioni
+
+                                        (if (< q 0)
+                                        then    (set j (min pf -q))
+                                                (fsetpos a f)
+                                                (filecopy-basic f g (* j smplsize) buf)
+                                                (dec pf j)
+                                                (set q 0) )
+                                        (while (> pf 0) do
+                                                (set j (min pf (- smpl q)))
+                                                (fsetpos (+ a (* q smplsize)) f)
+                                                (filecopy-basic f g (* j smplsize) buf)
+                                                (dec pf j) )))
                         (set err (- p ts)) )
                 (set p (* ts freq))
                 (if (< p smpl1)

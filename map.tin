@@ -203,9 +203,9 @@
         (map-report-low (match-th-main m) (match-map m)
                 (match-name1 m) (match-name2 m)
                 (match-rx m) (match-ry m)
-                (length (match-cache m)) (match-passed m) ))
+                (length (match-cache m)) (match-passed m) true ))
 
-(defnet map-report-low (target map name1 name2 rx ry nchecks npassed)
+(defnet map-report-low (target map name1 name2 rx ry nchecks npassed go-home)
         (deflocal ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q prv i)
 
         (if (listp target)
@@ -266,7 +266,8 @@
         (if (> (length wrn2) 0)
         then    (map-report-print (cons "p1" $"\n2nd movie frame(s) not found in the 1st one:\n") target)
                 (map-report-diff wrn2 target 1) )
-        (map-report-print [ "h1" . "" ] target) )
+        (if go-home
+        then    (map-report-print [ "h1" . "" ] target) ))
 
 (defnet map-report-diff (wrn target which)
         (deflocal i)
