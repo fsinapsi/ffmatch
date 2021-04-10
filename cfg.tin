@@ -9,15 +9,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet cfg-set (key val)
+        (cfg-set-low _db key val) )
+
+(defnet cfg-set-low (db key val)
         (set key (sqlite3-escape-strings key))
         (if (= val undef)
-        then    (sqlite3-exec _db undef
+        then    (sqlite3-exec db undef
                         "DELETE FROM config WHERE key='" key "'" )
         else    (if (stringp val)
                 then    (set val (sqlite3-escape-strings val)) )
-                (alt    (sqlite3-exec _db undef
+                (alt    (sqlite3-exec db undef
                                 "INSERT INTO config VALUES('" key "','" val "')" )
-                        (sqlite3-exec _db undef
+                        (sqlite3-exec db undef
                                 "UPDATE config SET value='" val
                                 "' WHERE key='" key "'" ))))
 
@@ -127,7 +130,6 @@
 
         (for c in [ "sift-scale"
                     "sift-draw-lines"
-                    "match-scale"
                     "final-closure"
                     "scd-display-enabled"
                     "filter-mirror1"
@@ -137,6 +139,7 @@
                     "filter-ar1-auto"
                     "filter-ar2-auto"
                     "cuvid-enabled"
+                    ;"concurrency-enabled"
                     ] do
                 (cfg-set c (iup-get-bool <cfg-info (+ "tb-" c)> "VALUE")) )
 
@@ -382,13 +385,13 @@
                 (cfg-setup-framed-toggle $"Line drawing" $"enabled" (cfg-get-or-default "sift-draw-lines" default-info) cfg-info "tb-sift-draw-lines")
                 (cfg-setup-framed-spin "Sup. step incr." 2 1000
                         (cfg-get-or-default-num "supervision-skip-double" default-info)
-                        cfg-info "sb-supervision-skip-double" )
-                (cfg-setup-framed-toggle $"Scaling" $"enabled" (cfg-get-or-default "match-scale" default-info) cfg-info "tb-match-scale") ))
+                        cfg-info "sb-supervision-skip-double" )))
 
         (set hbox2 (iup-hbox
-                (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled") ))
-
-        ;(iup-set-active hbox2 false)
+                (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled")
+                ;(cfg-setup-framed-toggle $"Concurrency" $"enabled"
+                ;    (cfg-get-or-default "concurrency-enabled" default-info) cfg-info "tb-concurrency-enabled" )
+                ))
 
         (set list (iup-list))
         (set <cfg-info "cb-languages"> list)

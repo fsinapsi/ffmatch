@@ -18,7 +18,8 @@
         (set <_kv "zoom-level"> 0)
         (init-parse-args)
         (init-db)
-        (init-default) )
+        (init-default)
+        (init-threads) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -60,17 +61,17 @@
                 else    (set path (datapath))
                         (if (= path undef)
                         then    (iup-error60 undef "please define the environment variable `HOME'")
-                                (exit -1) )
+                                (exit -2) )
                         (alt    (pathexists path)
                                 (mkdir path)
                                 (seq    (iup-error60 undef (+ "creation of directory `" (utf8-validate path) "' failed"))
-                                        (exit -1) ))
+                                        (exit -3) ))
                         (inc path "ffmatch.cfg") ))
         (set crea (not (pathexists path)))
         (set _db (sqlite3-open path))
         (if (= _db undef)
         then    (iup-error60 undef (+ "cannot open `" (utf8-validate path) "'"))
-                (exit -1) )
+                (exit -4) )
         (da-chiudere _db)
         (alt    (not crea)
                 (seq    (sqlite3-exec _db undef
@@ -82,7 +83,7 @@
                 (seq    (close _db)
                         (remove path)
                         (iup-error60 undef "creation of settings file failed")
-                        (exit -1) ))
+                        (exit -5) ))
         (cfg-set "cdate" (cdate))
         (cfg-set "date-run-last" (now))
         (cfg-inc "runs" 1)
@@ -117,6 +118,27 @@
 
 (defnet init-default ()
         (set <_kv "default"> (assoc-default (default-parameters))) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet init-threads ()
+        (deflocal i)
+
+        (alt    (for i in (list (cons "th-clock" (netptr th-clock))
+                                (cons "th-read-frames1" (netptr th-read-frames))
+                                (cons "th-read-frames2" (netptr th-read-frames)) ) do
+                        (set <_kv (car i)> (thread-create (cdr i) (thread-self)))
+                        (threadp <_kv (car i)>) )
+                (seq    (iup-error60 undef "creation of thread failed")
+                        (exit -6) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

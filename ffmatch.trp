@@ -17,6 +17,7 @@
 (include "cfg.tin")
 (include "utils.tin")
 (include "constants.tin")
+(include "progress.tin")
 (include "scdscan.tin")
 (include "match.tin")
 (include "map.tin")

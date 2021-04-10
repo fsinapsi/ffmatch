@@ -68,6 +68,9 @@
 (defun key-map (av1 av2 name1 name2)
         (+ "map-" (key-basic av1 name1) (key-basic av2 name2)) )
 
+(defun key-prm (av1 av2 name1 name2)
+        (+ "prm-" (key-basic av1 name1) (key-basic av2 name2)) )
+
 (defun key-basic (av name)
         (gcry-sha1sum-fast (+ (if (rmatch (av-codec-name av (av-video-stream-idx av)) "_cuvid") "cuvid" "")
                               (int->str (width av) 5 '0')
@@ -155,10 +158,10 @@
         (deflocal default-info)
 
         (set default-info <_kv "default">)
-        (set @ar (if (cfg-get-or-default (+ "filter-ar" which "-auto") default-info)
-            (av-sample-aspect-ratio av (av-video-stream-idx av))
-            (/ (cfg-get-or-default-num (+ "filter-ar" which) <_kv "default">)
-               (/ (width av) (height av)) ))))
+        (if (cfg-get-or-default (+ "filter-ar" which "-auto") default-info)
+        then    (set @ar (av-sample-aspect-ratio av (av-video-stream-idx av)))
+        else    (set @ar (/ (cfg-get-or-default-num (+ "filter-ar" which) default-info)
+                            (/ (width av) (height av)) ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -198,8 +201,8 @@
         (deflocal sy)
 
         (pix-clear pix)
-        (pix-scale frm1 pix1)
-        (pix-scale frm2 pix2)
+        (pix-sws-scale-bicubic frm1 pix1)
+        (pix-sws-scale-bicubic frm2 pix2)
         (pix-gamma pix1 gamma1)
         (pix-gamma pix2 gamma2)
         (set sy (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
@@ -224,10 +227,12 @@
         then    (if (> k 1)
                 then    (set w2 (* w2 k))
                 else    (set h2 (/ h2 k)) ))
-        (if (cfg-get-or-default "match-scale" default-info)
-        then    (set k (sqrt (/ (* w1 h1) (* w2 h2))))
-                (set w2 (* w2 k))
-                (set h2 (* h2 k)) )
+        (case (cfg-get-or-default-num "scaling-mode" default-info) of
+                0   (seq    (set k (/ w2 h2))
+                            (set h2 (sqrt (/ (* w1 h1) k)))
+                            (set w2 (* h2 k)) )
+                1   (seq    (set h2 (* h2 (/ w1 w2)))
+                            (set w2 w1) ))
         (set k (cfg-get-or-default-num "filter-rotate1" default-info))
         (if (= k 0)
         then    (set ww1 w1)
@@ -294,10 +299,45 @@
         (queue-put <_kv "da-chiudere"> obj) )
 
 (defnet quit ()
-        (deflocal obj)
+        (deflocal thclk th1 th2 obj)
 
+        (th-clock-reset)
+        (set thclk <_kv "th-clock">)
+        (send undef to thclk)
+        (set th1 <_kv "th-read-frames1">)
+        (send undef to th1)
+        (set th2 <_kv "th-read-frames2">)
+        (send undef to th2)
+        (thread-join thclk)
+        (thread-join th1)
+        (thread-join th2)
         (for obj in <_kv "da-chiudere"> do
                 (close obj) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet a ()
+        (deflocal p i j c r g b)
+
+        (set p (pix-load-static "logo.png"))
+        (for i in 0 .. (- (width p) 1) do
+        (for j in 0 .. (- (height p) 1) do
+                (set c (pix-point p i j))
+                (set r (pix-color-red c))
+                (set g (pix-color-green c))
+                (set b (pix-color-blue c))
+                (= r g)
+                (= r b)
+                (pix-draw-point p i j (pix-color r r r (- 255 r))) ))
+        (pix-save-png p "pippo.png") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

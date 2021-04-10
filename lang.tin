@@ -317,6 +317,10 @@
 1
 "Cancella i dati di \"mapping\""
 
+"Optimize \"mapping\" data"
+1
+"Ottimizza i dati di \"mapping\""
+
 "Clear obsolete paths"
 1
 "Cancella i path obsoleti"
@@ -533,17 +537,17 @@
 1
 "Apri progetto"
 
-"Save project"
+"Save/rename project"
 1
-"Salva progetto"
+"Salva/rinomina progetto"
 
 "open project"
 1
 "apri progetto"
 
-"save project"
+"save/rename project"
 1
-"salva progetto"
+"salva/rinomina progetto"
 
 "Project name"
 1
@@ -552,6 +556,10 @@
 "Rename project"
 1
 "Rinomina progetto"
+
+"Save project"
+1
+"Salva progetto"
 
 "Project `"
 1
@@ -624,6 +632,66 @@
 "Select cfg"
 1
 "Seleziona cfg"
+
+"View"
+1
+"Visualizza"
+
+"Do you want to link these segments"
+1
+"Vuoi collegare questi segmenti"
+
+"Same area"
+1
+"Stessa area"
+
+"Same width"
+1
+"Stessa larghezza"
+
+"Proportional"
+1
+"Proporzionale"
+
+"Warning: one of the two movies\nmay have undergone a frame rate change"
+1
+"Attenzione: uno dei due filmati potrebbe\naver subito un cambio di frame rate"
+
+"Export project data"
+1
+"Esporta dati del progetto"
+
+"Export project data as..."
+1
+"Esporta dati del progetto come..."
+
+"Project data successfully exported."
+1
+"Dati del progetto esportati con successo."
+
+"Keyboard shortcuts"
+1
+"Scorciatoie da tastiera"
+
+"The \"mapping\" data are already optimized."
+1
+"I dati di \"mapping\" sono già ottimizzati."
+
+"The \"mapping\" data will be optimized."
+1
+"I dati di \"mapping\" verranno ottimizzati."
+
+"Concurrency"
+1
+"Concorrenza"
+
+"Abort"
+1
+"Interrompi"
+
+"Thanks to:"
+1
+"Grazie a:"
 
         )
 

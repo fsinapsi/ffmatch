@@ -34,7 +34,7 @@
           [ "sift-agreements-min" . 12000 ]
           [ "sift-proportionality-threshold" . 0.9 ]
           [ "sift-scale" . true ]
-          [ "sift-scale-pixels" . (* 500 250) ]
+          [ "sift-scale-pixels" . (* 500 500) ]
           [ "filter-gamma1" . 1 ]
           [ "filter-gamma2" . 1 ]
           [ "filter-mirror1" . false ]
@@ -49,14 +49,15 @@
           [ "filter-ar2" . 1.78 ]
           [ "sift-draw-lines" . true ]
           [ "supervision-skip-double" . 10 ]
-          [ "match-scale" . true ]
           [ "scd-display-enabled" . true ]
           [ "cuvid-enabled" . false ]
+          [ "concurrency-enabled" . false ]
           [ "sift-impl" . 0 ]
           [ "vlfeat-first-octave-idx" . 0 ]
           [ "vlfeat-nlevels-per-octave" . 3 ]
           [ "vlfeat-peak-threshold" . 0 ]
           [ "vlfeat-edge-threshold" . 10 ]
+          [ "scaling-mode" . 0 ]
           ])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -36,7 +36,7 @@
 
 (defun info-setup-tabs (q) net info-setup-tabs)
 (defnet info-setup-tabs (q @wid)
-        (set @wid (iup-tabs (info-setup-page1 q) (info-setup-page2 q) (info-setup-page3 q) (info-setup-page4 q)))
+        (set @wid (iup-tabs (info-setup-page1 q) (info-setup-page2) (info-setup-page3) (info-setup-page4)))
         (iup-set-str-attribute @wid "TABTITLE0" $"Version")
         (iup-set-str-attribute @wid "TABTITLE1" $"Authors")
         (iup-set-str-attribute @wid "TABTITLE2" "Lavc")
@@ -82,8 +82,8 @@
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
         (iup-set-int @wid "GAP" 40) )
 
-(defun info-setup-page2 (q) net info-setup-page2)
-(defnet info-setup-page2 (q @wid)
+(defun info-setup-page2 () net info-setup-page2)
+(defnet info-setup-page2 (@wid)
         (set @wid (iup-vbox
                 (iup-label "FFmatch " $"was coded in TreeP by" " Frank Sinapsi")
                 (iup-link (url-home-page))
@@ -92,19 +92,15 @@
                 (iup-label "\n" $"Source code of" " " "TreeP")
                 (iup-link "https://github.com/fsinapsi/TreeP")
                 (iup-label "\n" $"Source code of" " " "FFmatch")
-                (iup-link "https://github.com/fsinapsi/ffmatch") ))
+                (iup-link "https://github.com/fsinapsi/ffmatch")
+                (iup-label "\n" $"Thanks to:"
+                           "\n" "HoHoHo, Devilman1, Donnje" )))
         (iup-set-str-attribute @wid "MARGIN" "20x20") )
 
-(defun info-setup-page3 (q) net info-setup-page3)
-(defnet info-setup-page3 (q @wid)
+(defun info-setup-page3 () net info-setup-page3)
+(defnet info-setup-page3 (@wid)
         (deflocal s c a)
 
-        (set @wid (iup-text))
-        (iup-set-bool @wid "MULTILINE" true)
-        (iup-set-bool @wid "READONLY" true)
-        (iup-set-bool @wid "EXPAND" true)
-        (iup-set-bool @wid "WORDWRAP" true)
-        (iup-set-str-attribute @wid "PADDING" "2x0")
         (set a (array 0))
         (for c in (av-avcodec-list) do
                 (if (= <c 0> (cmacro AVMEDIA_TYPE_VIDEO))
@@ -117,20 +113,10 @@
                   "Video codecs (" (length a) "):" nl ))
         (for c in a do
                 (inc s nl <c 1> " (" <c 2> ")") )
-        (iup-set-str-attribute @wid "VALUE" s)
-        (iup-set-int @wid "VISIBLELINES" 1)
-        (iup-set-int @wid "VISIBLECOLUMNS" 1)
-        (iup-set-int @wid "CARETPOS" 0) )
+        (set @wid (iup-text-generic s true)) )
 
-(defun info-setup-page4 (q) net info-setup-page4)
-(defnet info-setup-page4 (q @wid)
-        (set @wid (iup-text))
-        (iup-set-bool @wid "MULTILINE" true)
-        (iup-set-bool @wid "READONLY" true)
-        (iup-set-bool @wid "EXPAND" true)
-        (iup-set-bool @wid "WORDWRAP" false)
-        (iup-set-str-attribute @wid "PADDING" "2x0")
-        (iup-set-str-attribute @wid "VALUE" (+
+(defun info-setup-page4 ()
+        (iup-text-generic (+
                 (if (= (lang) 1)
                 "FFmatch è un software libero: puoi ridistribuirlo e/o\n" \
                 "modificarlo secondo i termini della GNU General Public License\n" \
@@ -154,10 +140,66 @@
                 nl
                 "----------------------------------------------------------" nl
                 nl
-                (license-gpl3) ))
-        (iup-set-int @wid "VISIBLELINES" 1)
-        (iup-set-int @wid "VISIBLECOLUMNS" 1)
-        (iup-set-int @wid "CARETPOS" 0) )
+                (license-gpl3) )
+                false ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet info-keyboard-shortcuts-cb (self)
+        (deflocal q butbox dlg i)
+
+        (set q (queue))
+
+        (set butbox (iup-box-ok undef q))
+
+        (set i (iup-vbox
+                        (iup-text-generic (info-keyboard-shortcuts) false)
+                        butbox ))
+        (iup-set-str-attribute i "MARGIN" "4x4")
+        (iup-set-int i "GAP" 0)
+
+        (set dlg (iup-dialog i))
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" $"Keyboard shortcuts")
+        (iup-set-str-attribute dlg "RASTERSIZE" "660x400")
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-attribute-handle dlg "DEFAULTENTER" (iup-box-ok-btn butbox))
+        (iup-set-attribute-handle dlg "DEFAULTESC" (iup-box-ok-btn butbox))
+
+        ;(iup-set-focus (iup-box-ok-btn butbox))
+
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
+
+        (close dlg)
+        (iup-close-queue q) )
+
+(defun info-keyboard-shortcuts ()
+        "F5: start\n" \
+        "Esc: abort\n" \
+        "Ctrl+1: selects the segment to which frame 1 belongs\n" \
+        "Ctrl+2: selects the segment to which frame 2 belongs\n" \
+        "Shift+'left arrow': same as 'simple blue left arrow button'\n" \
+        "Shift+'right arrow': same as 'simple blue right arrow button'\n" \
+        "Ctrl+'left arrow': same as 'double blue left arrow button'\n" \
+        "Ctrl+'right arrow': same as 'double blue right arrow button'\n" \
+        "Ctrl+Shift+'left arrow': same as 'first of segment blue left arrow button'\n" \
+        "Ctrl+Shift+'right arrow': same as 'last of segment blue right arrow button'\n" \
+        "Ctrl+Enter: same as 'link button'\n" \
+        "'down arrow': ...\n" \
+        "'up arrow': ...\n" \
+        "Shift+'down arrow': ...\n" \
+        "Shift+'up arrow': ...\n" \
+        "\n" \
+        "\n"
+        )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -206,14 +206,15 @@
                 (length (match-cache m)) (match-passed m) true ))
 
 (defnet map-report-low (target map name1 name2 rx ry nchecks npassed go-home)
-        (deflocal ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q prv i)
+        (deflocal buf ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q prv freecnt diffcnt diff diffprv i)
 
         (if (listp target)
         then    (set ab (cdr target))
                 (set target (car target)) )
         (set map-max1 (map-max-low (car map)))
         (set map-max2 (map-max-low (cdr map)))
-        (map-report-print (cons "c1" (+
+        (set buf (iup-text-buffer))
+        (map-report-print (cons "p1" (+
                 "(1) " name1 nl
                 "(2) " name2 nl
                 nl
@@ -225,12 +226,14 @@
                 $"horizontal ratio: " (approx3 rx) nl ))
                 (if (= ry undef) "" (+
                 $"vertical ratio: " (approx3 ry) nl ))
-                nl )) target )
+                nl )) buf )
         (set wrn1 (queue))
         (set wrn2 (queue))
         (set u (map-undef-low (car map) (cdr map)))
         (set ut (queue-get u))
         (set map (car map))
+        (set freecnt 0)
+        (set diffcnt 0)
         (for i in 1 .. (length map) do
                 (set a <map (for-pos)>)
                 (set p1 <a 0>)
@@ -238,20 +241,26 @@
                 (set q <a 2>)
                 (if (= q undef)
                 then    (if (and (= p1 <ut 0>) (= p2 <ut 1>))
-                        then    (map-report-print-range p1 p2 (red) (blue) target)
-                                (map-report-print (cons "p1c" (cons (red) (+ " -/-> ???" " {" (- p2 p1 -1) "-" (- <ut 3> <ut 2> -1) "}" nl))) target)
+                        then    (map-report-print-range p1 p2 (red) (blue) buf)
+                                (map-report-print (cons "p1c" (cons (red) (+ " -/-> ???" " {" (- p2 p1 -1) "-" (- <ut 3> <ut 2> -1) "}" nl))) buf)
                                 (if (arrayp ab)
                                 then    (array-append ab (list p1 <ut 2> 0) (list p2 <ut 3> 0)) )
                                 (set ut (queue-get u))
+                                (inc freecnt)
                         else    (queue-put wrn1 (list p1 p2 (if (= prv undef) 0 prv))) )
                         (clr prv)
                 else    (if (integerp prv)
                         then    (queue-put wrn2 (list (+ prv 1) (- q 1) (- p1 1))) )
                         (set prv (+ q p2 -p1))
-                        (map-report-print-range p1 p2 (darkgreen) (blue) target)
+                        (set diff (- q p1))
+                        (if (integerp diffprv)
+                        then    (if (<> diff diffprv)
+                                then    (inc diffcnt) ))
+                        (set diffprv diff)
+                        (map-report-print-range p1 p2 (darkgreen) (blue) buf)
                         (map-report-print (cons "p1c" (cons (darkgreen) (+ " ---> ["
                             (int->str q 6 '0') "-" (int->str prv 6 '0') "] {"
-                            (int->str (- p2 p1 -1) 6 '0') "} (diff=" (- q p1) ")" nl))) target )
+                            (int->str (- p2 p1 -1) 6 '0') "} (diff=" diff ")" nl))) buf )
                         (if (arrayp ab)
                         then    (if (= p1 p2)
                                 then    (array-append ab (list p1 q 3))
@@ -261,42 +270,47 @@
                         (if (and (= i (length map)) (= p2 map-max1) (< (+ q p2 -p1) map-max2))
                         then    (queue-put wrn2 (list (+ q p2 -p1 1) map-max2 map-max1)) )))
         (if (> (length wrn1) 0)
-        then    (map-report-print (cons "p1" $"\n1st movie frame(s) not found in the 2nd one:\n") target)
-                (map-report-diff wrn1 target 0) )
+        then    (map-report-print (cons "p1" $"\n1st movie frame(s) not found in the 2nd one:\n") buf)
+                (map-report-diff wrn1 buf 0) )
         (if (> (length wrn2) 0)
-        then    (map-report-print (cons "p1" $"\n2nd movie frame(s) not found in the 1st one:\n") target)
-                (map-report-diff wrn2 target 1) )
-        (if go-home
-        then    (map-report-print [ "h1" . "" ] target) ))
+        then    (map-report-print (cons "p1" $"\n2nd movie frame(s) not found in the 1st one:\n") buf)
+                (map-report-diff wrn2 buf 1) )
+        (map-report-print (cons "p1" (+ "\ninternal diff: " diffcnt
+                                        "\nfree seg: " freecnt )) buf )
+        (if (arrayp ab)
+        then    (gui-text1-hack true)
+                (set target <_kv "text1">)
+                (iup-text-buffer-flush buf target)
+                (if go-home
+                then    (iup-set-int target "CARETPOS" 0) )
+        else    (sendbuf 100 (cons "bf1" buf) to target)
+                (if go-home
+                then    (sendbuf 100 [ "h1" . undef ] to target) )))
 
-(defnet map-report-diff (wrn target which)
+(defnet map-report-diff (wrn buf which)
         (deflocal i)
 
         (while (> (length wrn) 0) do
                 (set i (queue-get wrn))
-                (map-report-print-range <i 0> <i 1> (black) (blue) target)
+                (map-report-print-range <i 0> <i 1> (black) (blue) buf)
                 (map-report-print (cons "p1" (+ <[ "¹" "²" ] which> "---> [" (int->str <i 2> 6 '0') "] {"
-                        (- <i 1> <i 0> -1) "}" nl )) target )))
+                        (- <i 1> <i 0> -1) "}" nl )) buf )))
 
-(defnet map-report-print-range (p1 p2 color1 color2 target)
-        (map-report-print (cons "p1c" (cons color1 "[")) target)
-        (map-report-print (cons "p1c" (cons color2 (int->str p1 6 '0'))) target)
-        (map-report-print (cons "p1c" (cons color1 "-")) target)
-        (map-report-print (cons "p1c" (cons color2 (int->str p2 6 '0'))) target)
-        (map-report-print (cons "p1c" (cons color1 "]")) target) )
+(defnet map-report-print-range (p1 p2 color1 color2 buf)
+        (map-report-print (cons "p1c" (cons color1 "[")) buf)
+        (map-report-print (cons "p1c" (cons color2 (int->str p1 6 '0'))) buf)
+        (map-report-print (cons "p1c" (cons color1 "-")) buf)
+        (map-report-print (cons "p1c" (cons color2 (int->str p2 6 '0'))) buf)
+        (map-report-print (cons "p1c" (cons color1 "]")) buf) )
 
-(defnet map-report-print (msg target)
+(defnet map-report-print (msg buf)
         (deflocal req)
 
-        (if (threadp target)
-        then    (sendbuf 100 msg to target)
-        else    (set req (car msg))
-                (set msg (cdr msg))
-                (case req of
-                        "c1"    (iup-text-set-and-go-home target msg)
-                        "p1"    (iup-text-append-and-go-end target msg)
-                        "p1c"   (iup-text-append-and-go-end-color target (car msg) (cdr msg))
-                        "h1"    (iup-text-append-and-go-home target msg) )))
+        (set req (car msg))
+        (set msg (cdr msg))
+        (case req of
+            "p1"    (iup-text-buffer-append buf msg)
+            "p1c"   (iup-text-buffer-append-color buf (car msg) (cdr msg)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
