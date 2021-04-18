@@ -64,6 +64,8 @@
                         (iup-link (+ (url-home-page) "/code/ffmatch/index.html") $"There is an update" ": " (date->version remote-version))
                         (iup-label $"There are no updates") )
                 (iup-label
+                        $"Current number of threads" ": " (thread-cur) nl
+                        $"Max number of threads" ": " (thread-max) nl
                         $"Selected language" ": " <(languages) (lang)> nl
                         $"Selected SIFT impl." ": " <(sift-impl) (cfg-get-or-default-num "sift-impl" <_kv "default">)> nl
                         ;$"Sound" ": " (if <_kv "enabled-sound"> $"enabled" $"disabled") nl
@@ -94,7 +96,7 @@
                 (iup-label "\n" $"Source code of" " " "FFmatch")
                 (iup-link "https://github.com/fsinapsi/ffmatch")
                 (iup-label "\n" $"Thanks to:"
-                           "\n" "HoHoHo, Devilman1, Donnje" )))
+                           "\n" "HoHoHo, Devilman1, ErTenebra, Donnje" )))
         (iup-set-str-attribute @wid "MARGIN" "20x20") )
 
 (defun info-setup-page3 () net info-setup-page3)
@@ -154,15 +156,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet info-keyboard-shortcuts-cb (self)
-        (deflocal q butbox dlg i)
+        (deflocal q butbox text dlg i)
 
         (set q (queue))
 
         (set butbox (iup-box-ok undef q))
 
-        (set i (iup-vbox
-                        (iup-text-generic (info-keyboard-shortcuts) false)
-                        butbox ))
+        (set text (iup-text-generic (info-keyboard-shortcuts) false))
+
+        (set i (iup-vbox text butbox))
         (iup-set-str-attribute i "MARGIN" "4x4")
         (iup-set-int i "GAP" 0)
 
@@ -173,6 +175,9 @@
         (iup-set-bool dlg "DIALOGFRAME" true)
         (iup-set-attribute-handle dlg "DEFAULTENTER" (iup-box-ok-btn butbox))
         (iup-set-attribute-handle dlg "DEFAULTESC" (iup-box-ok-btn butbox))
+
+        (iup-map dlg)
+        (iup-set-int text "CARETPOS" 0)
 
         ;(iup-set-focus (iup-box-ok-btn butbox))
 
@@ -197,6 +202,7 @@
         "'up arrow': ...\n" \
         "Shift+'down arrow': ...\n" \
         "Shift+'up arrow': ...\n" \
+        "Tab: ...\n" \
         "\n" \
         "\n"
         )

@@ -34,9 +34,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet scdscan-low (th-main name av pix default-info @v)
-        (deflocal th-read-frame scd-display-enabled abort l l1 frm hst pix1 pix2 gamma1 gamma2 idx val frameno last-frameno-displayed t)
+        (deflocal th-read-frame scd-display-enabled abort l l1 frm req hst pix1 pix2 gamma1 gamma2 idx val frameno last-frameno-displayed t)
 
-        (av-seek-frame av 0)
+        (av-rewind av)
 
         (set l (av-approximated-number-of-frames av))
         (set l1 (- l 1))
@@ -45,6 +45,11 @@
         (set <frm 0> (pix-create (width av) (height av)))
         (set <frm 1> (pix-create (width av) (height av)))
         (set <frm 2> (pix-create (width av) (height av)))
+
+        (set req (array 3))
+        (set <req 0> (list av <frm 0>))
+        (set <req 1> (list av <frm 1>))
+        (set <req 2> (list av <frm 2>))
 
         (set hst (array 3))
         (set <hst 0> (raw 256))
@@ -62,14 +67,17 @@
 
         (set @v (array default 0 l1))
 
-        (set th-read-frame (thread-create (netptr scdscan-read-frame-th) av (thread-self)))
-        (<> th-read-frame undef)
+        ; FIXME
+        ; non si può usare <_kv "th-read-frame1"> perché questo
+        ; è un thread diverso dal principale
+        ;(set th-read-frame <_kv "th-read-frame1">)
+        (set th-read-frame (thread-create (netptr th-read-frame) (thread-self)))
 
         (set t (now))
 
-        (send <frm 0> to th-read-frame)
+        (send <req 0> to th-read-frame)
         (receive val from th-read-frame)
-        (send <frm 1> to th-read-frame)
+        (send <req 1> to th-read-frame)
         (pix-scd-histogram-set <frm 0> <hst 0>)
         (set idx 1)
         (set scd-display-enabled (cfg-get-or-default "scd-display-enabled" default-info))
@@ -89,7 +97,7 @@
                 (opt    (receivenb abort from th-main)
                         (set abort true) )
                 until abort
-                (send <frm (scdscan-succ idx)> to th-read-frame)
+                (send <req (scdscan-succ idx)> to th-read-frame)
                 (pix-scd-histogram-set <frm idx> <hst idx>)
                 (set val (pix-scd-histogram-dist <hst (scdscan-prec idx)> <hst idx>))
                 (set <@v frameno> val)
@@ -115,26 +123,6 @@
 (defun scdscan-succ (idx) (% (+ idx 1) 3))
 
 (defun scdscan-prec (idx) (% (- idx 1) 3))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet scdscan-read-frame-th (av client)
-        (deflocal pix res)
-
-        (repeat (receive pix from client)
-                until (= pix undef)
-                (alt    (seq    (av-read-frame av pix)
-                                (set res true) )
-                        (set res false) )
-                (send res to client) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

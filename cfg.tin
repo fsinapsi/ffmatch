@@ -124,7 +124,7 @@
         (iup-exit-loop) )
 
 (defnet cfg-ok-low (self)
-        (deflocal cfg-info c old-lang new-lang)
+        (deflocal cfg-info c i old-lang new-lang)
 
         (set cfg-info <_kv "cfg-info">)
 
@@ -139,12 +139,12 @@
                     "filter-ar1-auto"
                     "filter-ar2-auto"
                     "cuvid-enabled"
-                    ;"concurrency-enabled"
                     ] do
                 (cfg-set c (iup-get-bool <cfg-info (+ "tb-" c)> "VALUE")) )
 
         (for c in [ "scd-min-blocks"
                     "scd-min-avg-block-size"
+                    "frame-buf-size"
                     "supervision-skip-double"
                     "checks-per-interval"
                     "checks-per-interval-extra"
@@ -176,6 +176,14 @@
                 (cfg-set c (iup-text-spin-ratio-val <cfg-info (+ "sb-" c)>)) )
 
         (cfg-set "sift-impl" (- (iup-get-int <cfg-info "cb-sift-impl"> "VALUE") 1))
+
+        (set i (cfg-get-num "frame-buf-size"))
+        (opt    (set c <_kv "av1">)
+                (<> c undef)
+                (av-set-buf-size c i) )
+        (opt    (set c <_kv "av2">)
+                (<> c undef)
+                (av-set-buf-size c i) )
 
         (set old-lang (lang))
         (set new-lang (- (iup-get-int <cfg-info "cb-languages"> "VALUE") 1))
@@ -380,6 +388,9 @@
         (set default-info <_kv "default">)
 
         (set hbox1 (iup-hbox
+                (cfg-setup-framed-spin "Frame buf size" 2 300
+                        (cfg-get-or-default-num "frame-buf-size" default-info)
+                        cfg-info "sb-frame-buf-size" )
                 (cfg-setup-framed-toggle "SCD display" $"enabled"
                     (cfg-get-or-default "scd-display-enabled" default-info) cfg-info "tb-scd-display-enabled" )
                 (cfg-setup-framed-toggle $"Line drawing" $"enabled" (cfg-get-or-default "sift-draw-lines" default-info) cfg-info "tb-sift-draw-lines")
@@ -388,10 +399,7 @@
                         cfg-info "sb-supervision-skip-double" )))
 
         (set hbox2 (iup-hbox
-                (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled")
-                ;(cfg-setup-framed-toggle $"Concurrency" $"enabled"
-                ;    (cfg-get-or-default "concurrency-enabled" default-info) cfg-info "tb-concurrency-enabled" )
-                ))
+                (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled") ))
 
         (set list (iup-list))
         (set <cfg-info "cb-languages"> list)

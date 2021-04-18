@@ -211,7 +211,7 @@
 
 "Restore default parameters"
 1
-"Ripristina i parametri di default"
+"Resetta parametri default"
 
 "Sequences"
 1
@@ -348,6 +348,18 @@
 "will be deleted."
 1
 "verranno cancellati."
+
+"Delete project"
+1
+"Cancella progetto"
+
+"' will be deleted."
+1
+"' verrà cancellato."
+
+"Project successfully deleted."
+1
+"Il progetto è stato cancellato con successo."
 
 "The \"sift check\" data will be deleted."
 1
@@ -688,6 +700,34 @@
 "Abort"
 1
 "Interrompi"
+
+"unrecognized audio format"
+1
+"formato audio non riconosciuto"
+
+"Current number of threads"
+1
+"Numero attuale di threads"
+
+"Max number of threads"
+1
+"Numero massimo di threads"
+
+"Try to disable cuvid..."
+1
+"Prova a disabilitare cuvid..."
+
+"Print buffers content"
+1
+"Stampa il contenuto dei buffers"
+
+"hole"
+1
+"buco"
+
+"holes"
+1
+"buchi"
 
 "Thanks to:"
 1

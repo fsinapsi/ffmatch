@@ -31,12 +31,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet th-read-frames (th)
+(defnet th-read-frame (th)
         (deflocal req)
 
         (repeat (receive req from th)
                 until (= req undef)
-                (alt    (seq    (av-read-frame <req 0> <req 1> <req 2>)
+                (alt    (seq    (if (= (length req) 2)
+                                then    (av-read-frame <req 0> <req 1>)
+                                else    (av-read-frame <req 0> <req 1> <req 2>) )
                                 (set req true) )
                         (set req false) )
                 (send req to th) ))

@@ -276,13 +276,14 @@
         then    (map-report-print (cons "p1" $"\n2nd movie frame(s) not found in the 1st one:\n") buf)
                 (map-report-diff wrn2 buf 1) )
         (map-report-print (cons "p1" (+ "\ninternal diff: " diffcnt
-                                        "\nfree seg: " freecnt )) buf )
+                                        "\nfree segm: " freecnt )) buf )
         (if (arrayp ab)
         then    (gui-text1-hack true)
                 (set target <_kv "text1">)
                 (iup-text-buffer-flush buf target)
                 (if go-home
-                then    (iup-set-int target "CARETPOS" 0) )
+                then    (iup-set-int target "CARETPOS" 0)
+                else    (gui-text1-hack-post) )
         else    (sendbuf 100 (cons "bf1" buf) to target)
                 (if go-home
                 then    (sendbuf 100 [ "h1" . undef ] to target) )))

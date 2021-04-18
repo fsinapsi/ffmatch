@@ -8,7 +8,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet progress (parent title free abortable label th)
+(defnet progress (parent title free abortable label th-join th)
         (deflocal q gauge vbox hbox dlg but lbl x y delay-step delay thclk cnt cnt-inc aborted done msg)
 
         (set q (queue))
@@ -93,7 +93,8 @@
         (iup-set-bool dlg "SIMULATEMODAL" false)
         (close dlg)
         (iup-close-queue q)
-        (thread-join th)
+        (if th-join
+        then    (thread-join th) )
         (not aborted) )
 
 (defnet progress-abort-cb (self)

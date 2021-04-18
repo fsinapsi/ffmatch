@@ -133,8 +133,8 @@
         (deflocal i)
 
         (alt    (for i in (list (cons "th-clock" (netptr th-clock))
-                                (cons "th-read-frames1" (netptr th-read-frames))
-                                (cons "th-read-frames2" (netptr th-read-frames)) ) do
+                                (cons "th-read-frame1" (netptr th-read-frame))
+                                (cons "th-read-frame2" (netptr th-read-frame)) ) do
                         (set <_kv (car i)> (thread-create (cdr i) (thread-self)))
                         (threadp <_kv (car i)>) )
                 (seq    (iup-error60 undef "creation of thread failed")

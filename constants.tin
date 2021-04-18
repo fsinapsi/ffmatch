@@ -51,7 +51,7 @@
           [ "supervision-skip-double" . 10 ]
           [ "scd-display-enabled" . true ]
           [ "cuvid-enabled" . false ]
-          [ "concurrency-enabled" . false ]
+          [ "frame-buf-size" . 20 ]
           [ "sift-impl" . 0 ]
           [ "vlfeat-first-octave-idx" . 0 ]
           [ "vlfeat-nlevels-per-octave" . 3 ]
