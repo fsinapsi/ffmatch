@@ -8,7 +8,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet scdscan (th-main name av pix default-info @v)
+(defnet scdscan (th-main name av pix default-info which @v)
         (deflocal key)
 
         (pix-wip pix)
@@ -20,7 +20,10 @@
         (set @v (cfg-get key))
         (if (<> @v undef)
         then    (set @v <@v 4>)
-        else    (scdscan-low th-main name av pix default-info @v)
+        else    (set @v (array default 0 (- (av-approximated-number-of-frames av) 1)))
+                (if (and (cmingw) (= (csysbits) 32))
+                then    (scdscan-low-alternate th-main name av pix default-info (my-av-par which av) @v)
+                else    (scdscan-low th-main name av pix default-info (my-av-par which av) @v) )
                 (cfg-set key (list (width av) (height av) (av-approximated-number-of-frames av) name @v)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -33,58 +36,151 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet scdscan-low (th-main name av pix default-info @v)
-        (deflocal th-read-frame scd-display-enabled abort l l1 frm req hst pix1 pix2 gamma1 gamma2 idx val frameno last-frameno-displayed t)
+(defnet scdscan-low (th-main name av pix default-info par v)
+        (deflocal path nthreads nframes t d threads th tot msg i)
 
-        (av-rewind av)
-
-        (set l (av-approximated-number-of-frames av))
-        (set l1 (- l 1))
-
-        (set frm (array 3))
-        (set <frm 0> (pix-create (width av) (height av)))
-        (set <frm 1> (pix-create (width av) (height av)))
-        (set <frm 2> (pix-create (width av) (height av)))
-
-        (set req (array 3))
-        (set <req 0> (list av <frm 0>))
-        (set <req 1> (list av <frm 1>))
-        (set <req 2> (list av <frm 2>))
-
-        (set hst (array 3))
-        (set <hst 0> (raw 256))
-        (set <hst 1> (raw 256))
-        (set <hst 2> (raw 256))
-
-        (set val (min (/ (- (width pix) (* 2 (space))) (width av))
-                      (/ (- (height pix) (* 3 (space))) 2 (height av)) ))
-
-        (set pix1 (pix-create (* val (width av)) (* val (height av))))
-        (set pix2 (pix-create (* val (width av)) (* val (height av))))
-
-        (set gamma1 (cfg-get-or-default-num "filter-gamma1" default-info))
-        (set gamma2 (cfg-get-or-default-num "filter-gamma2" default-info))
-
-        (set @v (array default 0 l1))
-
-        ; FIXME
-        ; non si può usare <_kv "th-read-frame1"> perché questo
-        ; è un thread diverso dal principale
-        ;(set th-read-frame <_kv "th-read-frame1">)
-        (set th-read-frame (thread-create (netptr th-read-frame) (thread-self)))
+        (set path (av-path av))
+        (set nthreads (cfg-get-or-default-num "scd-threads" default-info))
+        (set nframes (+ (length v) 1))
 
         (set t (now))
 
-        (send <req 0> to th-read-frame)
-        (receive val from th-read-frame)
-        (send <req 1> to th-read-frame)
-        (pix-scd-histogram-set <frm 0> <hst 0>)
+        (repeat (set d (/ (- (length v) 1) nthreads))
+                until (= nthreads 1)
+                until (>= d 10)
+                (dec nthreads) )
+        (set threads (array nthreads))
+        (for i in 1 .. nthreads do
+                (set <threads (for-pos)> (thread-create (netptr scdscan-segment-th)
+                    (thread-self)
+                    path
+                    (floor (* d (for-pos)))
+                    (+ (ceil (* d i)) 1) v )))
+
+        (sendbuf 100 (cons "p2" "scanning threads: ") to th-main)
+        (sendbuf 100 (cons "p2c" (cons (blue) (sprint nthreads nl))) to th-main)
+
+        (set tot 0)
+
+        (while (> (length threads) 0) do
+                (receive msg from th in threads)
+                (alt    (seq    (integerp msg)
+                                (set tot (min (+ tot msg) nframes))
+                                (sendbuf 100 (cons "c1" (+ "frame " tot "/" nframes
+                                    " (" (rint (/ tot (- (now) t))) " fps) ("
+                                    (rint (/ tot nframes 0.01)) "%)" ))
+                                    to th-main ))
+                        (seq    (or (= msg "q") (= (car msg) "e"))
+                                (if (= (car msg) "e")
+                                then    (if (integerp (cdr msg))
+                                        then    (sendbuf 100 (cons "p2"
+                                                    (+ $"frame # " (cdr msg) $" is not recoverable by a seek" nl) )
+                                                    to th-main )
+                                                (sendbuf 100 (cons "p2c" (cons (red)
+                                                    (+ $"too irregular timestamps not supported\n(more info in the guide)" nl) ))
+                                                    to th-main ))
+                                        (set <_abort 0> true) )
+                                (in th threads i)
+                                (array-remove threads i)
+                                (thread-join th) )
+                        (success) ))
+
+        (not <_abort 0>)
+        (sendbuf 100 (cons "c1" (+ "frame " nframes "/" nframes
+            " (" (rint (/ tot (- (now) t))) " fps) (100%)")) to th-main ))
+
+(defnet scdscan-segment-th (th path beg end v)
+        (deflocal res)
+
+        (set res (array 1))
+        (alt    (seq    (scdscan-segment-low th path beg end v res)
+                        (send "q" to th) )
+                (send (cons "e" <res 0>) to th) ))
+
+(defnet scdscan-segment-low (th path beg end v res)
+        (deflocal av frm hst frameno cnt prv)
+
+        (set av (av-avformat-open-input path))
+        (<> av undef)
+
+        (set frm (pix-create (width av) (height av)))
+        (pixp frm)
+
+        (set hst (array 2))
+        (set <hst 0> (raw 256))
+        (rawp <hst 0>)
+        (set <hst 1> (raw 256))
+        (rawp <hst 1>)
+
+        (set end (min end (- (length v) 1)))
+
+        (set frameno beg)
+        (set cnt 0)
+        (set prv 0)
+
+        (alt    (seq    (av-read-frame av frm frameno)
+                        (= (av-frameno av) frameno)
+                        (truep (av-is-frame-recoverable av))
+                        (pix-scd-histogram-set frm <hst (% cnt 2)>) )
+                (seq    (close av frm <hst 0> <hst 1>)
+                        (set <res 0> frameno)
+                        (fail) ))
+
+        (while (not <_abort 0>) do
+                (inc frameno)
+                until (> frameno end)
+                (inc cnt)
+                (alt    (seq    (av-read-frame av frm frameno)
+                                (= (av-frameno av) frameno)
+                                (truep (av-is-frame-recoverable av))
+                                (pix-scd-histogram-set frm <hst (% cnt 2)>)
+                                (set <v frameno> (pix-scd-histogram-dist <hst 0> <hst 1>))
+                                (if (= (% cnt 100) 0)
+                                then    (sendbuf 30 (- cnt prv) to th)
+                                        (set prv cnt) ))
+                        (seq    ; hack che rende tollerabile l'illeggibilità
+                                ; di (pochi) ultimi frame
+                                (< (- (length v) frameno) 150)
+                                (set frameno end) )
+                        (seq    (close av frm <hst 0> <hst 1>)
+                                (set <res 0> frameno)
+                                (fail) )))
+        (close av frm <hst 0> <hst 1>)
+        (not <_abort 0>)
+        (if (> cnt prv)
+        then    (send (- cnt prv) to th) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet scdscan-low-alternate (th-main name av pix default-info par v)
+        (deflocal done abort l l1 hst idx frameno t)
+
+        (av-rewind av)
+
+        (set l1 (length v))
+        (set l (+ l1 1))
+
+        (set hst (array 2))
+        (set <hst 0> (raw 256))
+        (set <hst 1> (raw 256))
+
+        (set t (now))
+
+        (av-read-scd-histogram-set av <hst 0>)
         (set idx 1)
-        (set scd-display-enabled (cfg-get-or-default "scd-display-enabled" default-info))
-        (set last-frameno-displayed -100)
+        (set done false)
         (set abort false)
-        (repeat (receive val from th-read-frame)
-                until (not val)
+        (repeat (alt    (av-read-scd-histogram-set av <hst idx>)
+                        (set done true) )
+                until done
                 (set frameno (av-frameno av))
                 until (>= frameno l1)
                 (if (not (av-is-frame-recoverable av))
@@ -94,35 +190,19 @@
                                                    nl )) to th-main )
                         (sendbuf 100 (cons "p2c" (cons (red) (+ $"too irregular timestamps not supported\n(more info in the guide)" nl ))) to th-main)
                         (set abort true) )
-                (opt    (receivenb abort from th-main)
-                        (set abort true) )
+                (if <_abort 0>
+                then    (set abort true) )
                 until abort
-                (send <req (scdscan-succ idx)> to th-read-frame)
-                (pix-scd-histogram-set <frm idx> <hst idx>)
-                (set val (pix-scd-histogram-dist <hst (scdscan-prec idx)> <hst idx>))
-                (set <@v frameno> val)
-                (if scd-display-enabled
-                then    (if (>= val 0.3)
-                        then    (if (>= (- frameno last-frameno-displayed) 30)
-                                then    (set last-frameno-displayed frameno)
-                                        (pix-copy-frames pix <frm (scdscan-prec idx)> <frm idx> pix1 pix2 gamma1 gamma2)
-                                        (alt    (gui-draw-image-th th-main)
-                                                (set abort true) ))))
+                (set <v frameno> (pix-scd-histogram-dist <hst 0> <hst 1>))
                 (if (= (% frameno 100) 0)
                 then    (sendbuf 100 (cons "c1" (+ "frame " frameno "/" l " (" (rint (/ frameno (- (now) t)))
                                                    " fps) (" (rint (/ frameno l 0.01)) "%)" ))
                                  to th-main ))
-                (set idx (scdscan-succ idx)) )
+                (set idx (- 1 idx)) )
 
-        (close pix1 pix2 <frm 0> <frm 1> <frm 2> <hst 0> <hst 1> <hst 2>)
-        (send undef to th-read-frame)
-        (thread-join th-read-frame)
+        (close <hst 0> <hst 1>)
         (not abort)
         (sendbuf 100 (cons "c1" (+ "frame " l "/" l " (" (rint (/ frameno (- (now) t))) " fps) (100%)")) to th-main) )
-
-(defun scdscan-succ (idx) (% (+ idx 1) 3))
-
-(defun scdscan-prec (idx) (% (- idx 1) 3))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -16,10 +16,19 @@
                 (sleep delay)
                 (send true to th) ))
 
-(defnet th-clock-reset ()
-        (deflocal res)
+(defnet th-clock-send (delay)
+        (deflocal thclk done res)
 
-        (opt* (receivenb res from <_kv "th-clock">)) )
+        (set thclk <_kv "th-clock">)
+        (set done false)
+        (repeat (alt    (seq    (sendnb delay to thclk)
+                                (set done true) )
+                        (seq    (receivenb res from thclk)
+                                (send delay to thclk)
+                                (set done true) )
+                        (success) )
+                until done
+                (sleep 0.01) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -74,6 +83,29 @@
                 (vl-sift-match-descr filt frm)
                 (send filt to th) )
         (close filt) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet th-sound (th)
+        (deflocal snd t prev-t)
+
+        (set prev-t (- (now) (* 60 60 24)))
+        (repeat (receive snd from th)
+                until (= snd undef)
+                (set t (now))
+                (opt    (truep <_kv "sound-enabled">)
+                        ;(if (> (- t prev-t) 30)
+                        ;then    (sdl-playwav-memory (raw-load-static "silence.wav") 1.0) )
+                        (sdl-playwav-memory snd 1.0) )
+                (set prev-t t) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

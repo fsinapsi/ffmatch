@@ -1,0 +1,257 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet project-open-cb (self)
+        (opt (project-open-low self)) )
+
+(defnet project-open-low (self)
+        (deflocal a i path)
+
+        (set a (cons (queue) (queue)))
+        (sqlite3-exec-data _db (netptr project-open-cback) a
+                "SELECT name,path1,path2 FROM projects ORDER BY name" )
+        (if (= (length (car a)) 0)
+        then    (iup-warning60 self $"There are no valid projects.")
+                (fail) )
+        (set i (iup-choose-menu (car a)))
+        (integerp i)
+        (set path (car <(cdr a) i>))
+        (alt    (open-common-low 1 path false)
+                (sound-iup-error60 self (+ "can't open `" path "'")) )
+        (set path (cdr <(cdr a) i>))
+        (alt    (open-common 2 path)
+                (sound-iup-error60 self (+ "can't open `" path "'")) )
+        (gui-report)
+        (gui-update-image)
+        (gui-update) )
+
+(defnet project-open-cback (a name path1 path2)
+        (if (and (pathexists path1) (pathexists path2))
+        then    (queue-put (car a) name)
+                (queue-put (cdr a) (cons path1 path2)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet project-save-cb (self)
+        (sqlite3-begin _db)
+        (alt    (seq    (project-save-low self)
+                        (sqlite3-end _db)
+                        (gui-update) )
+                (sqlite3-rollback _db) ))
+
+(defnet project-save-low (self)
+        (deflocal path1 path2 name newname)
+
+        (set path1 <_kv "path1">)
+        (stringp path1)
+        (set path2 <_kv "path2">)
+        (stringp path2)
+        (set path1 (sqlite3-escape-strings path1))
+        (set path2 (sqlite3-escape-strings path2))
+        (set name <(sqlite3-exec _db
+                        "SELECT name FROM projects WHERE path1='" path1
+                        "' AND path2='" path2 "' LIMIT 1") 0 0> )
+        (if (stringp name)
+        then    (set newname name)
+                (iup-edit-string self $"Rename project" $"Project name" newname)
+                (stringp newname)
+                (<> newname "")
+                (<> newname name)
+                (alt    (sqlite3-exec _db undef
+                            "UPDATE projects SET name='" (sqlite3-escape-strings newname)
+                            "' WHERE name='" (sqlite3-escape-strings name) "'" )
+                        (seq    (iup-confirm60 self (+ $"Project `" newname $"' exists. Do you want to overwrite it?"))
+                                (sqlite3-exec _db undef
+                                    "DELETE FROM projects WHERE name='" (sqlite3-escape-strings newname) "'")
+                                (sqlite3-exec _db undef
+                                    "UPDATE projects SET name='" (sqlite3-escape-strings newname)
+                                    "' WHERE name='" (sqlite3-escape-strings name) "'" ))
+                        (seq    (sound-iup-error60 self "Database error")
+                                (fail) ))
+        else    (iup-edit-string self $"Save project" $"Project name" name)
+                (stringp name)
+                (<> name "")
+                (alt    (sqlite3-exec _db undef
+                            "INSERT INTO projects VALUES('" (sqlite3-escape-strings name)
+                            "','" path1
+                            "','" path2
+                            "')" )
+                        (seq    (iup-confirm60 self (+ $"Project `" name $"' exists. Do you want to overwrite it?"))
+                                (sqlite3-exec _db undef
+                                    "UPDATE projects SET path1='" path1
+                                    "',path2='" path2
+                                    "' WHERE name='" (sqlite3-escape-strings name) "'" ))
+                        (seq    (sound-iup-error60 self "Database error")
+                                (fail) )))
+        (iup-info60 self $"Project successfully saved.") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet project-delete-cb (self)
+        (opt    (project-delete-low self)
+                (gui-update) ))
+
+(defnet project-delete-low (self)
+        (deflocal av1 av2 path1 path2 name)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set name <(sqlite3-exec _db
+            "SELECT name FROM projects WHERE path1='" (sqlite3-escape-strings <_kv "path1">)
+            "' AND path2='" (sqlite3-escape-strings <_kv "path2">) "' LIMIT 1") 0 0> )
+        (stringp name)
+        (iup-confirm60 self (+ $"Project `" name $"' will be deleted." ' ' $"Are you sure?"))
+        (sqlite3-exec _db undef
+            "DELETE FROM projects WHERE name='" (sqlite3-escape-strings name) "'")
+        (iup-info60 self $"Project successfully deleted.") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet project-export-cb (self)
+        (opt (project-export-low self)) )
+
+(defnet project-export-low (self)
+        (deflocal av1 av2 path1 path2 name1 name2 path db project-name)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set path1 <_kv "path1">)
+        (set path2 <_kv "path2">)
+        (set name1 (fullpath->name path1))
+        (set name2 (fullpath->name path2))
+        (set path1 (sqlite3-escape-strings path1))
+        (set path2 (sqlite3-escape-strings path2))
+        (set project-name <(sqlite3-exec _db
+            "SELECT name FROM projects WHERE path1='" path1
+            "' AND path2='" path2 "' LIMIT 1") 0 0> )
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                $"Export project data as..."
+                path
+                (+ (if (stringp project-name) project-name "project-data") ".cfg")
+                true ))
+        (stringp path)
+
+        (cfg-set "save-path" path)
+
+        (opt (remove path))
+        (set db (sqlite3-open path))
+        (<> db undef)
+
+        (sqlite3-begin db)
+        (alt    (iup-progress
+                    (thread-create (netptr project-export-th) (thread-self) db av1 av2 path1 path2 name1 name2 project-name)
+                    self "Exporting..." true false false false true )
+                (seq    (sqlite3-rollback db)
+                        (close db)
+                        (remove path)
+                        (sound-iup-error60 self "Error.")
+                        (fail) ))
+        (sqlite3-end db)
+        (close db)
+        (iup-info60 self $"Project data successfully exported.") )
+
+(defnet project-export-th (th db av1 av2 path1 path2 name1 name2 project-name)
+        (alt    (seq    (project-export-th-low th db av1 av2 path1 path2 name1 name2 project-name)
+                        (send "q" to th) )
+                (send "a" to th) ))
+
+(defnet project-export-th-low (th db av1 av2 path1 path2 name1 name2 project-name)
+        (deflocal key)
+
+        (sqlite3-exec db undef
+            "CREATE TABLE config(" \
+                    "key char unique not null," \
+                    "value char not null)" )
+        (sqlite3-exec db undef
+            "CREATE TABLE paths(" \
+                    "path char unique not null," \
+                    "name char not null)" )
+        (sqlite3-exec db undef
+            "CREATE TABLE projects(" \
+                    "name char unique not null," \
+                    "path1 char not null," \
+                    "path2 char not null)" )
+
+        (sqlite3-exec db undef
+            "INSERT INTO paths VALUES('"
+            path1 "','"
+            (sqlite3-escape-strings name1) "')" )
+        (sqlite3-exec db undef
+            "INSERT INTO paths VALUES('"
+            path2 "','"
+            (sqlite3-escape-strings name2) "')" )
+
+        (if (stringp project-name)
+        then    (sqlite3-exec db undef
+                    "INSERT INTO projects VALUES('" (sqlite3-escape-strings project-name)
+                    "','" path1
+                    "','" path2
+                    "')" ))
+
+        (set key (key-scd av1 name1))
+        (cfg-set-low db key (cfg-get key))
+        (set key (key-scd av2 name2))
+        (cfg-set-low db key (cfg-get key))
+        (set key (key-sck av1 av2 name1 name2))
+        (cfg-set-low db key (cfg-get key))
+        (set key (key-map av1 av2 name1 name2))
+        (cfg-set-low db key (cfg-get key))
+        (set key (key-prm av1 av2 name1 name2))
+        (cfg-set-low db key (cfg-get key))
+
+        (sqlite3-exec db undef
+            "CREATE INDEX paths_name ON paths(name)" )
+        (sqlite3-exec db undef
+            "CREATE INDEX projects_path1 ON projects(path1)" )
+        (sqlite3-exec db undef
+            "CREATE INDEX projects_path2 ON projects(path2)" ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

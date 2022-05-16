@@ -1,0 +1,126 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet move-sync-left-cb (self)
+        (deflocal n1 n2 lm rm left right)
+
+        (opt    (movie-sync-pre n1 n2 lm rm left right)
+                (not lm)
+                (if (= left 0)
+                then    (sound-pop) )
+                (move-sync-post n1 n2 -1) ))
+
+(defnet move-sync-right-cb (self)
+        (deflocal n1 n2 lm rm left right)
+
+        (opt    (movie-sync-pre n1 n2 lm rm left right)
+                (not rm)
+                (if (= right 0)
+                then    (sound-pop) )
+                (move-sync-post n1 n2 1) ))
+
+(defnet move-sync-left-fast-cb (self)
+        (deflocal n1 n2 lm rm left right n)
+
+        (opt    (movie-sync-pre n1 n2 lm rm left right)
+                (not lm)
+                (if (= left 0)
+                then    (sound-pop)
+                        (set n -1)
+                else    (set n (max -(cfg-get-or-default-num "supervision-skip-double" <_kv "default">) left)) )
+                (move-sync-post n1 n2 n) ))
+
+(defnet move-sync-right-fast-cb (self)
+        (deflocal n1 n2 lm rm left right n)
+
+        (opt    (movie-sync-pre n1 n2 lm rm left right)
+                (not rm)
+                (if (= right 0)
+                then    (sound-pop)
+                        (set n 1)
+                else    (set n (min (cfg-get-or-default-num "supervision-skip-double" <_kv "default">) right)) )
+                (move-sync-post n1 n2 n) ))
+
+(defnet move-sync-left-first-cb (self)
+        (deflocal n1 n2 lm rm left right)
+
+        (opt    (movie-sync-pre n1 n2 lm rm left right)
+                (not lm)
+                (move-sync-post n1 n2 left) ))
+
+(defnet move-sync-right-last-cb (self)
+        (deflocal n1 n2 lm rm left right)
+
+        (opt    (movie-sync-pre n1 n2 lm rm left right)
+                (not rm)
+                (move-sync-post n1 n2 right) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet movie-sync-pre (@n1 @n2 @left-is-min @right-is-max @left @right)
+        (deflocal k n1 n2 map p q n i1 i2)
+
+        (gui-not-locked)
+        (set k (cfg-get (key-map <_kv "av1">
+                                 <_kv "av2">
+                                 (fullpath->name <_kv "path1">)
+                                 (fullpath->name <_kv "path2">) )))
+        (<> k undef)
+        (set @n1 (gui-spin-value 1))
+        (set @n2 (gui-spin-value 2))
+        (set @left-is-min (or (= @n1 1) (= @n2 1)))
+        (set @right-is-max (or (= @n1 <k 0>) (= @n2 <k 1>)))
+        (set map (map-create <k 0> <k 1>))
+        (for i1 in <k 2> do
+                (set p <i1 0>)
+                (set q <i1 1>)
+                (set n <i1 2>)
+                (map-bind-low (car map) p q n)
+                (map-bind-low (cdr map) q p n) )
+        (for i1 in (car map) do
+                until (in @n1 <i1 0> .. <i1 1>) )
+        (for i2 in (cdr map) do
+                until (in @n2 <i2 0> .. <i2 1>) )
+        (set @left (max (- <i1 0> @n1) (- <i2 0> @n2)))
+        (set @right (min (- <i1 1> @n1) (- <i2 1> @n2))) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet move-sync-post (n1 n2 n)
+        (gui-spin-set-value 1 (+ n1 n))
+        (gui-spin-set-value 2 (+ n2 n))
+        (gui-update-image) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

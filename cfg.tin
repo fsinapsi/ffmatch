@@ -8,72 +8,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet cfg-set (key val)
-        (cfg-set-low _db key val) )
-
-(defnet cfg-set-low (db key val)
-        (set key (sqlite3-escape-strings key))
-        (if (= val undef)
-        then    (sqlite3-exec db undef
-                        "DELETE FROM config WHERE key='" key "'" )
-        else    (if (stringp val)
-                then    (set val (sqlite3-escape-strings val)) )
-                (alt    (sqlite3-exec db undef
-                                "INSERT INTO config VALUES('" key "','" val "')" )
-                        (sqlite3-exec db undef
-                                "UPDATE config SET value='" val
-                                "' WHERE key='" key "'" ))))
-
-(defnet cfg-clr (key)
-        (cfg-set key undef) )
-
-(defnet cfg-inc (key val)
-        (deflocal v)
-
-        (set v (cfg-get-num key))
-        (cfg-set key (+ (if (= v undef) 0 v) val)) )
-
-(defun cfg-exists (key)
-        (= <(sqlite3-exec _db
-                "SELECT count(*) FROM config WHERE key='"
-                (sqlite3-escape-strings key) "'" ) 0 0>
-           "1" ))
-
-(defun cfg-get (key)
-        <(sqlite3-exec _db
-                "SELECT value FROM config WHERE key='"
-                (sqlite3-escape-strings key) "'" ) 0 0> )
-
-(defun cfg-get-or-default (key default-info) net cfg-get-or-default)
-(defnet cfg-get-or-default (key default-info @val)
-        (set @val (cfg-get key))
-        (if (= @val undef)
-        then    (set @val <default-info key>) ))
-
-(defun cfg-get-num (key)
-        (cfg-validate-num (cfg-get key)) )
-
-(defun cfg-get-or-default-num (key default-info)
-        (cfg-validate-num (cfg-get-or-default key default-info)) )
-
-(defun cfg-validate-num (val)
-        (if (complexp val) val (str->num val)) )
-
-(defun cfg-get-lang () net cfg-get-lang)
-(defnet cfg-get-lang (@lang)
-        (set @lang (cfg-get "lang"))
-        (set @lang (if (= @lang undef) (lang) (cfg-validate-num @lang))) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defnet cfg-cb (self)
         (deflocal cfg-info default-info q butbox vbox dlg)
 
@@ -120,24 +54,25 @@
         (alt    (seq    (cfg-ok-low self)
                         (sqlite3-end _db) )
                 (seq    (sqlite3-rollback _db)
-                        (iup-error60 self "errore nel salvataggio configurazione") ))
+                        (sound-iup-error60 self "errore nel salvataggio configurazione") ))
         (iup-exit-loop) )
 
 (defnet cfg-ok-low (self)
-        (deflocal cfg-info c i old-lang new-lang)
+        (deflocal cfg-info c i which av old-lang new-lang)
 
         (set cfg-info <_kv "cfg-info">)
 
         (for c in [ "sift-scale"
                     "sift-draw-lines"
                     "final-closure"
-                    "scd-display-enabled"
                     "filter-mirror1"
                     "filter-mirror2"
                     "filter-flip1"
                     "filter-flip2"
                     "filter-ar1-auto"
                     "filter-ar2-auto"
+                    "debug-enabled"
+                    "sound-enabled"
                     "cuvid-enabled"
                     ] do
                 (cfg-set c (iup-get-bool <cfg-info (+ "tb-" c)> "VALUE")) )
@@ -145,6 +80,7 @@
         (for c in [ "scd-min-blocks"
                     "scd-min-avg-block-size"
                     "frame-buf-size"
+                    "scd-threads"
                     "supervision-skip-double"
                     "checks-per-interval"
                     "checks-per-interval-extra"
@@ -175,15 +111,32 @@
                     ] do
                 (cfg-set c (iup-text-spin-ratio-val <cfg-info (+ "sb-" c)>)) )
 
-        (cfg-set "sift-impl" (- (iup-get-int <cfg-info "cb-sift-impl"> "VALUE") 1))
+        (for c in [ "sift-impl"
+                    "filter-rows1"
+                    "filter-rows2"
+                    "filter-deint1"
+                    "filter-deint2"
+                    ] do
+                (cfg-set c (- (iup-get-int <cfg-info (+ "cb-" c)> "VALUE") 1)) )
+
+        (set <_kv "debug-enabled"> (cfg-get "debug-enabled"))
+        (set <_kv "sound-enabled"> (cfg-get "sound-enabled"))
 
         (set i (cfg-get-num "frame-buf-size"))
-        (opt    (set c <_kv "av1">)
-                (<> c undef)
-                (av-set-buf-size c i) )
-        (opt    (set c <_kv "av2">)
-                (<> c undef)
-                (av-set-buf-size c i) )
+        (for which in 1 .. 2 do
+                (opt    (set av <_kv (+ "av" which)>)
+                        (<> av undef)
+                        (av-set-buf-size av i)
+                        (av-set-filter-rows av (cfg-get-num (+ "filter-rows" which)))
+                        (set c (cfg-get-num (+ "filter-deint" which)))
+                        (if (= c 0)
+                        then    (av-set-filter av)
+                        else    (av-set-filter av <(deint-filters) c>)
+                                ;(set c (pix-create 10 10))
+                                ;(pixp c)
+                                ;(opt (av-read-frame av c (av-frameno av)))
+                                ;(close c)
+                                )))
 
         (set old-lang (lang))
         (set new-lang (- (iup-get-int <cfg-info "cb-languages"> "VALUE") 1))
@@ -332,10 +285,34 @@
 
 (defun cfg-setup-tabs-page4 (q) net cfg-setup-tabs-page4)
 (defnet cfg-setup-tabs-page4 (q @wid)
-        (deflocal cfg-info default-info hbox1 hbox2 hb1 hb2)
+        (deflocal cfg-info default-info hbox1 hbox2 hbox3 hbox4 hb1 hb2 rows1-list rows2-list deint1-list deint2-list i)
 
         (set cfg-info <_kv "cfg-info">)
         (set default-info <_kv "default">)
+
+        (set rows1-list (iup-list))
+        (set rows2-list (iup-list))
+        (set <cfg-info "cb-filter-rows1"> rows1-list)
+        (set <cfg-info "cb-filter-rows2"> rows2-list)
+        (iup-set-bool rows1-list "DROPDOWN" true)
+        (iup-set-bool rows2-list "DROPDOWN" true)
+        (for i in (row-filters) do
+                (iup-set-str-attribute rows1-list (+ (for-pos) 1) i)
+                (iup-set-str-attribute rows2-list (+ (for-pos) 1) i) )
+        (iup-set-int rows1-list "VALUE" (+ (cfg-get-or-default-num "filter-rows1" default-info) 1))
+        (iup-set-int rows2-list "VALUE" (+ (cfg-get-or-default-num "filter-rows2" default-info) 1))
+
+        (set deint1-list (iup-list))
+        (set deint2-list (iup-list))
+        (set <cfg-info "cb-filter-deint1"> deint1-list)
+        (set <cfg-info "cb-filter-deint2"> deint2-list)
+        (iup-set-bool deint1-list "DROPDOWN" true)
+        (iup-set-bool deint2-list "DROPDOWN" true)
+        (for i in (deint-filters) do
+                (iup-set-str-attribute deint1-list (+ (for-pos) 1) (if (= (for-pos) 0) $"none" i))
+                (iup-set-str-attribute deint2-list (+ (for-pos) 1) (if (= (for-pos) 0) $"none" i)) )
+        (iup-set-int deint1-list "VALUE" (+ (cfg-get-or-default-num "filter-deint1" default-info) 1))
+        (iup-set-int deint2-list "VALUE" (+ (cfg-get-or-default-num "filter-deint2" default-info) 1))
 
         (set hb1 (iup-hbox
             (cfg-setup-toggle "auto" (cfg-get-or-default "filter-ar1-auto" default-info) cfg-info "tb-filter-ar1-auto")
@@ -359,9 +336,12 @@
                     (cfg-get-or-default "filter-flip1" default-info) cfg-info "tb-filter-flip1" )
                 (cfg-setup-framed-spin-ratio "Rotate 1" (- 0.01 360) (- 360 0.01)
                         (cfg-get-or-default-num "filter-rotate1" default-info) 0.01
-                        cfg-info "sb-filter-rotate1" )
-                (iup-frame-with-margin "Aspect ratio 1" hb1) ))
+                        cfg-info "sb-filter-rotate1" )))
         (set hbox2 (iup-hbox
+                (iup-frame-with-margin "Rows 1" rows1-list)
+                (iup-frame-with-margin "Deint 1" deint1-list)
+                (iup-frame-with-margin "Aspect ratio 1" hb1) ))
+        (set hbox3 (iup-hbox
                 (cfg-setup-framed-spin-ratio "Gamma 2" 0.01 4
                         (cfg-get-or-default-num "filter-gamma2" default-info) 0.01
                         cfg-info "sb-filter-gamma2" )
@@ -371,13 +351,18 @@
                     (cfg-get-or-default "filter-flip2" default-info) cfg-info "tb-filter-flip2" )
                 (cfg-setup-framed-spin-ratio "Rotate 2" (- 0.01 360) (- 360 0.01)
                         (cfg-get-or-default-num "filter-rotate2" default-info) 0.01
-                        cfg-info "sb-filter-rotate2" )
+                        cfg-info "sb-filter-rotate2" )))
+        (set hbox4 (iup-hbox
+                (iup-frame-with-margin "Rows 2" rows2-list)
+                (iup-frame-with-margin "Deint 2" deint2-list)
                 (iup-frame-with-margin "Aspect ratio 2" hb2) ))
 
         (iup-set-int hbox1 "GAP" 5)
         (iup-set-int hbox2 "GAP" 5)
+        (iup-set-int hbox3 "GAP" 5)
+        (iup-set-int hbox4 "GAP" 5)
 
-        (set @wid (iup-vbox hbox1 hbox2))
+        (set @wid (iup-vbox hbox1 hbox2 hbox3 hbox4))
         (iup-set-int @wid "GAP" 2) )
 
 (defun cfg-setup-tabs-page5 (q) net cfg-setup-tabs-page5)
@@ -391,14 +376,17 @@
                 (cfg-setup-framed-spin "Frame buf size" 2 300
                         (cfg-get-or-default-num "frame-buf-size" default-info)
                         cfg-info "sb-frame-buf-size" )
-                (cfg-setup-framed-toggle "SCD display" $"enabled"
-                    (cfg-get-or-default "scd-display-enabled" default-info) cfg-info "tb-scd-display-enabled" )
+                (cfg-setup-framed-spin "SCD threads" 1 100
+                        (cfg-get-or-default-num "scd-threads" default-info)
+                        cfg-info "sb-scd-threads" )
                 (cfg-setup-framed-toggle $"Line drawing" $"enabled" (cfg-get-or-default "sift-draw-lines" default-info) cfg-info "tb-sift-draw-lines")
                 (cfg-setup-framed-spin "Sup. step incr." 2 1000
                         (cfg-get-or-default-num "supervision-skip-double" default-info)
                         cfg-info "sb-supervision-skip-double" )))
 
         (set hbox2 (iup-hbox
+                (cfg-setup-framed-toggle "Debug" $"enabled" (cfg-get-or-default "debug-enabled" default-info) cfg-info "tb-debug-enabled")
+                (cfg-setup-framed-toggle $"Sound" $"enabled" (cfg-get-or-default "sound-enabled" default-info) cfg-info "tb-sound-enabled")
                 (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled") ))
 
         (set list (iup-list))
@@ -482,6 +470,120 @@
                     "sb-vlfeat-peak-threshold"
                     "sb-vlfeat-edge-threshold" ] do
                 (iup-set-active <cfg-info i> vlfeat) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet cfg-import-cb (self)
+        (opt (cfg-import-low self)) )
+
+(defnet cfg-import-low (self)
+        (deflocal path db a msg)
+
+        (set path (iup-choose-file-open self $"Select cfg" (if (cmingw) (callpath) (datapath)) "CFG Files|*.cfg|All Files|*.*|" true))
+        (stringp path)
+        (set db (sqlite3-open path))
+        (if (= db undef)
+        then    (sound-iup-error60 self (+ "SQLite3 cannot open `" path "'"))
+                (fail) )
+        (set a (array default 0 6 2))
+
+        (sqlite3-begin _db)
+        (alt    (iup-progress
+                    (thread-create (netptr cfg-import-th) (thread-self) db a)
+                    self "Importing..." true true true false true )
+                (seq    (sqlite3-rollback _db)
+                        (close db)
+                        (sound-iup-error60 self "Aborted.")
+                        (fail) ))
+        (sqlite3-end _db)
+        (close db)
+
+        (set msg (+
+            "imported paths: " <a 0 0> "/" <a 0 1> nl
+            "imported projects: " <a 1 0> "/" <a 1 1> nl
+            "imported scd data: " <a 2 0> "/" <a 2 1> nl
+            "imported sift check data: " <a 3 0> "/" <a 3 1> nl
+            "imported mapping data: " <a 4 0> "/" <a 4 1> nl
+            "imported permutation data: " <a 5 0> "/" <a 5 1> nl
+            nl ))
+        (iup-text-append-and-go-end <_kv "text2"> msg)
+        (iup-info60 self msg)
+        (gui-report)
+        (gui-update) )
+
+(defnet cfg-import-th (th db a)
+        (deflocal dlg i)
+
+        (send "dlg" to th)
+        (receive dlg from th)
+        (alt    (seq    (opt (sqlite3-exec-data db (netptr cfg-import-cback1) (list th dlg a) "SELECT path,name FROM paths"))
+                        (not (iup-progress-aborted dlg))
+                        (opt (sqlite3-exec-data db (netptr cfg-import-cback2) (list th dlg a) "SELECT name,path1,path2 FROM projects"))
+                        (not (iup-progress-aborted dlg))
+                        (sqlite3-exec-data db (netptr cfg-import-cback3) (list th db dlg a) "SELECT key FROM config ORDER by key")
+                        (send "q" to th) )
+                (send "a" to th) ))
+
+(defnet cfg-import-cback1 (a path name)
+        (deflocal th dlg)
+
+        (set th <a 0>)
+        (set dlg <a 1>)
+        (set a <a 2>)
+        (not (iup-progress-aborted dlg))
+        (inc <a 0 1>)
+        (opt    (sqlite3-exec _db undef
+                    "INSERT INTO paths VALUES('" (sqlite3-escape-strings path)
+                    "','" (sqlite3-escape-strings name) "')" )
+                (inc <a 0 0>)
+                (sendbuf 100 (cons "m" (+ "imported paths: " <a 0 0>)) to th) ))
+
+(defnet cfg-import-cback2 (a name path1 path2)
+        (deflocal th dlg)
+
+        (set th <a 0>)
+        (set dlg <a 1>)
+        (set a <a 2>)
+        (not (iup-progress-aborted dlg))
+        (inc <a 1 1>)
+        (opt    (set path1 (sqlite3-escape-strings path1))
+                (set path2 (sqlite3-escape-strings path2))
+                (= (str->num <(sqlite3-exec _db "SELECT count(*) FROM projects WHERE path1='" path1 "' AND path2='" path2 "'") 0 0>) 0)
+                (sqlite3-exec _db undef
+                    "INSERT INTO projects VALUES('" (sqlite3-escape-strings name)
+                    "','" path1 "','" path2 "')" )
+                (inc <a 1 0>)
+                (sendbuf 100 (cons "m" (+ "imported projects: " <a 1 0>)) to th) ))
+
+(defnet cfg-import-cback3 (a key)
+        (deflocal th db dlg value i)
+
+        (set th <a 0>)
+        (set db <a 1>)
+        (set dlg <a 2>)
+        (set a <a 3>)
+        (not (iup-progress-aborted dlg))
+        (opt    (lmatch setidx i key "scd-" "sck-" "map-" "prm-")
+                (= (length key) (if (= i 0) 44 84))
+                (inc i 2)
+                (inc <a i 1>)
+                (set key (sqlite3-escape-strings key))
+                (= (str->num <(sqlite3-exec _db "SELECT count(*) FROM config WHERE key='" key "'") 0 0>) 0)
+                (set value <(sqlite3-exec-raw db "SELECT value FROM config WHERE key='" key "'") 0 0>)
+                (rawp value)
+                (sqlite3-exec-raw _db undef
+                            "INSERT INTO config VALUES('" key "','" value "')" )
+                (close value)
+                (inc <a i 0>)
+                (sendbuf 100 (cons "m" (+ "imported " <[ "scd" "sift check" "mapping" "permutation" ] (- i 2)> " data: " <a i 0>)) to th) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

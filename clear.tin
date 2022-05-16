@@ -1,0 +1,453 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-db-vacuum-cb (self)
+        (alt    (seq    (iup-progress
+                            (thread-create (netptr clear-db-vacuum-th) (thread-self))
+                            self "Db vacuum..." true false false true true )
+                        (sound-iup-info60 self "Db vacuum completed.") )
+                (sound-iup-error60 self "Error.") ))
+
+(defnet clear-db-vacuum-th (th)
+        (deflocal res)
+
+        (alt    (seq    (sqlite3-exec _db undef "VACUUM")
+                        (set res "q") )
+                (set res "a") )
+        (send res to th) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-text1-cb (self)
+        (clear-text-low 1) )
+
+(defnet clear-text2-cb (self)
+        (clear-text-low 2) )
+
+(defnet clear-text-low (which)
+        (iup-text-clear <_kv (+ "text" which)>)
+        (gui-update) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-paths-cb (self)
+        (opt (clear-paths-low self)) )
+
+(defnet clear-paths-low (self)
+        (deflocal q l)
+
+        (set q (queue))
+        (sqlite3-exec-data _db (netptr clear-paths-cback) q
+                "SELECT path FROM paths" )
+        (set l (length q))
+        (if (= l 0)
+        then    (iup-info60 self $"There are no obsolete paths.")
+                (fail) )
+        ;(print (sprintl q nl) nl)
+        (iup-confirm60 self (sprint l ' ' (if (= l 1) $"obsolete path will be deleted." $"obsolete paths will be deleted.") nl
+                                    $"Are you sure?" ))
+        (sqlite3-exec _db undef
+                "DELETE FROM paths WHERE path IN('"
+                (sprintl q "','") "')" )
+        (gui-update) )
+
+(defnet clear-paths-cback (q path)
+        (if (not (pathexists path))
+        then    (queue-put q (sqlite3-escape-strings path)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-projects-cb (self)
+        (opt (clear-projects-low self)) )
+
+(defnet clear-projects-low (self)
+        (deflocal q l)
+
+        (set q (queue))
+        (sqlite3-exec-data _db (netptr clear-projects-cback) q
+                "SELECT name,path1,path2 FROM projects" )
+        (set l (length q))
+        (if (= l 0)
+        then    (iup-info60 self $"There are no obsolete projects.")
+                (fail) )
+        ;(print (sprintl q nl) nl)
+        (iup-confirm60 self (sprint l ' ' (if (= l 1) $"obsolete project will be deleted." $"obsolete projects will be deleted.") nl
+                                    $"Are you sure?" ))
+        (sqlite3-exec _db undef
+                "DELETE FROM projects WHERE name IN('"
+                (sprintl q "','") "')" )
+        (gui-update) )
+
+(defnet clear-projects-cback (q name path1 path2)
+        (if (or (not (pathexists path1)) (not (pathexists path2)))
+        then    (queue-put q (sqlite3-escape-strings name)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-data-cb (self)
+        (opt (clear-data-low self)) )
+
+(defnet clear-data-low (self)
+        (deflocal a q l)
+
+        (set a (assoc))
+        (set q (queue))
+        (set <a undef> true) ; può sembrare strano ma serve
+        (alt    (iup-progress
+                    (thread-create (netptr clear-data-th1) (thread-self) a q)
+                    self "Please wait" true false false false true )
+                (seq    (sound-iup-error60 self "Error.")
+                        (fail) ))
+        (set l (length q))
+        (if (= l 0)
+        then    (iup-info60 self $"There are no obsolete data.")
+                (fail) )
+        ;(clear-data-tmp q)
+        (iup-confirm60 self (+ (if (= l 1) $"1 obsolete data will be deleted."
+                               (sprint l $" obsolete data will be deleted.") ) nl
+                               $"Are you sure?" ))
+        (alt    (iup-progress
+                    (thread-create (netptr clear-data-th2) (thread-self) q)
+                    self "Deleting..." true false false false true )
+                (seq    (sound-iup-error60 self "Error.")
+                        (fail) )))
+
+;(defnet clear-data-tmp (q)
+;        (deflocal i)
+;
+;        (for i in q do
+;                (opt    (lmatch i "scd-")
+;                        (print <(cfg-get i) 3> nl) )))
+
+(defnet clear-data-th1 (th a q)
+        (deflocal res)
+
+        (alt    (seq    (sqlite3-exec-data _db (netptr clear-data-cback1) a
+                            "SELECT path,name FROM paths" )
+                        (sqlite3-exec-data _db (netptr clear-data-cback2) (cons a q)
+                            "SELECT key FROM config" )
+                        (set res "q") )
+                (set res "a") )
+        (send res to th) )
+
+(defnet clear-data-cback1 (a path name)
+        (deflocal av)
+
+        (if (pathexists path)
+        then    (set av (av-avformat-open-input path))
+                (if (<> av undef)
+                then    (set <a (key-basic av name)> true)
+                        (close av) )))
+
+(defnet clear-data-cback2 (a key)
+        (deflocal q l code1 code2)
+
+        (set q (cdr a))
+        (set a (car a))
+        (if (in (length key) [ 44 84 ])
+        then    (set code1 (sub  4 40 key))
+                (set code2 (sub 44 40 key)) )
+        (case (sub 0 4 key) of
+                "scd-"  (if (not (in code1 a))
+                        then    (queue-put q key) )
+                "sck-"  (if (or (not (in code1 a)) (not (in code2 a)))
+                        then    (queue-put q key) )
+                "map-"  (if (or (not (in code1 a)) (not (in code2 a)))
+                        then    (queue-put q key) )
+                "prm-"  (if (or (not (in code1 a)) (not (in code2 a)))
+                        then    (queue-put q key) )))
+
+(defnet clear-data-th2 (th q)
+        (deflocal res)
+
+        (alt    (seq    (sqlite3-exec _db undef
+                            "DELETE FROM config WHERE key IN('"
+                            (sprintl q "','") "')" )
+                        (set res "q") )
+                (set res "a") )
+        (send res to th) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-scd1-cb (self)
+        (opt (clear-scd-low self 1)) )
+
+(defnet clear-scd2-cb (self)
+        (opt (clear-scd-low self 2)) )
+
+(defnet clear-scd-low (self which)
+        (deflocal av key)
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+        (set key (key-scd av (fullpath->name <_kv (+ "path" which)>)))
+        (truep (cfg-exists key))
+        (iup-confirm60 self
+                (+ $"The \"scd\" data for movie" ' ' which ' ' $"will be deleted." nl $"Are you sure?") )
+        (cfg-clr key)
+        (gui-update) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-sck-cb (self)
+        (opt (clear-sck-low self)) )
+
+(defnet clear-sck-low (self)
+        (deflocal av1 av2 key)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set key (key-sck av1 av2
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) ))
+        (truep (cfg-exists key))
+        (iup-confirm60 self
+                (+ $"The \"sift check\" data will be deleted." nl $"Are you sure?") )
+        (cfg-clr key)
+        (gui-update) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-failed-sck-cb (self)
+        (opt (clear-failed-sck-low self)) )
+
+(defnet clear-failed-sck-low (self)
+        (deflocal av1 av2 key sck cache i)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set key (key-sck av1 av2
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) ))
+        (set sck (cfg-get key))
+        (<> sck undef)
+        (set cache <sck 0>)
+        (set i (- (length cache) <sck 1>))
+        (if (= i 0)
+        then    (iup-info60 self $"There are no failed checks.")
+                (fail) )
+        (iup-confirm60 self (+ (if (= i 1) $"1 failed check will be deleted."
+                (sprint i $" failed checks will be deleted." )) nl $"Are you sure?" ))
+        (for i in cache do
+                (if (booleanp (cdr i))
+                then    (if (not (cdr i))
+                        then    (assoc-clr cache (car i)) )))
+        (cfg-set key sck)
+        (gui-report) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-map-cb (self)
+        (opt (clear-map-low self)) )
+
+(defnet clear-map-low (self)
+        (deflocal av1 av2 name1 name2 key prm)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set name1 (fullpath->name <_kv "path1">))
+        (set name2 (fullpath->name <_kv "path2">))
+        (set key (key-map av1 av2 name1 name2))
+        (truep (cfg-exists key))
+        (set prm (<> <_kv "prm"> undef))
+        (iup-confirm60 self
+                (+ $"The \"mapping\" data will be deleted." nl
+                   (if prm (+ $"Warning: the \"sift check\" data will also be deleted." nl) "")
+                   $"Are you sure?") )
+        (sqlite3-begin _db)
+        (alt    (seq    (cfg-clr key)
+                        (if prm
+                        then    (cfg-clr (key-prm av1 av2 name1 name2))
+                                (cfg-clr (key-sck av1 av2 name1 name2))
+                                (assoc-clr _kv "prm") )
+                        (sqlite3-end _db) )
+                (sqlite3-rollback _db) )
+        (gui-report)
+        (gui-update)
+        (if prm
+        then    (gui-update-image) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-optimize-map-cb (self)
+        (opt (clear-optimize-map-low self)) )
+
+(defnet clear-optimize-map-low (self)
+        (deflocal av1 av2 key k map p q n a i)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set key (key-map av1 av2
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) ))
+        (set k (cfg-get key))
+        (<> k undef)
+        (set map (map-create <k 0> <k 1>))
+        (for i in <k 2> do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (map-bind-low (car map) p q n)
+                (map-bind-low (cdr map) q p n) )
+        (set a (array 0))
+        (for i in (car map) do
+                (set q <i 2>)
+                (if (integerp q)
+                then    (array-append a (list <i 0> q (- <i 1> <i 0> -1))) ))
+        (if (= (length <k 2 >) (length a))
+        then    (iup-info60 self $"The \"mapping\" data are already optimized.")
+                (fail) )
+        (iup-confirm60 self
+                (+ $"The \"mapping\" data will be optimized." nl
+                   "(" (length <k 2 >) " -> " (length a) ")" nl
+                   $"Are you sure?" ))
+        (cfg-set key (list <k 0> <k 1> a))
+        (gui-report)
+        (gui-update) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet clear-data-tmp-cb (self)
+        (opt (clear-data-tmp-low self)) )
+
+(defnet clear-data-tmp-low (self)
+        (deflocal q l)
+
+        (set q (queue))
+        (alt    (iup-progress
+                    (thread-create (netptr clear-data-tmp-th1) (thread-self) q)
+                    self "Please wait" true false false true )
+                (seq    (sound-iup-error60 self "Error.")
+                        (fail) ))
+        (set l (length q))
+        (if (= l 0)
+        then    (iup-info60 self "Non c'è niente da cancellare.")
+                (fail) )
+        (iup-confirm60 self (+ (if (= l 1) $"1 obsolete data will be deleted."
+                               (sprint l $" obsolete data will be deleted.") ) nl
+                             $"Are you sure?" ))
+        (alt    (iup-progress
+                    (thread-create (netptr clear-data-th2) (thread-self) q)
+                    self "Deleting..." true false false true )
+                (seq    (sound-iup-error60 self "Error.")
+                        (fail) )))
+
+(defnet clear-data-tmp-th1 (th q)
+        (deflocal res)
+
+        (alt    (seq    (sqlite3-exec-data _db (netptr clear-data-tmp-cback) q
+                            "SELECT key FROM config" )
+                        (set res "q") )
+                (set res "a") )
+        (send res to th) )
+
+(defnet clear-data-tmp-cback (q key)
+        (if (= (length key) 84)
+        then    (if (= (sub  4 40 key) (sub 44 40 key))
+                then    (queue-put q key) )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

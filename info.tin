@@ -69,6 +69,7 @@
                         $"Selected language" ": " <(languages) (lang)> nl
                         $"Selected SIFT impl." ": " <(sift-impl) (cfg-get-or-default-num "sift-impl" <_kv "default">)> nl
                         ;$"Sound" ": " (if <_kv "enabled-sound"> $"enabled" $"disabled") nl
+                        "CC version (rts): " (cc-version) nl
                         "GC version: " (gc-version) nl
                         "GMP version: " (gmp-version) nl
                         "IUP version: " (iup-version) nl

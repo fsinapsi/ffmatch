@@ -144,8 +144,11 @@
 (defun map-undef2 (m)
         (map-undef-low (cdr (match-map m)) (car (match-map m))) )
 
-(defun map-undef-low (map1 map2) net map-undef-low)
-(defnet map-undef-low (map1 map2 @q)
+(defun map-undef-low (map1 map2)
+    (map-undef-low-low map1 map2 false) )
+
+(defun map-undef-low-low (map1 map2 also-empty) net map-undef-low-low)
+(defnet map-undef-low-low (map1 map2 also-empty @q)
         (deflocal i a min max)
 
         (set @q (queue))
@@ -156,7 +159,7 @@
                 then    (set max (if (= i (length map1))
                                 <map2 -1 1>
                                 (- <map1 i 2> 1) ))
-                        (if (<= min max)
+                        (if (or also-empty (<= min max))
                         then    (queue-put @q (list <a 0> <a 1> min max)) )
                 else    (set min (+ <a 2> <a 1> -<a 0> 1)) )))
 
@@ -206,7 +209,7 @@
                 (length (match-cache m)) (match-passed m) true ))
 
 (defnet map-report-low (target map name1 name2 rx ry nchecks npassed go-home)
-        (deflocal buf ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q prv freecnt diffcnt diff diffprv i)
+        (deflocal buf buf2 ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q prv freecnt diffcnt diff diffprv i)
 
         (if (listp target)
         then    (set ab (cdr target))
@@ -214,6 +217,7 @@
         (set map-max1 (map-max-low (car map)))
         (set map-max2 (map-max-low (cdr map)))
         (set buf (iup-text-buffer))
+        (set buf2 (iup-text-buffer))
         (map-report-print (cons "p1" (+
                 "(1) " name1 nl
                 "(2) " name2 nl
@@ -225,8 +229,7 @@
                 (if (= rx undef) "" (+
                 $"horizontal ratio: " (approx3 rx) nl ))
                 (if (= ry undef) "" (+
-                $"vertical ratio: " (approx3 ry) nl ))
-                nl )) buf )
+                $"vertical ratio: " (approx3 ry) nl )))) buf )
         (set wrn1 (queue))
         (set wrn2 (queue))
         (set u (map-undef-low (car map) (cdr map)))
@@ -241,8 +244,8 @@
                 (set q <a 2>)
                 (if (= q undef)
                 then    (if (and (= p1 <ut 0>) (= p2 <ut 1>))
-                        then    (map-report-print-range p1 p2 (red) (blue) buf)
-                                (map-report-print (cons "p1c" (cons (red) (+ " -/-> ???" " {" (- p2 p1 -1) "-" (- <ut 3> <ut 2> -1) "}" nl))) buf)
+                        then    (map-report-print-range p1 p2 (red) (blue) buf2)
+                                (map-report-print (cons "p1c" (cons (red) (+ " -/-> ???" " {" (- p2 p1 -1) "-" (- <ut 3> <ut 2> -1) "}" nl))) buf2)
                                 (if (arrayp ab)
                                 then    (array-append ab (list p1 <ut 2> 0) (list p2 <ut 3> 0)) )
                                 (set ut (queue-get u))
@@ -257,10 +260,10 @@
                         then    (if (<> diff diffprv)
                                 then    (inc diffcnt) ))
                         (set diffprv diff)
-                        (map-report-print-range p1 p2 (darkgreen) (blue) buf)
+                        (map-report-print-range p1 p2 (darkgreen) (blue) buf2)
                         (map-report-print (cons "p1c" (cons (darkgreen) (+ " ---> ["
                             (int->str q 6 '0') "-" (int->str prv 6 '0') "] {"
-                            (int->str (- p2 p1 -1) 6 '0') "} (diff=" diff ")" nl))) buf )
+                            (int->str (- p2 p1 -1) 6 '0') "} (diff=" diff ")" nl))) buf2 )
                         (if (arrayp ab)
                         then    (if (= p1 p2)
                                 then    (array-append ab (list p1 q 3))
@@ -270,13 +273,15 @@
                         (if (and (= i (length map)) (= p2 map-max1) (< (+ q p2 -p1) map-max2))
                         then    (queue-put wrn2 (list (+ q p2 -p1 1) map-max2 map-max1)) )))
         (if (> (length wrn1) 0)
-        then    (map-report-print (cons "p1" $"\n1st movie frame(s) not found in the 2nd one:\n") buf)
-                (map-report-diff wrn1 buf 0) )
+        then    (map-report-print (cons "p1" $"\n1st movie frame(s) not found in the 2nd one:\n") buf2)
+                (map-report-diff wrn1 buf2 0) )
         (if (> (length wrn2) 0)
-        then    (map-report-print (cons "p1" $"\n2nd movie frame(s) not found in the 1st one:\n") buf)
-                (map-report-diff wrn2 buf 1) )
-        (map-report-print (cons "p1" (+ "\ninternal diff: " diffcnt
-                                        "\nfree segm: " freecnt )) buf )
+        then    (map-report-print (cons "p1" $"\n2nd movie frame(s) not found in the 1st one:\n") buf2)
+                (map-report-diff wrn2 buf2 1) )
+        (map-report-print (cons "p1" (+ "internal diff: " diffcnt nl
+                                        "free segm: " freecnt nl
+                                        nl )) buf )
+        (iup-text-buffer-cat buf buf2)
         (if (arrayp ab)
         then    (gui-text1-hack true)
                 (set target <_kv "text1">)

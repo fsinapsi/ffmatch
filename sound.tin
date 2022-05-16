@@ -8,32 +8,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use lept)
+(defnet sound-play (snd)
+        (send snd to <_kv "th-sound">) )
 
-(include "common.tin")
-(include "lang.tin")
-(include "init.tin")
-(include "gui.tin")
-(include "move-sync.tin")
-(include "move-scd.tin")
-(include "move-spin.tin")
-(include "move-slide.tin")
-(include "force.tin")
-(include "cfg.tin")
-(include "utils.tin")
-(include "constants.tin")
-(include "scdscan.tin")
-(include "match.tin")
-(include "map.tin")
-(include "sift.tin")
-(include "audio.tin")
-(include "permute.tin")
-(include "threads.tin")
-(include "sound.tin")
-(include "clear.tin")
-(include "open.tin")
-(include "project.tin")
-(include "info.tin")
+(defnet sound-alert ()
+        (sound-play (raw-load-static "alert.wav")) )
+
+(defnet sound-pop ()
+        (sound-play (raw-load-static "pop.wav")) )
+
+(defnet sound-info ()
+        (sound-play (raw-load-static "info.wav")) )
+
+(defnet sound-error ()
+        (sound-play (raw-load-static "error.wav")) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,14 +33,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defstart ffmatch)
+(defnet sound-iup-info60 (self msg)
+        (sound-info)
+        (iup-info60 self msg) )
 
-(defnet ffmatch ()
-        (set-icon "emblem-videos.ico")
-        (iup-set-lang)
-        (init)
-        (gui)
-        (quit) )
+(defnet sound-iup-error60 (self msg)
+        (sound-error)
+        (iup-error60 self msg) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

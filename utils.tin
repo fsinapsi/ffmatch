@@ -153,15 +153,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun av-my-aspect-ratio (which av) net av-my-aspect-ratio)
-(defnet av-my-aspect-ratio (which av @ar)
+(defun my-av-par (which av) net my-av-par)
+(defnet my-av-par (which av @par)
         (deflocal default-info)
 
         (set default-info <_kv "default">)
         (if (cfg-get-or-default (+ "filter-ar" which "-auto") default-info)
-        then    (set @ar (av-sample-aspect-ratio av (av-video-stream-idx av)))
-        else    (set @ar (/ (cfg-get-or-default-num (+ "filter-ar" which) default-info)
-                            (/ (width av) (height av)) ))))
+        then    (set @par (av-sample-aspect-ratio av (av-video-stream-idx av)))
+                (if (= @par 0)
+                then    (set @par 1) )
+        else    (set @par (/ (cfg-get-or-default-num (+ "filter-ar" which) default-info)
+                             (/ (width av) (height av)) ))))
+
+(defun my-av-dar (which av)
+        (* (/ (width av) (height av)) (my-av-par which av)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -217,16 +222,14 @@
         (set h1 (height av1))
         (set w2 (width av2))
         (set h2 (height av2))
-        (set k (av-my-aspect-ratio 1 av1))
-        (if (> k 0)
-        then    (if (> k 1)
-                then    (set w1 (* w1 k))
-                else    (set h1 (/ h1 k)) ))
-        (set k (av-my-aspect-ratio 2 av2))
-        (if (> k 0)
-        then    (if (> k 1)
-                then    (set w2 (* w2 k))
-                else    (set h2 (/ h2 k)) ))
+        (set k (my-av-par 1 av1))
+        (if (> k 1)
+        then    (set w1 (* w1 k))
+        else    (set h1 (/ h1 k)) )
+        (set k (my-av-par 2 av2))
+        (if (> k 1)
+        then    (set w2 (* w2 k))
+        else    (set h2 (/ h2 k)) )
         (case (cfg-get-or-default-num "scaling-mode" default-info) of
                 0   (seq    (set k (/ w2 h2))
                             (set h2 (sqrt (/ (* w1 h1) k)))
@@ -295,22 +298,51 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defnet debug-print (msg)
+        (deflocal f)
+
+        (if <_kv "debug-enabled">
+        then    (set f <_kv "debug-fp">)
+                (if (= f undef)
+                then    (set f (fopenrw <_kv "debug-path">))
+                        (if (<> f undef)
+                        then    (fsetpos (length f) f)
+                        else    (set f (fcreate <_kv "debug-path">)) )
+                        (if (<> f undef)
+                        then    (set <_kv "debug-fp"> f)
+                                (da-chiudere f) ))
+                (if (<> f undef)
+                then    (fprint f (sprint (now) " - " (thread-self) ": " msg nl))
+                        (fflush f) )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defnet da-chiudere (obj)
         (queue-put <_kv "da-chiudere"> obj) )
 
 (defnet quit ()
-        (deflocal thclk th1 th2 obj)
+        (deflocal thclk th1 th2 thsnd obj)
 
-        (th-clock-reset)
         (set thclk <_kv "th-clock">)
-        (send undef to thclk)
+        (th-clock-send undef)
         (set th1 <_kv "th-read-frame1">)
         (send undef to th1)
         (set th2 <_kv "th-read-frame2">)
         (send undef to th2)
+        (set thsnd <_kv "th-sound">)
+        (send undef to thsnd)
         (thread-join thclk)
         (thread-join th1)
         (thread-join th2)
+        (thread-join thsnd)
         (for obj in <_kv "da-chiudere"> do
                 (close obj) ))
 
@@ -337,6 +369,54 @@
                 (= r g)
                 (= r b)
                 (pix-draw-point p i j (pix-color r r r (- 255 r))) ))
+        (pix-save-png p "pippo.png") )
+
+(defnet b ()
+        (deflocal p q z i j c r g b)
+
+        (set p (pix-load-static "logo.png"))
+        (set q (pix-load-static "128x128/emblem-videos.png"))
+
+        (pix-draw-pix-alpha p (/ (- (width p) (width q)) 2) (/ (- (height p) (height q)) 2) q)
+
+        (set z (pix-load "icons/logo.png"))
+
+        (for i in 0 .. (- (width z) 1) do
+        (for j in 0 .. (- (height z) 1) do
+                (set c (pix-point z i j))
+                (set r (pix-color-red c))
+                (set g (pix-color-green c))
+                (set b (pix-color-blue c))
+                (pix-draw-point z i j (pix-color r g 0xff (pix-color-alpha c))) ))
+
+        (pix-draw-pix-alpha p 0 0 z)
+
+        (pix-save-png p "pippo.png") )
+
+(defnet c ()
+        (deflocal p q z i j c r g b)
+
+        (set p (pix-load "icons/sfondo2.png"))
+        (set q (pix-load "icons/logo-alt4.png"))
+        (for i in 0 .. (- (width p) 1) do
+        (for j in 0 .. (- (height p) 1) do
+                (set c (pix-point p i j))
+                (pix-draw-point p i j (pix-color
+                        (pix-color-red c)
+                        (pix-color-green c)
+                        (pix-color-blue c)
+                        (pix-color-alpha (pix-point q i j)) ))))
+
+        (set z (pix-clone p))
+
+        (close q)
+
+        (set q (pix-load-static "128x128/emblem-videos.png"))
+
+        (pix-draw-pix-alpha p (/ (- (width p) (width q)) 2) (/ (- (height p) (height q)) 2) q)
+
+        (pix-draw-pix-alpha p 0 0 z)
+
         (pix-save-png p "pippo.png") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

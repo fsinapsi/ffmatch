@@ -8,51 +8,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use lept)
+(defnet move-slide-changed1-cb (self)
+        (move-slide-changed self 1) )
 
-(include "common.tin")
-(include "lang.tin")
-(include "init.tin")
-(include "gui.tin")
-(include "move-sync.tin")
-(include "move-scd.tin")
-(include "move-spin.tin")
-(include "move-slide.tin")
-(include "force.tin")
-(include "cfg.tin")
-(include "utils.tin")
-(include "constants.tin")
-(include "scdscan.tin")
-(include "match.tin")
-(include "map.tin")
-(include "sift.tin")
-(include "audio.tin")
-(include "permute.tin")
-(include "threads.tin")
-(include "sound.tin")
-(include "clear.tin")
-(include "open.tin")
-(include "project.tin")
-(include "info.tin")
+(defnet move-slide-changed2-cb (self)
+        (move-slide-changed self 2) )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defnet move-slide-changed (self which)
+        (deflocal v vmax kf)
 
-(defstart ffmatch)
-
-(defnet ffmatch ()
-        (set-icon "emblem-videos.ico")
-        (iup-set-lang)
-        (init)
-        (gui)
-        (quit) )
+        (opt    (gui-not-locked)
+                (set v (iup-get-double self "VALUE"))
+                (if (<= v 0.025)
+                then    (set v 1)
+                else    (set vmax (iup-get-int <_kv (+ "spin" which)> "SPINMAX"))
+                        (set v (rint (linear v 0 1 1 vmax)))
+                        (set kf (av-nearest-keyframe <_kv (+ "av" which)> v (div vmax 500)))
+                        (if (integerp kf)
+                        then    (set v (max 1 kf)) ))
+                (gui-spin-set-value which v)
+                (gui-update-image) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

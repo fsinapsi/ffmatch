@@ -8,32 +8,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use lept)
+(defnet move-scd-left1-cb (self)
+        (move-scd-low 1 true) )
 
-(include "common.tin")
-(include "lang.tin")
-(include "init.tin")
-(include "gui.tin")
-(include "move-sync.tin")
-(include "move-scd.tin")
-(include "move-spin.tin")
-(include "move-slide.tin")
-(include "force.tin")
-(include "cfg.tin")
-(include "utils.tin")
-(include "constants.tin")
-(include "scdscan.tin")
-(include "match.tin")
-(include "map.tin")
-(include "sift.tin")
-(include "audio.tin")
-(include "permute.tin")
-(include "threads.tin")
-(include "sound.tin")
-(include "clear.tin")
-(include "open.tin")
-(include "project.tin")
-(include "info.tin")
+(defnet move-scd-right1-cb (self)
+        (move-scd-low 1 false) )
+
+(defnet move-scd-left2-cb (self)
+        (move-scd-low 2 true) )
+
+(defnet move-scd-right2-cb (self)
+        (move-scd-low 2 false) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,14 +30,33 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defstart ffmatch)
+(defnet move-scd-low (which left)
+        (opt (move-scd-low-low which left)) )
 
-(defnet ffmatch ()
-        (set-icon "emblem-videos.ico")
-        (iup-set-lang)
-        (init)
-        (gui)
-        (quit) )
+(defnet move-scd-low-low (which left)
+        (deflocal av scd thres o n)
+
+        (gui-not-locked)
+        (set av <_kv (+ "av" which)>)
+        (if (or (= which 1) (= <_kv "prm"> undef))
+        then    (set scd (cfg-get (key-scd av (fullpath->name <_kv (+ "path" which)>))))
+                (listp scd)
+                (set scd <scd 4>)
+        else    (set scd (cdr (cfg-get (key-prm <_kv "av1"> <_kv "av2"> (fullpath->name <_kv "path1">) (fullpath->name <_kv "path2">)))))
+                (<> scd undef) )
+        (set thres (iup-text-spin-ratio-val <_kv (+ "scd-spin" which)>))
+        (set o (gui-spin-value which))
+        (if left
+        then    (for n in 1 .. (- o 1) rev do
+                        (if (>= <scd n> thres)
+                        then    (gui-spin-set-value which n)
+                                (gui-update-image)
+                                (fail) ))
+        else    (for n in (+ o 1) .. (- (av-approximated-number-of-frames av) 2) do
+                        (if (>= <scd n> thres)
+                        then    (gui-spin-set-value which n)
+                                (gui-update-image)
+                                (fail) ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

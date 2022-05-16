@@ -41,7 +41,7 @@
         (set frm1 (match-frm1 m))
         (set frm2 (match-frm2 m))
         (sift-read-frame m av1 p1 frm1)
-        (sift-read-frame m av2 p2 frm2)
+        (sift-read-frame m av2 (perm-convert p2) frm2)
         (if (match-params m "filter-mirror1")
         then    (pix-hflip frm1) )
         (if (match-params m "filter-flip1")

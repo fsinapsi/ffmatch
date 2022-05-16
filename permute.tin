@@ -166,7 +166,12 @@
 
 (defun perm-convert (n) net perm-convert)
 (defnet perm-convert (n @m)
-        (set @m n) )
+        (deflocal p)
+
+        (set p <_kv "prm">)
+        (if (= p undef)
+        then    (set @m n)
+        else    (set @m <p n>) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

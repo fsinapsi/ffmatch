@@ -13,17 +13,36 @@
 (defun zoom-step () 1.1)
 (defun space () 10)
 (defun framerates () [ 25 (/ 24000 1001) 24 ])
+
 (defun sift-impl ()
         [ "OpenCV"
           "VLFeat"
           ])
+
+(defun deint-filters ()
+        [ "none"
+          "kerndeint"
+          ])
+
+(defun spp-filters ()
+        [ "none"
+          "spp"
+          "uspp"
+          ])
+
+(defun row-filters ()
+        [ "entire frame"
+          "top field"
+          "bottom field"
+          ])
+
 (defun default-parameters ()
         [ [ "init-scd-threshold" . 15 ]
           [ "min-scd-threshold" . 3.5 ]
           [ "scd-threshold-ratio" . 0.95 ]
           [ "scd-min-blocks" . 4 ]
           [ "scd-min-avg-block-size" . 16 ]
-          [ "final-closure" . true ]
+          [ "final-closure" . false ]
           [ "checks-per-interval" . 4 ]
           [ "checks-per-interval-extra" . 8 ]
           [ "min-keypoints" . 60 ]
@@ -43,13 +62,19 @@
           [ "filter-flip2" . false ]
           [ "filter-rotate1" . 0 ]
           [ "filter-rotate2" . 0 ]
+          [ "filter-rows1" . 0 ]
+          [ "filter-rows2" . 0 ]
+          [ "filter-deint1" . 0 ]
+          [ "filter-deint2" . 0 ]
           [ "filter-ar1-auto" . true ]
           [ "filter-ar1" . 1.78 ]
           [ "filter-ar2-auto" . true ]
           [ "filter-ar2" . 1.78 ]
           [ "sift-draw-lines" . true ]
           [ "supervision-skip-double" . 10 ]
-          [ "scd-display-enabled" . true ]
+          [ "scd-threads" . 4 ]
+          [ "debug-enabled" . false ]
+          [ "sound-enabled" . true ]
           [ "cuvid-enabled" . false ]
           [ "frame-buf-size" . 20 ]
           [ "sift-impl" . 0 ]

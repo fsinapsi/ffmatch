@@ -69,41 +69,29 @@
 1
 "Vuoi sovrascriverlo?"
 
-" is actually linked to "
+" is already linked to "
 1
 " è già collegato a "
+
+" is currently linked to "
+1
+" è attualmente collegato a "
 
 "Do you want to remove the link?"
 1
 "Vuoi rimuovere il collegamento?"
 
-"Can't link "
-1
-"È impossibile collegare "
-
-" to "
-1
-" a "
-
-"At the moment "
-1
-"Al momento "
-
-" can only be mapped in ["
-1
-" può essere mappato soltanto in ["
-
 " will be linked to "
 1
 " verrà collegato a "
 
-"Are you sure?"
+"Do you want to move ["
 1
-"Confermi?"
+"Vuoi spostare ["
 
-"\nNOTE: a previously established link will be removed."
+"] (movie 2) to "
 1
-"\nNOTA: verrà rimosso un precedente collegamento."
+"] (filmato 2) verso "
 
 "Save frame "
 1
@@ -220,6 +208,14 @@
 "Final closure"
 1
 "Chiusura finale"
+
+"There are no segments to close."
+1
+"Non ci sono segmenti da chiudere."
+
+"Segments to close: "
+1
+"Segmenti da chiudere: "
 
 "enabled"
 1
@@ -369,6 +365,10 @@
 1
 "I dati di \"mapping\" verranno cancellati."
 
+"Warning: the \"sift check\" data will also be deleted."
+1
+"Attenzione: anche i dati \"sift check\" verranno cancellati."
+
 "Default parameters will be restored."
 1
 "Verranno ripristinati i parametri di default."
@@ -404,10 +404,6 @@
 "duration"
 1
 "durata"
-
-"The current operation will be aborted."
-1
-"L'operazione in corso verrà interrotta."
 
 "Aborted"
 1
@@ -697,10 +693,6 @@
 1
 "Concorrenza"
 
-"Abort"
-1
-"Interrompi"
-
 "unrecognized audio format"
 1
 "formato audio non riconosciuto"
@@ -728,6 +720,26 @@
 "holes"
 1
 "buchi"
+
+"none"
+1
+"nessuno"
+
+"Movements"
+1
+"Spostamenti"
+
+"Undo the last movement"
+1
+"Annulla l'ultimo spostamento"
+
+"The last movement will be undone."
+1
+"L'ultimo spostamento verrà annullato."
+
+" link(s) will also be deleted."
+1
+" link(s) verranno rimossi, inoltre."
 
 "Thanks to:"
 1

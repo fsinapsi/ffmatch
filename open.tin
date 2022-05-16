@@ -1,0 +1,156 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet open-common (which path)
+        (open-common-low which path true) )
+
+(defnet open-common-low (which path warning)
+        (deflocal default-info cuvid av av1 av2 name1 name2 n p i)
+
+        (set default-info <_kv "default">)
+        (set cuvid (cfg-get-or-default "cuvid-enabled" default-info))
+        (set av (if cuvid
+                    (av-avformat-open-input-cuvid path)
+                    (av-avformat-open-input path) ))
+        (if (= av undef)
+        then    (if cuvid
+                then    (set av (av-avformat-open-input path))
+                        (if (<> av undef)
+                        then    (close av)
+                                (iup-warning60 <_kv "dlg"> $"Try to disable cuvid...") ))
+                (fail) )
+        (alt    (seq    (set n (av-video-frame-rate av))
+                        (rationalp n)
+                        (> n 0)
+                        (set n (av-approximated-number-of-frames av))
+                        (integerp n)
+                        (>= n 3) )
+                (seq    (close av)
+                        (fail) ))
+        (av-set-buf-size av (cfg-get-or-default-num "frame-buf-size" default-info))
+        (set <_kv (+ "path" which)> path)
+        (close <_kv (+ "av" which)>)
+        (set <_kv (+ "av" which)> av)
+        (gui-spin-set-value which 1)
+        (iup-set-int <_kv (+ "spin" which)> "SPINMAX" (- n 2))
+        (av-set-filter-rows av (cfg-get-or-default-num (+ "filter-rows" which) default-info))
+        (opt    (set n (cfg-get-or-default-num (+ "filter-deint" which) default-info))
+                (> n 0)
+                (av-set-filter av <(deint-filters) n>) )
+
+        (set av1 <_kv "av1">)
+        (set av2 <_kv "av2">)
+        (set name1 (fullpath->name <_kv "path1">))
+        (set name2 (fullpath->name <_kv "path2">))
+
+        (assoc-clr _kv "prm")
+        (opt    (<> av1 undef)
+                (<> av2 undef)
+                (set n (cfg-get (key-prm av1 av2 name1 name2)))
+                (<> n undef)
+                (set p (perm-identity <(cfg-get (key-map av1 av2 name1 name2)) 1>))
+                (for i in (car n) do
+                    (set p (perm-move p <i 0> <i 1> <i 2>)) )
+                (set <_kv "prm"> p) )
+
+        (gui-print-info-on-selected-file which)
+        (opt    (truep warning)
+                (<> av1 undef)
+                (<> av2 undef)
+                (or (and (< (av-video-frame-rate av1) 25.5) (> (av-video-frame-rate av2) 27.5))
+                    (and (< (av-video-frame-rate av2) 25.5) (> (av-video-frame-rate av1) 27.5)) )
+                (iup-text-append-and-go-end-color <_kv "text2"> (red) (+
+                        $"Warning: one of the two movies\nmay have undergone a frame rate change"
+                        nl nl ))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet open1-cb (self)
+        (open-low self 1) )
+
+(defnet open2-cb (self)
+        (open-low self 2) )
+
+(defnet open-low (self which)
+        (deflocal path)
+
+        (opt    (set path (iup-choose-file-open self (+ $"Select movie " which) (cfg-get "path") undef true))
+                (stringp path)
+                (cfg-set "path" path)
+                (alt    (open-common which path)
+                        (seq    (sound-iup-error60 self (+ path $": movie not supported"))
+                                (fail) ))
+                (opt (sqlite3-exec _db undef
+                        "INSERT INTO paths VALUES('"
+                        (sqlite3-escape-strings path) "','"
+                        (sqlite3-escape-strings (fullpath->name path)) "')" ))
+                (gui-report)
+                (gui-update-image)
+                (gui-update) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet open-path1-cb (self)
+        (open-path-low self 1) )
+
+(defnet open-path2-cb (self)
+        (open-path-low self 2) )
+
+(defnet open-path-low (self which)
+        (deflocal a i path)
+
+        (opt    (set a (cons (queue) (queue)))
+                (sqlite3-exec-data _db (netptr open-path-cback) a
+                        "SELECT path,name FROM paths ORDER BY path" )
+                (if (= (length (cdr a)) 0)
+                then    (iup-warning60 self $"There are no valid paths.")
+                        (fail) )
+                (set i (iup-choose-menu (cdr a)))
+                (integerp i)
+                (set path <(car a) i>)
+                (alt    (open-common which path)
+                        (seq    (sound-iup-error60 self (+ path $": movie not supported"))
+                                (fail) ))
+                (cfg-set "path" path)
+                (gui-report)
+                (gui-update-image)
+                (gui-update) ))
+
+(defnet open-path-cback (a path name)
+        (if (pathexists path)
+        then    (queue-put (car a) path)
+                (queue-put (cdr a) name) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

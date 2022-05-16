@@ -370,11 +370,8 @@
 (defnet match-create-frm (which av sift-scale sift-scale-pixels @frm)
         (deflocal w h k)
 
-        (set w (width av))
+        (set w (* (width av) (my-av-par which av)))
         (set h (height av))
-        (set k (av-my-aspect-ratio which av))
-        (if (> k 0)
-        then    (set w (* w k)) )
         (if sift-scale
         then    (set k (sqrt (/ (* w h) sift-scale-pixels)))
                 (set w (/ w k))
@@ -412,7 +409,7 @@
 (defnet match-receivenb (m)
         (deflocal msg)
 
-        (receivenb msg from (match-th-main m))
+        (truep <_abort 0>)
         (match-abort m) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

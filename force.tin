@@ -1,0 +1,341 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet force-cb (self)
+        (opt (force-low self)) )
+
+(defnet force-low (self)
+        (deflocal key k a map n1 n2 d1 d2 p q n i u ut)
+
+        (gui-not-locked)
+        (set key (key-map <_kv "av1">
+                          <_kv "av2">
+                          (fullpath->name <_kv "path1">)
+                          (fullpath->name <_kv "path2">) ))
+        (set k (cfg-get key))
+        (<> k undef)
+        (set a <k 2>)
+        (set map (map-create <k 0> <k 1>))
+        (set n1 (gui-spin-value 1))
+        (set n2 (gui-spin-value 2))
+        (for i in a do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (in n1 p .. (+ p n -1))
+                then    (set d1 (for-pos)) )
+                (if (in n2 q .. (+ q n -1))
+                then    (set d2 (for-pos)) )
+                (map-bind-low (car map) p q n)
+                (map-bind-low (cdr map) q p n) )
+        (if (and (integerp d1) (= d1 d2))
+        then    (set p <a d1 0>)
+                (set q <a d1 1>)
+                (if (= (- n1 p) (- n2 q))
+                then    (iup-confirm60 self (sprint n1 $" is already linked to " n2 "." nl
+                                                    $"Do you want to remove the link?" ))
+                        (array-remove a d1)
+                        (force-low-update key k)
+                        (fail) ))
+        (if (integerp d1)
+        then    (set p <a d1 0>)
+                (set q <a d1 1>)
+                (iup-confirm60 self (sprint n1 " (" $"movie" " 1)" $" is currently linked to " (+ q (- n1 p)) " (" $"movie" " 2)." nl
+                                            $"Do you want to remove the link?" ))
+                (array-remove a d1)
+                (force-low-update key k)
+                (fail) )
+        (if (integerp d2)
+        then    (set p <a d2 0>)
+                (set q <a d2 1>)
+                (iup-confirm60 self (sprint n2 " (" $"movie" " 2)" $" is currently linked to " (+ p (- n2 q)) " (" $"movie" " 1)." nl
+                                            $"Do you want to remove the link?" ))
+                (array-remove a d2)
+                (force-low-update key k)
+                (fail) )
+        ; n1 e n2 sono entrambi liberi
+        (set p false)
+        (for i in (map-undef-low-low (car map) (cdr map) true) do
+                (set p (in n1 <i 0> .. <i 1>))
+                until p )
+        (truep p) ; non può mai fallire perché n1 è libero
+        (if (in n2 <i 2> .. <i 3>)
+        then    (iup-confirm60 self (sprint n1 $" will be linked to " n2 ". " $"Are you sure?"))
+                (array-append a (list n1 n2 1))
+
+                ; qui si controlla se la creazione del link ha lasciato due
+                ; zone di pari ampiezza (sia prima che dopo il link creato)
+                ; e, in caso positivo, si chiede conferma all'utente se desidera
+                ; collegare tutto l'intervallo...
+
+                (map-bind-low (car map) n1 n2 1)
+                (map-bind-low (cdr map) n2 n1 1)
+                (set u (map-undef-low (car map) (cdr map)))
+                (set ut (queue-get u))
+                (for i in (car map) do
+                        (if (= <i 2> undef)
+                        then    (if (and (= <i 0> <ut 0>) (= <i 1> <ut 1>))
+                                then    (opt    (or (= (+ <i 1> 1) n1) (= <i 0> (+ n1 1)))
+                                                (set n (- <i 1> <i 0> -1))
+                                                (= n (- <ut 3> <ut 2> -1))
+                                                (iup-confirm60 self (+ $"Do you want to link these segments" " {" n "}?" nl
+                                                                       "["  (int->str <i 0> 6 '0') "-" (int->str <i 1> 6 '0') "] <-> ["
+                                                                       (int->str <ut 2> 6 '0') "-" (int->str <ut 3> 6 '0') "]" ))
+                                                (array-append a (list <i 0> <ut 2> n)) )
+                                        (set ut (queue-get u)) )))
+
+                (force-low-update key k)
+                (fail) )
+        (set p false)
+        (for u in (map-undef-low-low (cdr map) (car map) true) do
+                (set p (in n2 <u 0> .. <u 1>))
+                until p )
+        (truep p) ; non può mai fallire perché n2 è libero
+        (set p <u 0>)
+        (set q (if (> n2 <i 3>) (+ <i 3> 1) <i 2>))
+        (set n (- <u 1> <u 0> -1))
+        (iup-confirm60 self (+ $"Do you want to move [" p "-" <u 1> $"] (movie 2) to " q "?"))
+        (if (> q p)
+        then    (dec q n) )
+        (sqlite3-begin _db)
+        (alt    (iup-progress
+                    (thread-create (netptr force-low-move-th) (thread-self) p q n)
+                    self "Moving..." true false false false true )
+                (seq    (sqlite3-rollback _db)
+                        (sound-iup-error60 self "Error.")
+                        (fail) ))
+        (sqlite3-end _db)
+        (gui-spin-set-value 2 (+ q (- n2 p)))
+        (gui-report-low false)
+        (gui-print-selected-cb self)
+        (gui-move-text1-on-current-value 1)
+        (gui-update) )
+
+(defnet force-low-update (key k)
+        (cfg-set key k)
+        (gui-report-low false)
+        (gui-move-text1-on-current-value 1)
+        (gui-update) )
+
+(defnet force-low-move-th (th src dst n)
+        (alt    (seq    (force-low-move-low src dst n)
+                        (send "q" to th) )
+                (send "a" to th) ))
+
+(defnet force-low-move-low (src dst n)
+        (deflocal av1 av2 name1 name2 pix1 pix2)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set name1 (fullpath->name <_kv "path1">))
+        (set name2 (fullpath->name <_kv "path2">))
+        (set pix1 (pix-create (width av2) (height av2)))
+        (pixp pix1)
+        (set pix2 (pix-create (width av2) (height av2)))
+        (if (not (pixp pix2))
+        then    (close pix1)
+                (fail) )
+        (alt    (force-low-move-low-low src dst n av1 av2 name1 name2 pix1 pix2)
+                (seq    (close pix1 pix2)
+                        (fail) ))
+        (close pix1 pix2) )
+
+(defnet force-low-move-low-low (src dst n av1 av2 name1 name2 pix1 pix2)
+        (deflocal key k id p a b c i j l)
+
+        (set key (key-map av1 av2 name1 name2))
+        (set k (cfg-get key))
+        (set id (perm-identity <k 1>))
+        (set p (perm-move id dst src n))
+        (set a <k 2>)
+        (for i in 0 .. (- (length a) 1) do
+                (set <a i> (list <a i 0> <p <a i 1>> <a i 2>)) )
+        (cfg-set key k)
+
+        (set key (key-sck av1 av2 name1 name2))
+        (set k (cfg-get key))
+        (set a (assoc))
+        (for i in (car k) do
+                (set <a (+ (sub 0 6 (car i)) (int->str <p (str->num (sub 6 6 (car i)))> 6 '0'))> (cdr i)) )
+        (set k (cons a (cdr k)))
+        (cfg-set key k)
+
+        (set key (key-prm av1 av2 name1 name2))
+        (set k (cfg-get key))
+        (if (= k undef)
+        then    (set k (cons (array 0) <(cfg-get (key-scd av2 name2)) 4>)) )
+        (set a (car k))
+        (set b (cdr k))
+        (array-append a (list src dst n))
+        (set c (array (length b)))
+        (set p (perm-inverse p))
+        (set l 0)
+        (for i in 0 .. (- (length c) 1) do
+                (set j <p i>)
+                (if (= j undef)
+                then    (set j i) )
+                (if (and (<> j l) (> l 0))
+                then    (av-read-frame av2 pix1 (perm-convert (- l 1)))
+                        (av-read-frame av2 pix2 (perm-convert j))
+                        (set <c i> (pix-scd-histogram pix1 pix2))
+                else    (set <c i> <b j>) )
+                (set l (+ j 1)) )
+        (cfg-set key (cons a c))
+
+        (set p id)
+        (for i in a do
+                (set p (perm-move p <i 0> <i 1> <i 2>)) )
+
+        (set <_kv "prm"> p) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet force-undo-last-movement-cb (self)
+        (opt (force-undo-last-movement-low self)) )
+
+(defnet force-undo-last-movement-low (self)
+        (deflocal av1 av2 name1 name2 key-prm k-prm key-map k-map a src dst n l i j)
+
+        (gui-not-locked)
+        (<> <_kv "prm"> undef)
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set name1 (fullpath->name <_kv "path1">))
+        (set name2 (fullpath->name <_kv "path2">))
+        (set key-prm (key-prm av1 av2 name1 name2))
+        (set k-prm (cfg-get key-prm))
+        (<> k-prm undef)
+        (set a (car k-prm))
+        (> (length a) 0)
+        (set n <a -1>)
+        (set src <n 0>)
+        (set dst <n 1>)
+        (set n <n 2>)
+        (set key-map (key-map av1 av2 name1 name2))
+        (set k-map (cfg-get key-map))
+        (set l nil)
+        (if (<> k-map undef)
+        then    (set j (+ dst n -1))
+                (for i in <k-map 2> do
+                        (if (and (>= (+ <i 1> <i 2> -1) dst) (<= <i 1> j))
+                        then    (list-push l (for-pos)) )))
+        (iup-confirm60 self (+ $"The last movement will be undone." nl
+                               (if (<> l nil) (+ $"Warning" ": " (length l) $" link(s) will also be deleted." nl) "")
+                               $"Are you sure?" ))
+        (sqlite3-begin _db)
+        (alt    (iup-progress
+                    (thread-create (netptr force-undo-last-movement-th) (thread-self) dst src n key-prm key-map k-map l)
+                    self "Coming back..." true false false false true )
+                (seq    (sqlite3-rollback _db)
+                        (sound-iup-error60 self "Error.")
+                        (fail) ))
+        (sqlite3-end _db)
+        (gui-spin-set-value 2 <(perm-move (perm-identity <k-map 1>) src dst n) (gui-spin-value 2)>)
+        (gui-report-low false)
+        (gui-print-selected-cb self)
+        (gui-move-text1-on-current-value 1)
+        (gui-update) )
+
+(defnet force-undo-last-movement-th (th src dst n key-prm key-map k-map l)
+        (alt    (seq    (force-undo-last-movement-th-low src dst n key-prm key-map k-map l)
+                        (send "q" to th) )
+                (send "a" to th) ))
+
+(defnet force-undo-last-movement-th-low (src dst n key-prm key-map k-map l)
+        (deflocal k-prm a i)
+
+        (if (<> l nil)
+        then    (for i in l do
+                        (array-remove <k-map 2> i) )
+                (cfg-set key-map k-map) )
+        (force-low-move-low src dst n)
+        (set k-prm (cfg-get key-prm))
+        (set a (car k-prm))
+        (array-remove a (- (length a) 1))
+        (array-remove a (- (length a) 1))
+        (if (= (length a) 0)
+        then    ;(set i <_kv "prm">)
+                ;(set j (perm-max i))
+                ;(print "test identity (" j "): " (= i (perm-identity j)) nl)
+                ;(set i (cdr (cfg-get key-prm)))
+                ;(set j <(cfg-get (key-scd av2 name2)) 4>)
+                ;(print "test scd: " (= i j) nl)
+                (cfg-clr key-prm)
+                (assoc-clr _kv "prm")
+        else    (cfg-set key-prm k-prm) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet force-final-closure-cb (self)
+        (opt (force-final-closure-low self)) )
+
+(defnet force-final-closure-low (self)
+        (deflocal key k a map p q n cf i)
+
+        (gui-not-locked)
+        (set key (key-map <_kv "av1">
+                          <_kv "av2">
+                          (fullpath->name <_kv "path1">)
+                          (fullpath->name <_kv "path2">) ))
+        (set k (cfg-get key))
+        (<> k undef)
+        (set a <k 2>)
+        (set map (map-create <k 0> <k 1>))
+        (for i in a do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (map-bind-low (car map) p q n)
+                (map-bind-low (cdr map) q p n) )
+        (set cf (queue))
+        (set n 0)
+        (for i in (map-undef-low (car map) (cdr map)) do
+                (set p (- <i 1> <i 0> -1))
+                (if (= p (- <i 3> <i 2> -1))
+                then    (queue-put cf i)
+                        (inc n p) ))
+        (if (= (length cf) 0)
+        then    (iup-info60 self $"There are no segments to close.")
+                (fail) )
+        (iup-confirm60 self (+ $"Segments to close: " (length cf) " (" n " frames)." nl $"Are you sure?"))
+        (for i in cf do
+                (array-append a (list <i 0> <i 2> (- <i 1> <i 0> -1))) )
+        (force-low-update key k) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

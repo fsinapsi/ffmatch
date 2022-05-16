@@ -9,7 +9,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet audio-cb (self)
+        (opt (audio-low self)) )
+
+(defnet audio-low (self)
         (deflocal audio-info q vbox dlg)
+
+        (truep (cfg-exists (key-map <_kv "av1">
+                                    <_kv "av2">
+                                    (fullpath->name <_kv "path1">)
+                                    (fullpath->name <_kv "path2">) )))
 
         (set audio-info (assoc))
         (set <_kv "audio-info"> audio-info)
@@ -32,7 +40,7 @@
         (iup-set-dlg-parent self dlg)
         (iup-set-str-attribute dlg "TITLE" $"Audio tracks")
         (iup-set-bool dlg "DIALOGFRAME" true)
-        (iup-set-attribute-handle dlg "DEFAULTESC" <audio-info "btn-ok">)
+        (iup-set-callback dlg "K_ANY" (netptr audio-kb-cb))
 
         (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
 
@@ -122,6 +130,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defnet audio-kb-cb (dlg c)
+        (case c of
+                (cmacro K_ESC)          (iup-exit-loop)
+                (cmacro K_F1)           (audio-open1-cb dlg)
+                (cmacro K_F2)           (audio-open2-cb dlg)
+                default                 (fail) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun audio-setup-open-delay (which) 0)
 
 (defun audio-setup-open-delay- (which) net audio-setup-open-delay)
@@ -173,12 +198,12 @@
         (set audio-info <_kv "audio-info">)
 
         (set th (thread-create (netptr audio-open-th) (thread-self) f which audio-info))
-        (progress self "Parsing audio..." false false false false th)
+        (iup-progress th self "Parsing audio..." false true false true false)
         (receive duration from th)
         (thread-join th)
         (close f)
         (if (= duration undef)
-        then    (iup-error60 self (+ path ": " $"unrecognized audio format"))
+        then    (sound-iup-error60 self (+ path ": " $"unrecognized audio format"))
                 (fail) )
         (iup-set-str-attribute <audio-info (+ "label" which)> "TITLE" <duration 1>)
         (if (<> <duration 2> undef)
@@ -191,19 +216,20 @@
                 then    (iup-set-str-attribute <audio-info "combo1"> "VALUE" (approx3 i)) ))
         (set <audio-info (+ "duration" which)> duration)
         (set <audio-info (+ "path" which)> path)
-        (iup-set-active <audio-info (+ "sb-delay" which)> (= <audio-info (+ "codec" which)> "WAV"))
+        (iup-set-active <audio-info (+ "sb-delay" which)> (in <audio-info (+ "codec" which)> [ "WAV" "SOX" ]))
         (iup-set-active <audio-info "btn-save"> (stringp <audio-info (+ "path" (- 3 which))>)) )
 
 (defnet audio-open-th (th f which audio-info)
         (deflocal duration)
 
-        (alt    (audio-open-wav th f which audio-info duration)
+        (alt    (audio-open-wav f which audio-info duration)
+                (audio-open-sox f which audio-info duration)
                 (audio-open-compressed th f which audio-info duration)
                 (success) )
         (send "q" to th)
         (send duration to th) )
 
-(defnet audio-open-wav (th f which audio-info @duration)
+(defnet audio-open-wav (f which audio-info @duration)
         (deflocal ch freq smplsize bps offset smpl)
 
         (fsetpos 0 f)
@@ -237,24 +263,63 @@
         (set <audio-info (+ "smpl" which)> smpl)
         (set <audio-info (+ "ts" which)> offset) )
 
-(defnet audio-open-compressed (th f which audio-info @duration)
-        (deflocal aud a n i)
+(defnet audio-open-sox (f which audio-info @duration)
+        (deflocal ch freq smplsize bps offset smpl comment-size)
 
+        (fsetpos 0 f)
+        (= (freadstr f 4) ".SoX")
+        (set offset (freaduint-le f 32))
+        (skip (freaduint-le f 64))
+        (set freq (floor (freadfloat-le f 64)))
+        (set ch (freaduint-le f 32))
+        (set comment-size (freaduint-le f 32))
+        (<= comment-size (- 0xFFFFFFFF (+ 4 8 8 4 4) 4))
+        (> freq 0)
+        (< freq (maxint))
+        (> ch 0)
+        (< ch (maxint))
+        (set smplsize (* 4 ch))
+        (set bps 32)
+        (inc offset 4)
+        (set smpl (div (- (length f) offset) smplsize))
+        (> smpl 0)
+        (set @duration (/ smpl freq))
+        (set @duration (list @duration
+                             (+ "SoX " ch "ch " freq "Hz " bps "bps " (date-s2hhmmss @duration))
+                             undef ))
+        (set <audio-info (+ "codec" which)> "SOX")
+        (set <audio-info (+ "mode" which)> ch)
+        (set <audio-info (+ "frequency" which)> freq)
+        (set <audio-info (+ "smplsize" which)> smplsize)
+        (set <audio-info (+ "bps" which)> bps)
+        (set <audio-info (+ "smpl" which)> smpl)
+        (set <audio-info (+ "ts" which)> offset) )
+
+(defnet audio-open-compressed (th f which audio-info @duration)
+        (deflocal dlg aud a n i)
+
+        (send "dlg" to th)
+        (receive dlg from th)
         (fsetpos 0 f)
         (set aud (aud-create f))
         (set n 0)
         (set i (* (length f) 2))
-        (opt*   (aud-parse-step aud)
+        (opt*   (not (iup-progress-aborted dlg))
+                (aud-parse-step aud)
                 (inc n)
                 (if (= (% n 4000) 1)
                 then    (sendbuf 100 (/ (fpos f) i) to th) ))
         (close aud)
+        (not (iup-progress-aborted dlg))
         (fsetpos 0 f)
         (set aud (aud-create f))
         (set a (array (+ n 1) 2))
         (set <a 0 0> 0)
         (set <a 0 1> 0)
         (for i in 1 .. n do
+                (if (iup-progress-aborted dlg)
+                then    (close aud)
+                        (fail) )
                 (aud-parse-step aud)
                 (set <a i 0> (aud-duration aud))
                 (set <a i 1> (- (fpos f) (aud-buf-act aud)))
@@ -328,15 +393,16 @@
 
         (set g (fcreate path))
         (if (= g undef)
-        then    (iup-error60 dlg (+ $"Creation of file `" path $"' failed."))
+        then    (sound-iup-error60 dlg (+ $"Creation of file `" path $"' failed."))
                 (fail) )
 
         (alt    (audio-save-as-ok-low audio-info dlg fps which g)
                 (seq    (close g)
                         (remove path)
+                        (sound-iup-error60 dlg $"I/O error.")
                         (fail) ))
         (close g)
-        (iup-info60 dlg (+ $"Audio track successfully saved as `" path "'.")) )
+        (sound-iup-info60 dlg (+ $"Audio track successfully saved as `" path "'.")) )
 
 (defnet audio-save-as-check-duration (audio-info dlg fps)
         (deflocal v1 v2 a1 a2 in1 in2)
@@ -356,40 +422,42 @@
                                       $"Do you want to continue?" ))))
 
 (defnet audio-save-as-ok-low (audio-info dlg fps which g)
-        (deflocal f1 f2 buf)
+        (deflocal path f1 f2)
 
-        (set buf <audio-info "path1">)
-        (set f1 (fopenro buf))
+        (set path <audio-info "path1">)
+        (set f1 (fopenro path))
         (if (= f1 undef)
-        then    (iup-error60 dlg (+ "Cannot open `" buf "'."))
+        then    (sound-iup-error60 dlg (+ "Cannot open `" path "'."))
                 (fail) )
-        (set buf <audio-info "path2">)
-        (set f2 (fopenro buf))
+        (set path <audio-info "path2">)
+        (set f2 (fopenro path))
         (if (= f2 undef)
         then    (close f1)
-                (iup-error60 dlg (+ "Cannot open `" buf "'."))
+                (sound-iup-error60 dlg (+ "Cannot open `" path "'."))
                 (fail) )
-        (set buf (raw 65536))
-        (alt    (progress dlg "Saving audio track..." false false false true
-                    (thread-create (netptr audio-save-as-ok-th) (thread-self) audio-info fps which g f1 f2 buf
+        (alt    (iup-progress
+                    (thread-create (netptr audio-save-as-ok-th) (thread-self) audio-info fps which g f1 f2
                         (iup-get-int <audio-info "sb-delay1"> "VALUE")
-                        (iup-get-int <audio-info "sb-delay2"> "VALUE") ))
-                (seq    (close buf f1 f2)
-                        (iup-error60 dlg $"I/O error.")
+                        (iup-get-int <audio-info "sb-delay2"> "VALUE") )
+                    dlg "Saving audio track..." false true false true true )
+                (seq    (close f1 f2)
                         (fail) ))
-        (close buf f1 f2) )
+        (close f1 f2) )
 
-(defnet audio-save-as-ok-th (th audio-info fps which g f1 f2 buf delay1 delay2)
-        (deflocal res)
+(defnet audio-save-as-ok-th (th audio-info fps which g f1 f2 delay1 delay2)
+        (deflocal buf)
 
+        (set buf (raw 65536))
         (alt    (seq    (audio-save-as-ok-th-low th audio-info fps which g f1 f2 buf delay1 delay2)
-                        (set res "q") )
-                (set res "a") )
-        (send res to th) )
+                        (send "q" to th) )
+                (send "a" to th) )
+        (close buf) )
 
 (defnet audio-save-as-ok-th-low (th audio-info fps which g f1 f2 buf delay1 delay2)
-        (deflocal f a1 a2 a smpl1 smpl2 smpl delay map p q n ts last-ts err pf freq smplsize i j)
+        (deflocal dlg f a1 a2 a smpl1 smpl2 smpl delay map p q n ts last-ts err pf freq smplsize i j)
 
+        (send "dlg" to th)
+        (receive dlg from th)
         (set i (cfg-get (key-map <_kv "av1">
                                  <_kv "av2">
                                  (fullpath->name <_kv "path1">)
@@ -427,9 +495,10 @@
         (set last-ts (/ (+ <map -1 1> 1) fps))
         (set ts 0)
         (set err 0)
-        (if (= <audio-info "codec1"> "WAV")
+        (if (in <audio-info "codec1"> [ "WAV" "SOX"])
         then    (filecopy-basic f1 g a1 buf)
-                (for i in (audio-segment map) do
+                (for i in (audio-segment map which) do
+                        (not (iup-progress-aborted dlg))
                         (set p (/ (+ <i 1> 1) fps))
                         (set n (- p ts))
                         (if (> n 0)
@@ -471,7 +540,8 @@
                 (if (< p smpl1)
                 then    (fsetpos (+ a1 (* p smplsize)) f1)
                         (filecopy-basic f1 g (* (- smpl1 p) smplsize) buf) )
-        else    (for i in (audio-segment map) do
+        else    (for i in (audio-segment map which) do
+                        (not (iup-progress-aborted dlg))
                         (set p (/ (+ <i 1> 1) fps))
                         (set n (- p ts))
                         (if (> n 0)
@@ -522,23 +592,44 @@
 
 (defun audio-segment-max () 2000)
 
-(defun audio-segment (map) net audio-segment)
-(defnet audio-segment (map @q)
-        (deflocal i p q n d pp)
+(defun audio-segment (map which) net audio-segment)
+(defnet audio-segment (map which @a)
+        (deflocal prm i p q n real-p real-n a)
 
-        (set @q (queue))
+        (set prm <_kv "prm">)
+        (set @a (array 0))
         (for i in map do
                 (set p <i 0>)
                 (set q <i 1>)
                 (set n <i 2>)
-                (repeat (set d (- q p -1))
-                        until (<= d (audio-segment-max))
-                        (set pp (+ p (audio-segment-max)))
-                        (queue-put @q (list p (- pp 1) n))
-                        (set p pp)
+                (repeat (if (= which 1)
+                        then    (set real-p p)
+                                (if (integerp n)
+                                then    (if (= prm undef)
+                                        then    (set real-n n)
+                                        else    (set real-n <prm n>) )
+                                else    (set real-n n) )
+                        else    (if (= prm undef)
+                                then    (set real-p p)
+                                else    (set real-p <prm p>) )
+                                (set real-n n) )
+                        (alt    (seq    (= <@a -1 1> (- real-p 1))
+                                        (if (integerp real-n)
+                                        then    (integerp <@a -1 2>)
+                                                (= (- real-n <@a -1 2>) (- real-p <@a -1 0>))
+                                        else    (not (integerp <@a -1 2>)) )
+                                        (< (- <@a -1 1> <@a -1 0> -1) (audio-segment-max))
+                                        (inc <@a (- (length @a) 1) 1>) )
+                                (seq    (set a (array 3))
+                                        (set <a 0> real-p)
+                                        (set <a 1> real-p)
+                                        (set <a 2> real-n)
+                                        (array-append @a a) ))
+                        until (= p q)
+                        (inc p)
                         (if (integerp n)
-                        then    (inc n (audio-segment-max)) ))
-                (queue-put @q (list p q n)) ))
+                        then    (inc n) )))
+        (sort @a (funptr less0)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

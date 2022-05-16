@@ -8,51 +8,43 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use lept)
+(defnet move-spin1-cb (self v)
+        (move-spin-low 1 self v) )
 
-(include "common.tin")
-(include "lang.tin")
-(include "init.tin")
-(include "gui.tin")
-(include "move-sync.tin")
-(include "move-scd.tin")
-(include "move-spin.tin")
-(include "move-slide.tin")
-(include "force.tin")
-(include "cfg.tin")
-(include "utils.tin")
-(include "constants.tin")
-(include "scdscan.tin")
-(include "match.tin")
-(include "map.tin")
-(include "sift.tin")
-(include "audio.tin")
-(include "permute.tin")
-(include "threads.tin")
-(include "sound.tin")
-(include "clear.tin")
-(include "open.tin")
-(include "project.tin")
-(include "info.tin")
+(defnet move-spin2-cb (self v)
+        (move-spin-low 2 self v) )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defnet move-spin-low (which self v)
+        (deflocal vv)
 
-(defstart ffmatch)
+        (set vv (gui-spin-value which))
+        (if (<> v vv)
+        then    (if (gui-locked)
+                then    (iup-set-int self "SPINVALUE" vv)
+                else    (iup-set-str-attribute self "VALUE" v)
+                        (gui-update-image) )))
 
-(defnet ffmatch ()
-        (set-icon "emblem-videos.ico")
-        (iup-set-lang)
-        (init)
-        (gui)
-        (quit) )
+(defnet move-spin-kb1-cb (self c)
+        (move-spin-kb-low 1 self c) )
+
+(defnet move-spin-kb2-cb (self c)
+        (move-spin-kb-low 2 self c) )
+
+(defnet move-spin-kb-low (which self c)
+        (alt    (gui-locked)
+                (or (= <_kv "av1"> undef) (= <_kv "av2"> undef))
+                (seq    (= c (cmacro K_CR))
+                        (move-spin-shortcut-low which self 0) )
+                (seq    (= c (cmacro K_sUP))
+                        (move-spin-shortcut-low which self 10) )
+                (seq    (= c (cmacro K_sDOWN))
+                        (move-spin-shortcut-low which self -10) )
+                (seq    (= c (cmacro K_TAB))
+                        (opt (gui-sync-low which false)) )))
+
+(defnet move-spin-shortcut-low (which spin incr)
+        (opt    (gui-spin-set-value which (+ (gui-spin-value which) incr))
+                (gui-update-image) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
