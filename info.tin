@@ -24,7 +24,6 @@
         (set dlg (iup-dialog i))
         (iup-set-dlg-parent self dlg)
         (iup-set-str-attribute dlg "TITLE" $"About FFmatch")
-        (iup-set-str-attribute dlg "RASTERSIZE" "660x400")
         (iup-set-bool dlg "DIALOGFRAME" true)
         (iup-set-attribute-handle dlg "DEFAULTENTER" (iup-box-ok-btn butbox))
         (iup-set-attribute-handle dlg "DEFAULTESC" (iup-box-ok-btn butbox))
@@ -41,6 +40,8 @@
         (iup-set-str-attribute @wid "TABTITLE1" $"Authors")
         (iup-set-str-attribute @wid "TABTITLE2" "Lavc")
         (iup-set-str-attribute @wid "TABTITLE3" $"License")
+        (if (clinux)
+        then    (iup-set-bgcolor @wid (white)) )
         (iup-set-bool @wid "EXPAND" true) )
 
 (defun info-setup-page1 (q) net info-setup-page1)
@@ -49,7 +50,6 @@
 
         (set i (iup-label))
         (iup-set-str-attribute i "EXPAND" "VERTICAL")
-        ;(set img (iup-image-rgba (pix-load-static "128x128/emblem-videos.png")))
         (set img (iup-image-rgba (pix-load-static "logo.png")))
         (iup-set-attribute-handle i "IMAGE" img)
         (queue-put q img)
@@ -64,10 +64,10 @@
                         (iup-link (+ (url-home-page) "/code/ffmatch/index.html") $"There is an update" ": " (date->version remote-version))
                         (iup-label $"There are no updates") )
                 (iup-label
+                        "CPUs: " (openjp2-get-num-cpus) nl
                         $"Current number of threads" ": " (thread-cur) nl
                         $"Max number of threads" ": " (thread-max) nl
                         $"Selected language" ": " <(languages) (lang)> nl
-                        $"Selected SIFT impl." ": " <(sift-impl) (cfg-get-or-default-num "sift-impl" <_kv "default">)> nl
                         ;$"Sound" ": " (if <_kv "enabled-sound"> $"enabled" $"disabled") nl
                         "CC version (rts): " (cc-version) nl
                         "GC version: " (gc-version) nl
@@ -76,11 +76,9 @@
                         "IUP system: " (iup-get-global "SYSTEM") nl
                         (if (clinux) (+ "GTK version: " (iup-get-global "GTKVERSION") nl) "")
                         "IUP DEFAULTFONT: " (iup-get-global "DEFAULTFONT") nl
-                        "libavcodec version: " (av-codec-version) "/" (av-avcodec-version) nl
-                        "VLFeat version: " (vl-version) nl )
+                        "libavcodec version: " (av-codec-version) "/" (av-avcodec-version) nl )
                 (iup-fill) ))
         (iup-set-int vbox "GAP" 0)
-
         (set @wid (iup-hbox (iup-fill) i vbox (iup-fill)))
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
         (iup-set-int @wid "GAP" 40) )
@@ -97,7 +95,7 @@
                 (iup-label "\n" $"Source code of" " " "FFmatch")
                 (iup-link "https://github.com/fsinapsi/ffmatch")
                 (iup-label "\n" $"Thanks to:"
-                           "\n" "HoHoHo, Devilman1, ErTenebra, Donnje" )))
+                           "\n" "HoHoHo, Devilman1, ErTenebra" )))
         (iup-set-str-attribute @wid "MARGIN" "20x20") )
 
 (defun info-setup-page3 () net info-setup-page3)

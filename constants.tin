@@ -14,11 +14,6 @@
 (defun space () 10)
 (defun framerates () [ 25 (/ 24000 1001) 24 ])
 
-(defun sift-impl ()
-        [ "OpenCV"
-          "VLFeat"
-          ])
-
 (defun deint-filters ()
         [ "none"
           "kerndeint"
@@ -48,7 +43,7 @@
           [ "min-keypoints" . 60 ]
           [ "min-keypoints-min-ratio" . 0.05 ]
           [ "min-keypoints-min-ratio-lum" . 0.2 ]
-          [ "sift-match-threshold" . 0.3 ]
+          [ "sift-match-threshold-val" . 0.68 ]
           [ "sift-match-threshold-min-ratio" . 0.02 ]
           [ "sift-agreements-min" . 12000 ]
           [ "sift-proportionality-threshold" . 0.9 ]
@@ -77,11 +72,6 @@
           [ "sound-enabled" . true ]
           [ "cuvid-enabled" . false ]
           [ "frame-buf-size" . 20 ]
-          [ "sift-impl" . 0 ]
-          [ "vlfeat-first-octave-idx" . 0 ]
-          [ "vlfeat-nlevels-per-octave" . 3 ]
-          [ "vlfeat-peak-threshold" . 0 ]
-          [ "vlfeat-edge-threshold" . 10 ]
           [ "scaling-mode" . 0 ]
           ])
 

@@ -34,8 +34,6 @@
 
         (iup-set-active <cfg-info "sb-sift-scale-pixels"> (cfg-get-or-default "sift-scale" default-info))
         (iup-set-callback <cfg-info "tb-sift-scale"> "ACTION" (netptr cfg-toggled-sift-scale))
-        (cfg-combo-sift-impl-cb <cfg-info "cb-sift-impl">)
-        (iup-set-callback <cfg-info "cb-sift-impl"> "ACTION" (netptr cfg-combo-sift-impl-cb))
         (iup-set-active <cfg-info "sb-filter-ar1"> (not (cfg-get-or-default "filter-ar1-auto" default-info)))
         (iup-set-active <cfg-info "sb-filter-ar2"> (not (cfg-get-or-default "filter-ar2-auto" default-info)))
         (iup-set-callback <cfg-info "tb-filter-ar1-auto"> "ACTION" (netptr cfg-toggled-fileter-ar1))
@@ -87,8 +85,6 @@
                     "sift-agreements-min"
                     "sift-scale-pixels"
                     "min-keypoints"
-                    "vlfeat-first-octave-idx"
-                    "vlfeat-nlevels-per-octave"
                     ] do
                 (cfg-set c (iup-get-int <cfg-info (+ "sb-" c)> "SPINVALUE")) )
 
@@ -97,7 +93,7 @@
                     "scd-threshold-ratio"
                     "min-keypoints-min-ratio"
                     "min-keypoints-min-ratio-lum"
-                    "sift-match-threshold"
+                    "sift-match-threshold-val"
                     "sift-match-threshold-min-ratio"
                     "sift-proportionality-threshold"
                     "filter-gamma1"
@@ -106,13 +102,10 @@
                     "filter-rotate2"
                     "filter-ar1"
                     "filter-ar2"
-                    "vlfeat-peak-threshold"
-                    "vlfeat-edge-threshold"
                     ] do
                 (cfg-set c (iup-text-spin-ratio-val <cfg-info (+ "sb-" c)>)) )
 
-        (for c in [ "sift-impl"
-                    "filter-rows1"
+        (for c in [ "filter-rows1"
                     "filter-rows2"
                     "filter-deint1"
                     "filter-deint2"
@@ -240,47 +233,21 @@
 
 (defun cfg-setup-tabs-page3 (q) net cfg-setup-tabs-page3)
 (defnet cfg-setup-tabs-page3 (q @wid)
-        (deflocal cfg-info default-info list hbox1 hbox2 hbox3 i)
+        (deflocal cfg-info default-info hbox1 i)
 
         (set cfg-info <_kv "cfg-info">)
         (set default-info <_kv "default">)
 
-        (set list (iup-list))
-        (set <cfg-info "cb-sift-impl"> list)
-        (iup-set-bool list "DROPDOWN" true)
-        (for i in (sift-impl) do
-                (iup-set-str-attribute list (+ (for-pos) 1) i) )
-        (iup-set-int list "VALUE" (+ (cfg-get-or-default-num "sift-impl" default-info) 1))
-
         (set hbox1 (iup-hbox
-                (iup-frame-with-margin "SIFT impl." list)
                 (iup-frame-with-margin "Match thres.+min ratio" (iup-hbox
-                        (cfg-setup-spin-ratio 0.05 0.95 (cfg-get-or-default-num "sift-match-threshold" default-info) 0.01
-                            cfg-info "sb-sift-match-threshold" )
+                        (cfg-setup-spin-ratio 0.09 1.95 (cfg-get-or-default-num "sift-match-threshold-val" default-info) 0.01
+                            cfg-info "sb-sift-match-threshold-val" )
                         (cfg-setup-spin-ratio 0.01 0.99 (cfg-get-or-default-num "sift-match-threshold-min-ratio" default-info) 0.01
                             cfg-info "sb-sift-match-threshold-min-ratio" )))))
 
-        (set hbox2 (iup-hbox
-                (cfg-setup-framed-spin "First octave idx" -1 5
-                        (cfg-get-or-default-num "vlfeat-first-octave-idx" default-info)
-                        cfg-info "sb-vlfeat-first-octave-idx" )
-                (cfg-setup-framed-spin "NLevels per octave" 1 6
-                        (cfg-get-or-default-num "vlfeat-nlevels-per-octave" default-info)
-                        cfg-info "sb-vlfeat-nlevels-per-octave" )))
-
-        (set hbox3 (iup-hbox
-                (cfg-setup-framed-spin-ratio "Peak threshold" 0 5
-                        (cfg-get-or-default-num "vlfeat-peak-threshold" default-info) 0.05
-                        cfg-info "sb-vlfeat-peak-threshold" )
-                (cfg-setup-framed-spin-ratio "Edge threshold" 1 10
-                        (cfg-get-or-default-num "vlfeat-edge-threshold" default-info) 0.05
-                        cfg-info "sb-vlfeat-edge-threshold" )))
-
         (iup-set-int hbox1 "GAP" 5)
-        (iup-set-int hbox2 "GAP" 5)
-        (iup-set-int hbox3 "GAP" 5)
 
-        (set @wid (iup-vbox hbox1 hbox2 hbox3))
+        (set @wid (iup-vbox hbox1))
         (iup-set-int @wid "GAP" 2) )
 
 (defun cfg-setup-tabs-page4 (q) net cfg-setup-tabs-page4)
@@ -449,27 +416,6 @@
 
 (defnet cfg-toggled-fileter-ar2 (self)
         (iup-set-active <_kv "cfg-info" "sb-filter-ar2"> (not (iup-get-bool self "VALUE"))) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet cfg-combo-sift-impl-cb (self)
-        (deflocal cfg-info vlfeat i)
-
-        (set cfg-info <_kv "cfg-info">)
-        (set vlfeat (= <(sift-impl) (- (iup-get-int self "VALUE") 1)> "VLFeat"))
-        (for i in [ "sb-vlfeat-first-octave-idx"
-                    "sb-vlfeat-nlevels-per-octave"
-                    "sb-vlfeat-peak-threshold"
-                    "sb-vlfeat-edge-threshold" ] do
-                (iup-set-active <cfg-info i> vlfeat) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -62,27 +62,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet th-sift-features (sift-impl th frm vlfeat-first-octave-idx nlevels-per-octave peak-thresh edge-thresh)
-        (case sift-impl of
-                0   (th-sift-features-opencv th frm)
-                1   (th-sift-features-vlfeat th frm vlfeat-first-octave-idx nlevels-per-octave peak-thresh edge-thresh) ))
-
-(defnet th-sift-features-opencv (th frm)
+(defnet th-sift-features (th frm)
         (repeat (receive frm from th)
                 until (not (pixp frm))
-                (send (cv-sift-features frm) to th) ))
-
-(defnet th-sift-features-vlfeat (th frm vlfeat-first-octave-idx nlevels-per-octave peak-thresh edge-thresh)
-        (deflocal filt)
-
-        (set filt (vl-sift-new (width frm) (height frm) -1 nlevels-per-octave vlfeat-first-octave-idx))
-        (vl-sift-set-peak-thresh filt peak-thresh)
-        (vl-sift-set-edge-thresh filt edge-thresh)
-        (repeat (receive frm from th)
-                until (not (pixp frm))
-                (vl-sift-match-descr filt frm)
-                (send filt to th) )
-        (close filt) )
+                (send (sift-features frm) to th) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

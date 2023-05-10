@@ -58,22 +58,25 @@
         (sift-draw-image m)
         (receive filt1 from (match-th-sift1 m))
         (receive filt2 from (match-th-sift2 m))
-        (not (match-abort m))
-        (set k1 (if (= filt1 undef) 0 (length filt1)))
-        (set k2 (if (= filt2 undef) 0 (length filt2)))
-        (if (< (min k1 k2) (match-params m "min-keypoints"))
-        then    (if alternate
-                then    (sift-check-too-few-keypoints m p1 p2 filt1 filt2 k1 k2 dlum @score)
-                else    (set @score true) )
-        else    (sift-check-enough-keypoints m filt1 filt2 k1 k2 dlum @score) )
-        (set <cache key> @score)
-        (if (booleanp @score)
-        then    (if @score
-                then    (inc <m 1>)
-                else    (if (match-params m "sift-draw-lines")
-                        then    (sift-draw-x m)
-                                (sift-draw-image m) )))
-        (not (match-abort m)) )
+        (alt    (seq    (not (match-abort m))
+                        (set k1 (if (= filt1 undef) 0 (length filt1)))
+                        (set k2 (if (= filt2 undef) 0 (length filt2)))
+                        (if (< (min k1 k2) (match-params m "min-keypoints"))
+                        then    (if alternate
+                                then    (sift-check-too-few-keypoints m p1 p2 filt1 filt2 k1 k2 dlum @score)
+                                else    (set @score true) )
+                        else    (sift-check-enough-keypoints m filt1 filt2 k1 k2 dlum @score) )
+                        (set <cache key> @score)
+                        (if (booleanp @score)
+                        then    (if @score
+                                then    (inc <m 1>)
+                                else    (if (match-params m "sift-draw-lines")
+                                        then    (sift-draw-x m)
+                                                (sift-draw-image m) )))
+                        (not (match-abort m))
+                        (close filt1 filt2) )
+                (seq    (close filt1 filt2)
+                        (fail) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -110,9 +113,7 @@
 (defnet sift-check-enough-keypoints (m filt1 filt2 k1 k2 dlum @score)
         (deflocal matches nx ny bnx bny sumrx sumry deltax deltay avgx avgy rx ry)
 
-        (case (match-params m "sift-impl") of
-                0   (set matches (cv-sift-match filt1 filt2 (match-params m "sift-match-threshold")))
-                1   (set matches (vl-sift-match filt1 filt2 0 (match-params m "sift-match-threshold"))) )
+        (set matches (sift-match filt1 filt2 (match-params m "sift-match-threshold-val")))
         (if (< (/ (length matches) (min k1 k2)) (match-params m "sift-match-threshold-min-ratio"))
         then    (set @score false)
                 (msg-log m (+ "too few matches (" (length matches) " [" k1 "," k2 "])" nl))
@@ -200,8 +201,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet sift-draw-matches (m matches)
-        (deflocal pix kx1 ky1 kx2 ky2 sx1 sy1 sx2 sy2 i)
+        (deflocal color pix kx1 ky1 kx2 ky2 sx1 sy1 sx2 sy2 cr raw i cnt)
 
+        (set color (purple))
         (set pix (match-pix m))
         (set kx1 (/ (width (match-pix1 m)) (width (match-frm1 m))))
         (set ky1 (/ (height (match-pix1 m)) (height (match-frm1 m))))
@@ -211,14 +213,21 @@
         (set sy1 (/ (- (height pix) (height (match-pix1 m)) (height (match-pix2 m)) (space)) 2))
         (set sx2 (/ (- (width pix) (width (match-pix2 m))) 2))
         (set sy2 (+ sy1 (height (match-pix1 m)) (space)))
-        (while (> (length matches) 0) do
+    ;    (set cr (cairo-svg-surface-create-for-stream (width pix) (height pix)))
+    ;    (cairo-set-source-rgba cr color)
+    ;    (cairo-set-line-width cr 1)
+        (set cnt 0)
+        (while (and (> (length matches) 0) (< cnt 2000)) do
+                (inc cnt)
                 (set i (queue-get matches))
-                (pix-draw-line pix
-                               (+ (* (car (car i)) kx1) sx1)
-                               (+ (* (cdr (car i)) ky1) sy1)
-                               (+ (* (car (cdr i)) kx2) sx2)
-                               (+ (* (cdr (cdr i)) ky2) sy2)
-                              (purple) )))
+    ;            (cairo-move-to cr (+ (* (car (car i)) kx1) sx1) (+ (* (cdr (car i)) ky1) sy1))
+    ;            (cairo-line-to cr (+ (* (car (cdr i)) kx2) sx2) (+ (* (cdr (cdr i)) ky2) sy2))
+                (pix-draw-line pix (+ (* (car (car i)) kx1) sx1) (+ (* (cdr (car i)) ky1) sy1)
+                                   (+ (* (car (cdr i)) kx2) sx2) (+ (* (cdr (cdr i)) ky2) sy2)
+                                   color )
+                (skip) )
+    ;    (pix-draw-and-close-cairo pix cr)
+        (skip) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -231,31 +240,28 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet sift-draw-x (m)
-        (deflocal pix w1 h1 w2 h2 x1 y1 x2 y2)
+        (deflocal pix cr raw w1 h1 w2 h2)
 
         (set pix (match-pix m))
+        (set cr (cairo-svg-surface-create-for-stream (width pix) (height pix)))
+        (cairo-scale cr 1 1)
+        (cairo-set-source-rgba cr (red))
         (set w1 (width (match-pix1 m)))
         (set h1 (height (match-pix1 m)))
         (set w2 (width (match-pix2 m)))
         (set h2 (height (match-pix2 m)))
-        (set x1 (/ (- (width pix) w1) 2))
-        (set y1 (/ (- (height pix) h1 h2 (space)) 2))
-        (set x2 (+ (/ (- (width pix) w2) 2) w2 -1))
-        (set y2 (+ (/ (- (height pix) h1 h2 (space)) 2) h1 (space) h2 -1))
-        (pix-draw-line pix (+ x1 2) y1 x2 (- y2 2) (red))
-        (pix-draw-line pix (+ x1 1) y1 x2 (- y2 1) (red))
-        (pix-draw-line pix x1 y1 x2 y2 (red))
-        (pix-draw-line pix x1 (+ y1 1) (- x2 1) y2 (red))
-        (pix-draw-line pix x1 (+ y1 2) (- x2 2) y2 (red))
-        (set x1 (+ (/ (- (width pix) w1) 2) w1 -1))
-        (set y1 (/ (- (height pix) h1 h2 (space)) 2))
-        (set x2 (/ (- (width pix) w2) 2))
-        (set y2 (+ (/ (- (height pix) h1 h2 (space)) 2) h1 (space) h2 -1))
-        (pix-draw-line pix (- x1 2) y1 x2 (- y2 2) (red))
-        (pix-draw-line pix (- x1 1) y1 x2 (- y2 1) (red))
-        (pix-draw-line pix x1 y1 x2 y2 (red))
-        (pix-draw-line pix x1 (+ y1 1) (+ x2 1) y2 (red))
-        (pix-draw-line pix x1 (+ y1 2) (+ x2 2) y2 (red)) )
+        (cairo-move-to cr (/ (- (width pix) w1) 2) (/ (- (height pix) h1 h2 (space)) 2))
+        (cairo-line-to cr (+ (/ (- (width pix) w2) 2) w2 -1) (+ (/ (- (height pix) h1 h2 (space)) 2) h1 (space) h2 -1))
+        (cairo-move-to cr (+ (/ (- (width pix) w1) 2) w1 -1) (/ (- (height pix) h1 h2 (space)) 2))
+        (cairo-line-to cr (/ (- (width pix) w2) 2) (+ (/ (- (height pix) h1 h2 (space)) 2) h1 (space) h2 -1))
+        (cairo-set-line-width cr 10)
+        (cairo-stroke cr)
+        (set raw (cairo-flush-and-close-raw cr))
+        (rawp raw)
+        (set cr (rsvg-load raw))
+        (close raw)
+        (pix-draw-pix-alpha pix 0 0 cr)
+        (close cr) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
