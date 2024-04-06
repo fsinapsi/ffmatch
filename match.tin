@@ -398,8 +398,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet match-receivenb (m)
-        (deflocal msg)
-
         (truep <_abort 0>)
         (match-abort m) )
 

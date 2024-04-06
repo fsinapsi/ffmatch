@@ -114,6 +114,15 @@
                   "Video codecs (" (length a) "):" nl ))
         (for c in a do
                 (inc s nl <c 1> " (" <c 2> ")") )
+        (set a (array 0))
+        (for c in (av-decoder-name-list) do
+                (array-append a c) )
+        (sort a)
+        (inc s nl
+               nl
+               "Decoders (" (length a) "):" nl )
+        (for c in a do
+                (inc s nl c) )
         (set @wid (iup-text-generic s true)) )
 
 (defun info-setup-page4 ()
