@@ -472,22 +472,6 @@
         then    (fsetpos (+ a1 (* p smplsize)) f1)
                 (filecopy-basic f1 g (* (- smpl1 p) smplsize) buf) ))
 
-(defnet audio-save-as-ok-search (t a @x)
-        (deflocal p q i)
-
-        (set p 0)
-        (set q (- (length a) 1))
-        (while (> (- q p) 1) do
-                (set i (div (+ p q) 2))
-                (if (>= t <a i 0>)
-                then    (set p i)
-                else    (set q i) ))
-        (if (> q 0)
-        then    (if (<= (abs (- t <a (- q 1) 0>))
-                        (abs (- t <a q 0>)) )
-                then    (dec q) ))
-        (set @x <a q>) )
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                                                                      ;;;;
