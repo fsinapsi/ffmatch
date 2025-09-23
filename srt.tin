@@ -1,0 +1,273 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet srt-cb (self)
+        (opt (srt-low self)) )
+
+(defnet srt-low (self)
+        (deflocal srt-info q vbox dlg)
+
+        (truep (cfg-exists (key-map <_kv "av1">
+                                    <_kv "av2">
+                                    (fullpath->name <_kv "path1">)
+                                    (fullpath->name <_kv "path2">) )))
+
+        (set srt-info (assoc))
+        (set <_kv "srt-info"> srt-info)
+
+        (set q (queue))
+
+        (set vbox (iup-vbox
+                        (srt-setup-open q)
+                        (iup-horizontal-separator)
+                        (srt-setup-framerates q)
+                        (iup-horizontal-separator)
+                        (srt-setup-bottom q) ))
+        (iup-set-str-attribute vbox "MARGIN" "4x4")
+        (iup-set-int vbox "GAP" 0)
+
+        (set dlg (iup-dialog vbox))
+        (set <srt-info "dlg"> dlg)
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" $"Subtitles")
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-callback dlg "K_ANY" (netptr srt-kb-cb))
+
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
+
+        (close dlg)
+        (iup-close-queue q)
+        (assoc-clr _kv "srt-info") )
+
+(defun srt-setup-open (q) net srt-setup-open)
+(defnet srt-setup-open (q @wid)
+        (deflocal srt-info but text l)
+
+        (set srt-info <_kv "srt-info">)
+
+        (set but (iup-button-icon $"select srt"
+                (netptr srt-open-cb)
+                (pix-load-static "16x16/document-open-5.png")
+                q ))
+
+        (set text (iup-text))
+        (set <srt-info "text"> text)
+        (iup-set-bool text "READONLY" true)
+        (iup-set-int text "VISIBLECOLUMNS" 24)
+
+        (set l (iup-list))
+        (set <srt-info "combo"> l)
+        (iup-set-bool l "DROPDOWN" true)
+        (iup-set-str-attribute l 1 "movie 1")
+        (iup-set-str-attribute l 2 "movie 2")
+        (iup-set-int l "VALUE" 1)
+
+        (set @wid (iup-hbox but text l))
+        (iup-set-int @wid "GAP" 3)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+(defun srt-setup-framerates (q) net srt-setup-framerates)
+(defnet srt-setup-framerates (q @wid)
+        (deflocal srt-info lab1 text1 lab2 text2)
+
+        (set srt-info <_kv "srt-info">)
+
+        (set lab1 (iup-label "framerate 1"))
+
+        (set text1 (iup-text))
+        (set <srt-info "framerate-text1"> text1)
+        (iup-set-str-attribute text1 "MASK" "(/d+/.?/d*|/./d+)")
+        (iup-set-bool text1 "READONLY" false)
+        (iup-set-int text1 "VISIBLECOLUMNS" 8)
+        (iup-set-str-attribute text1 "VALUE" (approx3 (av-video-frame-rate <_kv "av1">)))
+
+        (set lab2 (iup-label "framerate 2"))
+
+        (set text2 (iup-text))
+        (set <srt-info "framerate-text2"> text2)
+        (iup-set-str-attribute text2 "MASK" "(/d+/.?/d*|/./d+)")
+        (iup-set-bool text2 "READONLY" false)
+        (iup-set-int text2 "VISIBLECOLUMNS" 8)
+        (iup-set-str-attribute text2 "VALUE" (approx3 (av-video-frame-rate <_kv "av2">)))
+
+        (set @wid (iup-hbox lab1 text1 (iup-fill) lab2 text2))
+        (iup-set-int @wid "GAP" 3)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+(defun srt-setup-bottom (q) net srt-setup-bottom)
+(defnet srt-setup-bottom (q @wid)
+        (deflocal srt-info btn-save btn-ok)
+
+        (set srt-info <_kv "srt-info">)
+
+        (set btn-save (iup-button-icon $"save srt as..." (netptr srt-save-as-cb) (pix-load-static "16x16/document-save-5.png") q))
+        (set <srt-info "btn-save"> btn-save)
+        (iup-set-active btn-save false)
+
+        (set btn-ok (iup-button-icon-ok (netptr iup-cancel-cb) q))
+        (set <srt-info "btn-ok"> btn-ok)
+
+        (set @wid (iup-hbox btn-save (iup-fill) btn-ok))
+        (iup-set-int @wid "GAP" 3)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet srt-kb-cb (dlg c)
+        (case c of
+                (cmacro K_ESC)          (iup-exit-loop)
+                (cmacro K_F1)           (srt-open-cb dlg)
+                (cmacro K_F2)           (srt-open-cb dlg)
+                (cmacro K_cO)           (srt-open-cb dlg)
+                default                 (fail) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet srt-open-cb (self)
+        (opt (srt-open-low self)) )
+
+(defnet srt-open-low (self)
+        (deflocal srt-info path s srt)
+
+        (set path (cfg-get "srt-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-open self $"Select srt" path undef true))
+        (stringp path)
+        (cfg-set "srt-path" path)
+        (alt    (seq    (pathexists path)
+                        (< (fsize path) 10000000)
+                        (set s (str-load path))
+                        (stringp s)
+                        (set srt (srt-parse s))
+                        (<> srt undef) )
+                (seq    (sound-iup-error60 self (+ path ": " $"unrecognized format"))
+                        (fail) ))
+
+        (set srt-info <_kv "srt-info">)
+        (set <srt-info "srt"> srt)
+        (iup-set-str-attribute <srt-info "text"> "VALUE" (fullpath->name path))
+        (iup-set-active <srt-info "btn-save"> true) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet srt-save-as-cb (self)
+        (opt (srt-save-as-low self)) )
+
+(defnet srt-save-as-low (self)
+        (deflocal srt-info srt fr1 fr2 which map i a1 b1 a2 b2 srt1 srt2 srt3 tsa tsb fit a path)
+
+        (set srt-info <_kv "srt-info">)
+        (set srt <srt-info "srt">)
+        (set fr1 (str->num (iup-get-str-attribute <srt-info "framerate-text1"> "VALUE")))
+        (rationalp fr1)
+        (> fr1 0)
+        (set fr2 (str->num (iup-get-str-attribute <srt-info "framerate-text2"> "VALUE")))
+        (rationalp fr2)
+        (> fr2 0)
+        (set which (iup-get-int <srt-info "combo"> "VALUE"))
+
+        (set path (iup-choose-file-save self $"Save srt as..." (cfg-get "srt-path") "subtitles.srt" true))
+        (stringp path)
+
+        (set map (array 0))
+        (for i in (audio-segment (car (get-map)) 1 (maxint)) do
+                (set a1 <i 0>)
+                (set b1 <i 1>)
+                (set a2 <i 2>)
+                (if (<> a2 undef)
+                then    (set b2 (+ a2 b1 -a1))
+                        (case which of
+                                1       (array-append map (list (/ a1 fr1) (/ b1 fr1) (/ a2 fr2) (/ b2 fr2)))
+                                2       (array-append map (list (/ a2 fr1) (/ b2 fr1) (/ a1 fr2) (/ b1 fr2))) )))
+        (set srt1 (array 0))
+        (set srt2 (array 0))
+        (set srt3 (array 0))
+        (for i in srt do
+                (srt-convert-ts map <i 1> <i 2> tsa tsb fit)
+                (set a (array 4))
+                (set <a 0> <i 0>)
+                (set <a 1> tsa)
+                (set <a 2> tsb)
+                (set <a 3> <i 3>)
+                (if fit
+                then    (array-append srt1 a)
+                else    (array-append srt2 a)
+                        (set a (array 4))
+                        (set <a 0> <i 0>)
+                        (set <a 1> <i 1>)
+                        (set <a 2> <i 2>)
+                        (set <a 3> <i 3>)
+                        (array-append srt3 a) ))
+        (str-save path (srt-dump-fix-counts srt1))
+        (opt (rmatch case remove path ".srt"))
+        (set i (+ path "-uncertain.srt"))
+        (opt    (alt    (not (pathexists i))
+                        (iup-confirm60 self (+ "`" i $"' exists. Do you want to overwrite it?")) )
+                (str-save i (srt-dump-fix-counts srt2)) )
+        (set i (+ path "-forced.srt"))
+        (opt    (alt    (not (pathexists i))
+                        (iup-confirm60 self (+ "`" i $"' exists. Do you want to overwrite it?")) )
+                (str-save i (srt-dump-fix-counts srt3)) )
+        (sound-iup-info60 self (+ $"srt successfully saved.")) )
+
+(defnet srt-convert-ts (map tsa tsb @tsa @tsb @fit)
+        (deflocal row best i j)
+
+        (set best -(maxint))
+        (for i in map do
+                (set j (- (min tsb <i 1>) (max tsa <i 0>)))
+                (if (> j best)
+                then    (set best j)
+                        (set row (for-pos)) ))
+        (if (integerp row)
+        then    (set i <map row 0>)
+                (set j <map row 1>)
+                (set @tsa (max 0 (linear tsa i j <map row 2> <map row 3>)))
+                (set @tsb (max 0 (linear tsb i j <map row 2> <map row 3>)))
+                (set @fit (and (in tsa i .. j) (in tsb i .. j)))
+        else    (set @tsa 0)
+                (set @tsb 0)
+                (set @fit false) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

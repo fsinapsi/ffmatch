@@ -390,17 +390,6 @@
 
         (send "dlg" to th)
         (receive dlg from th)
-        (set i (cfg-get (key-map <_kv "av1">
-                                 <_kv "av2">
-                                 (fullpath->name <_kv "path1">)
-                                 (fullpath->name <_kv "path2">) )))
-        (set map (map-create <i 0> <i 1>))
-        (for i in <i 2> do
-                (set p <i 0>)
-                (set q <i 1>)
-                (set n <i 2>)
-                (map-bind-low (car map) p q n)
-                (map-bind-low (cdr map) q p n) )
         (set a1 <audio-info "ts1">)
         (set a2 <audio-info "ts2">)
         (set freq <audio-info "frequency1">)
@@ -409,6 +398,7 @@
         (set smpl2 <audio-info "smpl2">)
         (set delay1 (rint (* (/ delay1 1000) freq)))
         (set delay2 (rint (* (/ delay2 1000) freq)))
+        (set map (get-map))
         (if (= which 1)
         then    (set map (car map))
         else    (set map (cdr map))
@@ -428,7 +418,7 @@
         (set ts 0)
         (set err 0)
         (filecopy-basic f1 g a1 buf)
-        (for i in (audio-segment map which) do
+        (for i in (audio-segment map which (audio-segment-max)) do
                 (not (iup-progress-aborted dlg))
                 (set p (/ (+ <i 1> 1) fps))
                 (set n (- p ts))
@@ -484,8 +474,8 @@
 
 (defun audio-segment-max () 2000)
 
-(defun audio-segment (map which) net audio-segment)
-(defnet audio-segment (map which @a)
+(defun audio-segment (map which audio-segment-max) net audio-segment)
+(defnet audio-segment (map which audio-segment-max @a)
         (deflocal prm i p q n real-p real-n a)
 
         (set prm <_kv "prm">)
@@ -510,7 +500,7 @@
                                         then    (integerp <@a -1 2>)
                                                 (= (- real-n <@a -1 2>) (- real-p <@a -1 0>))
                                         else    (not (integerp <@a -1 2>)) )
-                                        (< (- <@a -1 1> <@a -1 0> -1) (audio-segment-max))
+                                        (< (- <@a -1 1> <@a -1 0> -1) audio-segment-max)
                                         (inc <@a (- (length @a) 1) 1>) )
                                 (seq    (set a (array 3))
                                         (set <a 0> real-p)

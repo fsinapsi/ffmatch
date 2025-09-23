@@ -82,6 +82,41 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun get-map () net get-map)
+(defnet get-map (@map)
+        (deflocal av1 av2)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set @map (get-map-low (cfg-get (key-map av1 av2
+                (fullpath->name <_kv "path1">)
+                (fullpath->name <_kv "path2">) )))))
+
+(defun get-map-low (key-map) net get-map-low)
+(defnet get-map-low (key-map @map)
+        (deflocal i p q n)
+
+        (<> key-map undef)
+        (set @map (map-create <key-map 0> <key-map 1>))
+        (for i in <key-map 2> do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (map-bind-low (car @map) p q n)
+                (map-bind-low (cdr @map) q p n) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun dump-ar-circa (ar val valp)
         (if (and (<> ar val)
                  (< (/ (abs (- ar val)) val) 0.012) )

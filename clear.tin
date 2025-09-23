@@ -358,7 +358,7 @@
         (opt (clear-optimize-map-low self)) )
 
 (defnet clear-optimize-map-low (self)
-        (deflocal av1 av2 key k map p q n a i)
+        (deflocal av1 av2 key k a i q)
 
         (set av1 <_kv "av1">)
         (<> av1 undef)
@@ -369,19 +369,12 @@
                 (fullpath->name <_kv "path2">) ))
         (set k (cfg-get key))
         (<> k undef)
-        (set map (map-create <k 0> <k 1>))
-        (for i in <k 2> do
-                (set p <i 0>)
-                (set q <i 1>)
-                (set n <i 2>)
-                (map-bind-low (car map) p q n)
-                (map-bind-low (cdr map) q p n) )
         (set a (array 0))
-        (for i in (car map) do
+        (for i in (car (get-map-low k)) do
                 (set q <i 2>)
                 (if (integerp q)
                 then    (array-append a (list <i 0> q (- <i 1> <i 0> -1))) ))
-        (if (= (length <k 2 >) (length a))
+        (if (= (length <k 2>) (length a))
         then    (iup-info60 self $"The \"mapping\" data are already optimized.")
                 (fail) )
         (iup-confirm60 self

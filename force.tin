@@ -297,7 +297,7 @@
         (opt (force-final-closure-low self)) )
 
 (defnet force-final-closure-low (self)
-        (deflocal key k a map p q n cf i)
+        (deflocal key k a map cf p n i)
 
         (gui-not-locked)
         (set key (key-map <_kv "av1">
@@ -307,13 +307,7 @@
         (set k (cfg-get key))
         (<> k undef)
         (set a <k 2>)
-        (set map (map-create <k 0> <k 1>))
-        (for i in a do
-                (set p <i 0>)
-                (set q <i 1>)
-                (set n <i 2>)
-                (map-bind-low (car map) p q n)
-                (map-bind-low (cdr map) q p n) )
+        (set map (get-map-low k))
         (set cf (queue))
         (set n 0)
         (for i in (map-undef-low (car map) (cdr map)) do

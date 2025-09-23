@@ -73,7 +73,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet movie-sync-pre (@n1 @n2 @left-is-min @right-is-max @left @right)
-        (deflocal k n1 n2 map p q n i1 i2)
+        (deflocal k map i1 i2)
 
         (gui-not-locked)
         (set k (cfg-get (key-map <_kv "av1">
@@ -85,13 +85,7 @@
         (set @n2 (gui-spin-value 2))
         (set @left-is-min (or (= @n1 1) (= @n2 1)))
         (set @right-is-max (or (= @n1 <k 0>) (= @n2 <k 1>)))
-        (set map (map-create <k 0> <k 1>))
-        (for i1 in <k 2> do
-                (set p <i1 0>)
-                (set q <i1 1>)
-                (set n <i1 2>)
-                (map-bind-low (car map) p q n)
-                (map-bind-low (cdr map) q p n) )
+        (set map (get-map-low k))
         (for i1 in (car map) do
                 until (in @n1 <i1 0> .. <i1 1>) )
         (for i2 in (cdr map) do

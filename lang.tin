@@ -285,6 +285,10 @@
 1
 "tracce audio"
 
+"subtitles"
+1
+"sottotitoli"
+
 "preferences"
 1
 "preferenze"
@@ -421,17 +425,33 @@
 1
 "Tracce audio"
 
+"Subtitles"
+1
+"Sottotitoli"
+
 "select audio"
 1
 "seleziona audio"
+
+"select srt"
+1
+"seleziona srt"
 
 "save track as..."
 1
 "salva la traccia come..."
 
+"save srt as..."
+1
+"salva srt come..."
+
 "Select audio"
 1
 "Seleziona audio"
+
+"Select srt"
+1
+"Seleziona srt"
 
 "It seems like the audio track contains extraneous data. Please fix it."
 1
@@ -461,6 +481,10 @@
 1
 "come..."
 
+"Save srt as..."
+1
+"Salva srt come..."
+
 "It seems like stream lengths are inconsistent:"
 1
 "Sembra che le lunghezze degli stream siano inconsistenti:"
@@ -480,6 +504,10 @@
 "Audio track successfully saved as `"
 1
 "La traccia audio è stata salvata con successo come `"
+
+"srt successfully saved."
+1
+"srt salvato con successo."
 
 "I/O error."
 1
@@ -673,6 +701,14 @@
 1
 "Esporta dati del progetto come..."
 
+"Save the actual map"
+1
+"Salva la mappa effettiva"
+
+"Save the actual map as..."
+1
+"Salva la mappa effettiva come..."
+
 "Project data successfully exported."
 1
 "Dati del progetto esportati con successo."
@@ -696,6 +732,10 @@
 "unrecognized audio format"
 1
 "formato audio non riconosciuto"
+
+"unrecognized format"
+1
+"formato non riconosciuto"
 
 "Current number of threads"
 1

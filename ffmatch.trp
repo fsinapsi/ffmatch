@@ -25,6 +25,7 @@
 (include "map.tin")
 (include "sift.tin")
 (include "audio.tin")
+(include "srt.tin")
 (include "permute.tin")
 (include "threads.tin")
 (include "sound.tin")
