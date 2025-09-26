@@ -243,7 +243,7 @@
         (sound-iup-info60 self (+ $"srt successfully saved.")) )
 
 (defnet srt-convert-ts (map tsa tsb @tsa @tsb @fit)
-        (deflocal row best i j)
+        (deflocal row best i j k l)
 
         (set best -(maxint))
         (for i in map do
@@ -254,8 +254,12 @@
         (if (integerp row)
         then    (set i <map row 0>)
                 (set j <map row 1>)
-                (set @tsa (max 0 (linear tsa i j <map row 2> <map row 3>)))
-                (set @tsb (max 0 (linear tsb i j <map row 2> <map row 3>)))
+                (set k <map row 2>)
+                (set l <map row 3>)
+                (set @tsa (max 0 (linear tsa i j k l)))
+                (set @tsb (max 0 (linear tsb i j k l)))
+                (dec i 0.2)
+                (inc j 0.2)
                 (set @fit (and (in tsa i .. j) (in tsb i .. j)))
         else    (set @tsa 0)
                 (set @tsb 0)
