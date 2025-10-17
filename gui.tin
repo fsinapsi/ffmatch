@@ -260,7 +260,10 @@
                                 (cons (list $"Print timestamps movie 1" (cons a "print-timestamps1"))
                                       (netptr gui-print-timestamps1-cb) )
                                 (cons (list $"Print timestamps movie 2" (cons a "print-timestamps2"))
-                                      (netptr gui-print-timestamps2-cb) ))
+                                      (netptr gui-print-timestamps2-cb) )
+                                (iup-separator)
+                                (cons (list "Print diff stats (experimental)" (cons a "print-diff-stats"))
+                                      (netptr gui-print-diff-stats-cb) ))
                         (list (+ "&" $"Clear")
                                 (cons (list $"Clear \"scd\" data 1" (cons a "clear-scd1"))
                                       (netptr clear-scd1-cb) )
@@ -808,6 +811,7 @@
                 (iup-set-active <menu-info "clear-map"> i)
                 (iup-set-active <menu-info "optimize-map"> i)
                 (iup-set-active <menu-info "final-closure"> i)
+                (iup-set-active <menu-info "print-diff-stats"> i)
 
                 (set i (> (iup-get-int <_kv "text1"> "COUNT") 0))
                 (iup-set-active <menu-info "save-text1"> i)
@@ -1436,6 +1440,42 @@
 
 (defnet gui-print-timestamps2-cb (self)
         (gui-print-timestamps 2) )
+
+(defnet gui-print-diff-stats-cb (self)
+        (opt (gui-print-diff-stats-low)) )
+
+(defnet gui-print-diff-stats-low ()
+        (deflocal map d1 d2 a1 a2 t1 t2 i)
+
+        (set map (get-map))
+        (<> map undef)
+        (set d1 (array 0))
+        (set d2 (array 0))
+        (set a1 (car map))
+        (set a2 (cdr map))
+        (for i in 1 .. (- (length a1) 2) do
+                (if (= <a1 i 2> undef)
+                then    (set t1 (- <a1 i 1> <a1 i 0> -1))
+                        (set t2 (- <a2 i 1> <a2 i 0> -1))
+                        (if (in (/ t1 t2) (/ 2 3) .. (/ 3 2))
+                        then    (if (>= t1 t2)
+                                then    (array-append d1 (cons t1 t2)) )
+                                (if (<= t1 t2)
+                                then    (array-append d2 (cons t1 t2)) ))))
+        (if (> (length d2) (length d1))
+        then    (set i d1)
+                (set d1 d2)
+                (set d2 i) )
+        (if (> (/ (length d1) (length d2)) 2)
+        then    (set t1 0)
+                (set t2 0)
+                (for i in d1 do
+                        (inc t1 (car i))
+                        (inc t2 (cdr i)) )
+                (iup-text-append-and-go-end <_kv "text2"> (sprint
+                        t1 " - " t2 nl
+                        (approx6 (/ t1 t2)) nl
+                        (approx6 (/ t2 t1)) nl ))))
 
 (defnet gui-restore-default-cb (self)
         (opt (gui-restore-default-low self)) )
