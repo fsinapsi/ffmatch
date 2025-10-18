@@ -210,7 +210,7 @@
                 then    (set b2 (+ a2 b1 -a1))
                         (case which of
                                 1       (array-append map (list (/ a1 fr1) (/ b1 fr1) (/ a2 fr2) (/ b2 fr2)))
-                                2       (array-append map (list (/ a2 fr1) (/ b2 fr1) (/ a1 fr2) (/ b1 fr2))) )))
+                                2       (array-append map (list (/ a2 fr2) (/ b2 fr2) (/ a1 fr1) (/ b1 fr1))) )))
         (set srt1 (array 0))
         (set srt2 (array 0))
         (set srt3 (array 0))
