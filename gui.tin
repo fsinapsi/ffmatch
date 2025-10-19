@@ -1445,7 +1445,7 @@
         (opt (gui-print-diff-stats-low)) )
 
 (defnet gui-print-diff-stats-low ()
-        (deflocal map d1 d2 a1 a2 t1 t2 i)
+        (deflocal map d1 d2 a1 a2 t1 t2 fr1 fr2 i)
 
         (set map (get-map))
         (<> map undef)
@@ -1472,11 +1472,18 @@
                 (for i in d1 do
                         (inc t1 (car i))
                         (inc t2 (cdr i)) )
+                (set fr1 (av-video-frame-rate <_kv "av1">))
+                (set fr2 (av-video-frame-rate <_kv "av2">))
                 (iup-text-append-and-go-end <_kv "text2"> (sprint
+                        nl
                         t1 " - " t2 nl
-                        (approx6 (/ t1 t2)) nl
-                        (approx6 (/ t2 t1)) nl ))
-        else    (iup-text-append-and-go-end <_kv "text2"> "Try adding more data.\n") ))
+                        t1 "/" t2 "=" (approx6 (/ t1 t2)) nl
+                        t1 "/" t2 "=" (approx6 (/ t2 t1)) nl
+                        "movie 1: (" (approx3 fr1) " → " (approx6 (* fr1 (/ t2 t1)))
+                        "] or [" (approx6 (* fr1 (/ t1 t2))) " → " (approx3 fr1) ")" nl
+                        "movie 2: (" (approx3 fr2) " → " (approx6 (* fr2 (/ t1 t2)))
+                        "] or [" (approx6 (* fr2 (/ t2 t1))) " → " (approx3 fr2) ")" nl ))
+        else    (iup-text-append-and-go-end <_kv "text2"> (+ "\n" $"Try adding more links." nl)) ))
 
 (defnet gui-restore-default-cb (self)
         (opt (gui-restore-default-low self)) )
