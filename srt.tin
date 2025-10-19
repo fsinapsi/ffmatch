@@ -65,8 +65,8 @@
         (set l (iup-list))
         (set <srt-info "combo"> l)
         (iup-set-bool l "DROPDOWN" true)
-        (iup-set-str-attribute l 1 "movie 1")
-        (iup-set-str-attribute l 2 "movie 2")
+        (iup-set-str-attribute l 1 "movie 1 → movie 2")
+        (iup-set-str-attribute l 2 "movie 2 → movie 1")
         (iup-set-int l "VALUE" 1)
 
         (set @wid (iup-hbox but text l))

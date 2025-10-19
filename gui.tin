@@ -1455,8 +1455,8 @@
         (set a2 (cdr map))
         (for i in 1 .. (- (length a1) 2) do
                 (if (= <a1 i 2> undef)
-                then    (set t1 (- <a1 i 1> <a1 i 0> -1))
-                        (set t2 (- <a2 i 1> <a2 i 0> -1))
+                then    (set t1 (- <a1 i 1> <a1 i 0> -2))
+                        (set t2 (- <a2 i 1> <a2 i 0> -2))
                         (if (in (/ t1 t2) (/ 2 3) .. (/ 3 2))
                         then    (if (>= t1 t2)
                                 then    (array-append d1 (cons t1 t2)) )
@@ -1466,7 +1466,7 @@
         then    (set i d1)
                 (set d1 d2)
                 (set d2 i) )
-        (if (> (/ (length d1) (length d2)) 2)
+        (if (> (length d1) (* (length d2) 2))
         then    (set t1 0)
                 (set t2 0)
                 (for i in d1 do
@@ -1475,7 +1475,8 @@
                 (iup-text-append-and-go-end <_kv "text2"> (sprint
                         t1 " - " t2 nl
                         (approx6 (/ t1 t2)) nl
-                        (approx6 (/ t2 t1)) nl ))))
+                        (approx6 (/ t2 t1)) nl ))
+        else    (iup-text-append-and-go-end <_kv "text2"> "Try adding more data.\n") ))
 
 (defnet gui-restore-default-cb (self)
         (opt (gui-restore-default-low self)) )
