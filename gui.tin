@@ -211,6 +211,10 @@
                                       (netptr gui-save-frame2-cb) )
                                 (cons (list $"Save the actual map" (cons a "save-actual-map"))
                                       (netptr gui-save-actual-map-cb) )
+                                (cons (list (+ $"Save" " vid script 1") (cons a "save-vid-script-1"))
+                                      (netptr gui-save-vid-script-1-cb) )
+                                (cons (list (+ $"Save" " vid script 2") (cons a "save-vid-script-2"))
+                                      (netptr gui-save-vid-script-2-cb) )
                                 (iup-separator)
                                 (cons $"Import data from cfg"
                                       (netptr cfg-import-cb) )
@@ -822,6 +826,8 @@
                 (iup-set-active <menu-info "clear-text2"> i)
 
                 (iup-set-active <menu-info "save-actual-map"> i)
+                (iup-set-active <menu-info "save-vid-script-1"> i)
+                (iup-set-active <menu-info "save-vid-script-2"> i)
 
                 (iup-set-active <menu-info "save-frame1"> supervision)
                 (iup-set-active <menu-info "save-frame2"> supervision)
@@ -1648,6 +1654,58 @@
                 (set n <i 2>)
                 (if (<> n undef)
                 then    (inc s "[" (int->str p 6 '0') "-" (int->str q 6 '0') "] ---> [" (int->str n 6 '0') "-" (int->str (+ n q -p) 6 '0') "]" nl) ))
+        (fprint f
+                (if (cms-windows)
+                        (find-and-replace s "\n" "\r\n")
+                        s ))
+        (close f) )
+
+(defnet gui-save-vid-script-1-cb (self)
+        (opt (gui-save-vid-script self 1)) )
+
+(defnet gui-save-vid-script-2-cb (self)
+        (opt (gui-save-vid-script self 2)) )
+
+(defnet gui-save-vid-script (self which)
+        (deflocal path f w h odar fr osdtempl s i p q n)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ $"Save" " vid script " which $" as...")
+                path
+                "vid-script.sh"
+                true ))
+        (stringp path)
+        (set f (fcreate path))
+        (if (= f undef)
+        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
+                (fail) )
+        (cfg-set "save-path" path)
+        (set w (width <_kv (+ "av" (- 3 which))>))
+        (set h (height <_kv (+ "av" (- 3 which))>))
+        (set odar (av-dar <_kv (+ "av" (- 3 which))>))
+        (set odar (sprint (num odar) (if (= (den odar) 1) "" (+ ":" (den odar)))))
+        (set fr (av-video-frame-rate <_kv (+ "av" which)>))
+        (if (< (abs (- fr (/ 24000 1001))) 0.0005)
+        then    (set fr (/ 24000 1001)) )
+        (set fr (sprint (num fr) (if (= (den fr) 1) "" (+ ":" (den fr)))))
+        ;(set osdtempl " -osdtempl \"***%n***%n***\"")
+        (set osdtempl "")
+        (set s "")
+        (for i in (audio-segment (if (= which 1) (car (get-map)) (cdr (get-map))) 1 (maxint)) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (or (= p 1) (= n 1))
+                then    (dec p)
+                        (dec n) )
+                (inc s "vid -ifps " fr " -odar " odar " -o null -save seg" (int->str (for-pos) 4 '0') ".vid movie")
+                (if (= n undef)
+                then    (inc s which ".mkv" osdtempl " -hscale " w " -vscale " h " -skip " p)
+                else    (inc s (- 3 which) ".mkv -skip " n) )
+                (inc s "f -dur " (- q p -1) "f" nl) )
         (fprint f
                 (if (cms-windows)
                         (find-and-replace s "\n" "\r\n")

@@ -19,12 +19,6 @@
           "kerndeint"
           ])
 
-(defun spp-filters ()
-        [ "none"
-          "spp"
-          "uspp"
-          ])
-
 (defun row-filters ()
         [ "entire frame"
           "top field"
