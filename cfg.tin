@@ -112,6 +112,8 @@
                     ] do
                 (cfg-set c (- (iup-get-int <cfg-info (+ "cb-" c)> "VALUE") 1)) )
 
+        (cfg-set "osdtempl" (iup-get-str-attribute <cfg-info "text-osdtempl"> "VALUE"))
+
         (set <_kv "debug-enabled"> (cfg-get "debug-enabled"))
         (set <_kv "sound-enabled"> (cfg-get "sound-enabled"))
 
@@ -354,7 +356,8 @@
         (set hbox2 (iup-hbox
                 (cfg-setup-framed-toggle "Debug" $"enabled" (cfg-get-or-default "debug-enabled" default-info) cfg-info "tb-debug-enabled")
                 (cfg-setup-framed-toggle $"Sound" $"enabled" (cfg-get-or-default "sound-enabled" default-info) cfg-info "tb-sound-enabled")
-                (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled") ))
+                (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled")
+                (cfg-setup-framed-text "vid template" (cfg-get-or-default "osdtempl" default-info) cfg-info "text-osdtempl") ))
 
         (set list (iup-list))
         (set <cfg-info "cb-languages"> list)
@@ -397,6 +400,15 @@
 
 (defun cfg-setup-framed-spin-ratio (title vmin vmax vcur vinc cfg-info key)
         (iup-frame-with-margin title (cfg-setup-spin-ratio vmin vmax vcur vinc cfg-info key)) )
+
+(defun cfg-setup-text (vcur cfg-info key) net cfg-setup-text)
+(defnet cfg-setup-text (vcur cfg-info key @wid)
+        (set @wid (iup-text))
+        (iup-set-str-attribute @wid "VALUE" vcur)
+        (set <cfg-info key> @wid) )
+
+(defun cfg-setup-framed-text (title vcur cfg-info key)
+        (iup-frame-with-margin title (cfg-setup-text vcur cfg-info key)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
