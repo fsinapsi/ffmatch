@@ -215,6 +215,10 @@
                                       (netptr gui-save-vid-script-1-cb) )
                                 (cons (list (+ $"Save" " vid script 2") (cons a "save-vid-script-2"))
                                       (netptr gui-save-vid-script-2-cb) )
+                                (cons (list (+ $"Save" " wavcat script 1") (cons a "save-wavcat-script-1"))
+                                      (netptr gui-save-wavcat-script-1-cb) )
+                                (cons (list (+ $"Save" " wavcat script 2") (cons a "save-wavcat-script-2"))
+                                      (netptr gui-save-wavcat-script-2-cb) )
                                 (iup-separator)
                                 (cons $"Import data from cfg"
                                       (netptr cfg-import-cb) )
@@ -828,6 +832,8 @@
                 (iup-set-active <menu-info "save-actual-map"> i)
                 (iup-set-active <menu-info "save-vid-script-1"> i)
                 (iup-set-active <menu-info "save-vid-script-2"> i)
+                (iup-set-active <menu-info "save-wavcat-script-1"> i)
+                (iup-set-active <menu-info "save-wavcat-script-2"> i)
 
                 (iup-set-active <menu-info "save-frame1"> supervision)
                 (iup-set-active <menu-info "save-frame2"> supervision)
@@ -1484,11 +1490,11 @@
                         nl
                         t1 " - " t2 nl
                         t1 "/" t2 "=" (approx6 (/ t1 t2)) nl
-                        t1 "/" t2 "=" (approx6 (/ t2 t1)) nl
-                        "movie 1: (" (approx3 fr1) " → " (approx6 (* fr1 (/ t2 t1)))
-                        "] or [" (approx6 (* fr1 (/ t1 t2))) " → " (approx3 fr1) ")" nl
-                        "movie 2: (" (approx3 fr2) " → " (approx6 (* fr2 (/ t1 t2)))
-                        "] or [" (approx6 (* fr2 (/ t2 t1))) " → " (approx3 fr2) ")" nl ))
+                        t2 "/" t1 "=" (approx6 (/ t2 t1)) nl
+                        "movie 1: [" (approx3 fr1) " → " (approx6 (* fr1 (/ t2 t1)))
+                        "] or [" (approx6 (* fr1 (/ t1 t2))) " → " (approx3 fr1) "]" nl
+                        "movie 2: [" (approx3 fr2) " → " (approx6 (* fr2 (/ t1 t2)))
+                        "] or [" (approx6 (* fr2 (/ t2 t1))) " → " (approx3 fr2) "]" nl ))
         else    (iup-text-append-and-go-end <_kv "text2"> (+ "\n" $"Try adding more links." nl)) ))
 
 (defnet gui-restore-default-cb (self)
@@ -1716,6 +1722,71 @@
                         (find-and-replace s "\n" "\r\n")
                         s ))
         (close f) )
+
+(defnet gui-save-wavcat-script-1-cb (self)
+        (opt (gui-save-wavcat-script self 1)) )
+
+(defnet gui-save-wavcat-script-2-cb (self)
+        (opt (gui-save-wavcat-script self 2)) )
+
+(defnet gui-save-wavcat-script (self which)
+        (deflocal path f fr1 fr2 s i p q n)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ $"Save" " wavcat script " which $" as...")
+                path
+                "wavcat-script.sh"
+                true ))
+        (stringp path)
+        (set f (fcreate path))
+        (if (= f undef)
+        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
+                (fail) )
+        (cfg-set "save-path" path)
+        (set fr1 (av-video-frame-rate <_kv "av1">))
+        (set fr2 (av-video-frame-rate <_kv "av2">))
+        (set s (+ "movie1='" (fullpath->name <_kv "path1">) "'" nl
+                  "movie2='" (fullpath->name <_kv "path2">) "'" nl
+                  "audio1='audio1.wav'" nl
+                  "audio2='audio2.wav'" nl
+                  "#ffmpeg -i \"$movie1\" \"$audio1\"" nl
+                  "#ffmpeg -i \"$movie2\" \"$audio2\"" nl ))
+        (for i in (audio-segment (if (= which 1) (car (get-map)) (cdr (get-map))) 1 (maxint)) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (or (= p 1) (= n 1))
+                then    (dec p)
+                        (dec n) )
+                (inc s "wavcat -o seg" (int->str (for-pos) 4 '0') ".wav -seg "
+                                (gui-save-wavcat-script-ts which fr1 fr2 p n (- q p -1))
+                                " \"$audio" )
+                (if (= n undef)
+                then    (inc s which)
+                else    (inc s (- 3 which)) )
+                (inc s "\"" nl) )
+        (fprint f
+                (if (cms-windows)
+                        (find-and-replace s "\n" "\r\n")
+                        s ))
+        (close f) )
+
+(defun gui-save-wavcat-script-ts (which fr1 fr2 n1 n2 m) net gui-save-wavcat-script-ts)
+(defnet gui-save-wavcat-script-ts (which fr1 fr2 n1 n2 m @s)
+        (deflocal fr n)
+
+        (if (= n2 undef)
+        then    (set n n1)
+                (set fr (if (= which 1) fr1 fr2))
+        else    (set n n2)
+                (set fr (if (= which 1) fr2 fr1)) )
+        (set n (/ n fr))
+        (set m (/ m fr))
+        ;(set @s (sprint (num n) ":" (den n) " "  (num m) ":" (den m))) )
+        (set @s (sprint (approx10 n) " "  (approx10 m))) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
