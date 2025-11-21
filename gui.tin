@@ -1866,7 +1866,7 @@
                   "movie='" (fullpath->name <_kv (+ "path" which)>) "'" nl
                   "audio1='audio1.wav'" nl
                   "audio2='audio2.wav'" nl
-                  "vprefix=\"vid -hscale 1024 -osdtempl %id -ifps $fr\"" nl
+                  "vprefix=\"vid -hscale 1024 -osdtempl %rd%n%id -ifps $fr\"" nl
                   "aprefix=\"wavcat -fps $fr\"" nl ))
         (set st (stack))
         (set vskip 0)
