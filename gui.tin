@@ -1842,7 +1842,7 @@
         (close f) )
 
 (defnet gui-save-junction-script (self which)
-        (deflocal path f fr s i p q n st junst vskip vdur)
+        (deflocal path context f fr s i p q n st junst vskip vdur)
 
         (set path (cfg-get "save-path"))
         (if (not (stringp path))
@@ -1853,6 +1853,8 @@
                 (+ "junction-script-" which ".sh")
                 true ))
         (stringp path)
+        ; context è il numero di frame da lasciare prima e dopo il punto di giunzione
+        (set context (cfg-get-or-default-num "junction-context" <_kv "default">))
         (set f (fcreate path))
         (if (= f undef)
         then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
@@ -1866,7 +1868,7 @@
                   "movie='" (fullpath->name <_kv (+ "path" which)>) "'" nl
                   "audio1='audio1.wav'" nl
                   "audio2='audio2.wav'" nl
-                  "vprefix=\"vid -hscale 1024 -osdtempl %rd%n%id -ifps $fr\"" nl
+                  "vprefix=\"vid -hscale 1024 -osdtempl %rd%n%id/%md -ifps $fr\"" nl
                   "aprefix=\"wavcat -fps $fr\"" nl ))
         (set st (stack))
         (set vskip 0)
@@ -1878,22 +1880,22 @@
                 then    (dec p)
                         (dec n) )
                 (set vdur (- q p -1))
-                (if (and (> (for-pos) 0) (>= vdur 200))
+                (if (and (> (for-pos) 0) (>= vdur context))
                 then    (inc vskip) )
                 (if (= n undef)
                 then    (push st (list vdur p p which))
                 else    (push st (list vdur p n (- 3 which))) ))
-        (if (>= vdur 200)
+        (if (>= vdur context)
         then    (dec vskip) )
         (set i vskip)
         (set junst (stack))
         (while (> (length st) 1) do
                 (set p (pop st))
-                (push junst (list (min <p 0> 200) <p 1> <p 2> <p 3>))
+                (push junst (list (min <p 0> context) <p 1> <p 2> <p 3>))
                 (repeat (set p (pop st))
-                        (set n (min <p 0> 200))
+                        (set n (min <p 0> context))
                         (push junst (list n (+ <p 1> (- <p 0> n)) (+ <p 2> (- <p 0> n)) <p 3>))
-                        until (= n 200)
+                        until (= n context)
                         until (= (length st) 0) )
                 (push st p)
                 (inc s "$aprefix -o junction-" (int->str i 4 '0') ".wav")
@@ -1908,6 +1910,9 @@
                 (inc s nl
                      "$vprefix -save junction-" (int->str i 4 '0') ".vid \"$movie\" -skip " vskip "f -dur " vdur "f" nl)
                 (dec i) )
+        (inc s "#wavcat -o __tmp__.wav junction-*wav" nl
+               "#vid -cat junction-*vid -o lavc junction-all.mkv -audio __tmp__.wav" nl
+               "#rm __tmp__.wav" nl )
         (fprint f
                 (if (cms-windows)
                         (find-and-replace s "\n" "\r\n")

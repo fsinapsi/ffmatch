@@ -79,6 +79,7 @@
                     "scd-min-avg-block-size"
                     "frame-buf-size"
                     "scd-threads"
+                    "junction-context"
                     "supervision-skip-double"
                     "checks-per-interval"
                     "checks-per-interval-extra"
@@ -357,6 +358,9 @@
                 (cfg-setup-framed-toggle "Debug" $"enabled" (cfg-get-or-default "debug-enabled" default-info) cfg-info "tb-debug-enabled")
                 (cfg-setup-framed-toggle $"Sound" $"enabled" (cfg-get-or-default "sound-enabled" default-info) cfg-info "tb-sound-enabled")
                 (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled")
+                (cfg-setup-framed-spin "junct.context" 25 2500
+                        (cfg-get-or-default-num "junction-context" default-info)
+                        cfg-info "sb-junction-context" )
                 (cfg-setup-framed-text "vid template" (cfg-get-or-default "osdtempl" default-info) cfg-info "text-osdtempl") ))
 
         (set list (iup-list))

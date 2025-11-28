@@ -66,6 +66,7 @@
           [ "sound-enabled" . true ]
           [ "cuvid-enabled" . false ]
           [ "frame-buf-size" . 20 ]
+          [ "junction-context" . 200 ]
           [ "osdtempl" . "" ]
           [ "scaling-mode" . 0 ]
           ])
