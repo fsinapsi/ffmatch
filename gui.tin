@@ -1708,8 +1708,8 @@
         (if (<> osdtempl "")
         then    (set osdtempl (+ " -osdtempl \"" osdtempl "\"")) )
         (set s (+ "fr='" fr "'" nl
-                  "movie1='" (fullpath->name <_kv "path1">) "'" nl
-                  "movie2='" (fullpath->name <_kv "path2">) "'" nl
+                  "movie1=\"" (fullpath->name <_kv "path1">) "\"" nl
+                  "movie2=\"" (fullpath->name <_kv "path2">) "\"" nl
                   "prefix=\"vid -ifps $fr -odar " odar "\"" nl
                   "scale=' -hscale " w " -vscale " h "'" nl ))
         (for i in (audio-segment (if (= which 1) (car (get-map)) (cdr (get-map))) 1 (maxint)) do
@@ -1758,8 +1758,8 @@
         then    (set fr (/ 24000 1001)) )
         (set fr (sprint (num fr) (if (= (den fr) 1) "" (+ ":" (den fr)))))
         (set s (+ "fr='" fr "'" nl
-                  "#movie1='" (fullpath->name <_kv "path1">) "'" nl
-                  "#movie2='" (fullpath->name <_kv "path2">) "'" nl
+                  "#movie1=\"" (fullpath->name <_kv "path1">) "\"" nl
+                  "#movie2=\"" (fullpath->name <_kv "path2">) "\"" nl
                   "audio1='audio1.wav'" nl
                   "audio2='audio2.wav'" nl
                   "prefix=\"wavcat -fps $fr\"" nl ))
@@ -1789,58 +1789,6 @@
 (defnet gui-save-junction-script-2-cb (self)
         (opt (gui-save-junction-script self 2)) )
 
-(defnet gui-save-junction-script-old (self which)
-        (deflocal path f fr s i p q n)
-
-        (set path (cfg-get "save-path"))
-        (if (not (stringp path))
-        then    (set path (cfg-get "path")) )
-        (set path (iup-choose-file-save self
-                (+ $"Save" " junction script " which $" as...")
-                path
-                (+ "junction-script-" which ".sh")
-                true ))
-        (stringp path)
-        (set f (fcreate path))
-        (if (= f undef)
-        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
-                (fail) )
-        (cfg-set "save-path" path)
-        (set fr (av-video-frame-rate <_kv (+ "av" which)>))
-        (if (< (abs (- fr (/ 24000 1001))) 0.0005)
-        then    (set fr (/ 24000 1001)) )
-        (set fr (sprint (num fr) (if (= (den fr) 1) "" (+ ":" (den fr)))))
-        (set s (+ "fr='" fr "'" nl
-                  "movie='" (fullpath->name <_kv (+ "path" which)>) "'" nl
-                  "audio1='audio1.wav'" nl
-                  "audio2='audio2.wav'" nl
-                  "vprefix=\"vid -ifps $fr\"" nl
-                  "aprefix=\"wavcat -fps $fr\"" nl ))
-        (for i in (audio-segment (if (= which 1) (car (get-map)) (cdr (get-map))) 1 (maxint)) do
-                (set p <i 0>)
-                (set q <i 1>)
-                (set n <i 2>)
-                (if (or (= p 1) (= n 1))
-                then    (dec p)
-                        (dec n) )
-                (inc s "$vprefix -save 'seg [" (int->str p 6 '0') "-" (int->str q 6 '0') "]")
-                (if (= n undef)
-                then    (inc s " (" which)
-                else    (inc s " - [" (int->str n 6 '0') "-" (int->str (+ n q -p) 6 '0') "] (" (- 3 which)) )
-                (inc s  ").vid' \"$movie\" -skip " p "f -dur " (- q p -1) "f" nl)
-                (inc s "$aprefix -o 'seg [" (int->str p 6 '0') "-" (int->str q 6 '0') "]")
-                (if (= n undef)
-                then    (inc s " (" which ").wav' -seg " p "f " (- q p -1)
-                                "f \"$audio" which "\"" nl )
-                else    (inc s " - [" (int->str n 6 '0') "-" (int->str (+ n q -p) 6 '0') "] (" (- 3 which) ").wav' -seg "
-                                n "f " (- q p -1)
-                                "f \"$audio" (- 3 which) "\"" nl )))
-        (fprint f
-                (if (cms-windows)
-                        (find-and-replace s "\n" "\r\n")
-                        s ))
-        (close f) )
-
 (defnet gui-save-junction-script (self which)
         (deflocal path context f fr s i p q n st junst vskip vdur)
 
@@ -1865,7 +1813,7 @@
         then    (set fr (/ 24000 1001)) )
         (set fr (sprint (num fr) (if (= (den fr) 1) "" (+ ":" (den fr)))))
         (set s (+ "fr='" fr "'" nl
-                  "movie='" (fullpath->name <_kv (+ "path" which)>) "'" nl
+                  "movie=\"" (fullpath->name <_kv (+ "path" which)>) "\"" nl
                   "audio1='audio1.wav'" nl
                   "audio2='audio2.wav'" nl
                   "vprefix=\"vid -hscale 1024 -osdtempl %rd%n%id/%md -ifps $fr\"" nl

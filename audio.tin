@@ -233,7 +233,8 @@
         (set bps (freaduint-le f 16))
         (fsetpos (+ offset 20) f)
         (while (<> (freadstr f 4) "data") do
-                (fsetpos (+ (fpos f) (freaduint-le f 32)) f) )
+                (set offset (freaduint-le f 32))
+                (fsetpos (+ (fpos f) offset) f) )
         (skip (freaduint-le f 32))
         (set offset (fpos f))
         (set smpl (div (- (length f) offset) smplsize))

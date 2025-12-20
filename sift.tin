@@ -201,7 +201,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet sift-draw-matches (m matches)
-        (deflocal color pix kx1 ky1 kx2 ky2 sx1 sy1 sx2 sy2 cr raw i cnt)
+        (deflocal color pix kx1 ky1 kx2 ky2 sx1 sy1 sx2 sy2 cr raw i)
 
         (set color (purple))
         (set pix (match-pix m))
@@ -213,20 +213,18 @@
         (set sy1 (/ (- (height pix) (height (match-pix1 m)) (height (match-pix2 m)) (space)) 2))
         (set sx2 (/ (- (width pix) (width (match-pix2 m))) 2))
         (set sy2 (+ sy1 (height (match-pix1 m)) (space)))
-    ;    (set cr (cairo-svg-surface-create-for-stream (width pix) (height pix)))
-    ;    (cairo-set-source-rgba cr color)
-    ;    (cairo-set-line-width cr 1)
-        (set cnt 0)
-        (while (and (> (length matches) 0) (< cnt 2000)) do
-                (inc cnt)
-                (set i (queue-get matches))
-    ;            (cairo-move-to cr (+ (* (car (car i)) kx1) sx1) (+ (* (cdr (car i)) ky1) sy1))
-    ;            (cairo-line-to cr (+ (* (car (cdr i)) kx2) sx2) (+ (* (cdr (cdr i)) ky2) sy2))
+        ;(set cr (cairo-svg-surface-create-for-stream (width pix) (height pix)))
+        ;(cairo-set-source-rgba cr color)
+        ;(cairo-set-line-width cr 1)
+        (for i in matches do
+                until (= (for-pos) 500)
+                ;(cairo-move-to cr (+ (* (car (car i)) kx1) sx1) (+ (* (cdr (car i)) ky1) sy1))
+                ;(cairo-line-to cr (+ (* (car (cdr i)) kx2) sx2) (+ (* (cdr (cdr i)) ky2) sy2))
                 (pix-draw-line pix (+ (* (car (car i)) kx1) sx1) (+ (* (cdr (car i)) ky1) sy1)
                                    (+ (* (car (cdr i)) kx2) sx2) (+ (* (cdr (cdr i)) ky2) sy2)
                                    color )
                 (skip) )
-    ;    (pix-draw-and-close-cairo pix cr)
+        ;(pix-draw-and-close-cairo pix cr)
         (skip) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

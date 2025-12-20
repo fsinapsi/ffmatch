@@ -86,8 +86,8 @@
                 (set t (now))
                 (opt    (truep <_kv "sound-enabled">)
                         ;(if (> (- t prev-t) 30)
-                        ;then    (sdl-playwav-memory (raw-load-static "silence.wav") 1.0) )
-                        (sdl-playwav-memory snd 1.0) )
+                        ;then    (wav-play-memory (raw-load-static "silence.wav")) )
+                        (wav-play-memory snd) )
                 (set prev-t t) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
