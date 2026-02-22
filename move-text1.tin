@@ -1,0 +1,86 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet move-text1-on-current-value (which)
+        (opt (move-text1-low which (gui-spin-value which) false)) )
+
+(defnet move-text1-now (which pos)
+        (opt (move-text1-low which pos true)) )
+
+(defnet move-text1-low (which pos now)
+        (deflocal text1 s t u l x1 y1 x2 y2 i found)
+
+        (set text1 <_kv "text1">)
+        (set s (iup-get-str-attribute text1 "VALUE"))
+        (set t s)
+        (set y2 0)
+        (set found false)
+        (repeat (str-readline s l)
+                (<> l undef)
+                (opt    (= <l 0> '[')
+                        (= <l 7> '-')
+                        (= <l 14> ']')
+                        (set x1 (str->num (sub 1 6 l)))
+                        (integerp x1)
+                        (set y1 (str->num (sub 8 6 l)))
+                        (integerp y1)
+                        (set u (sub 15 (maxint) l))
+                        (alt    (seq    (lmatch u "¹")
+                                        (set x2 -1)
+                                        (set y2 -1) )
+                                (seq    (lmatch u "²")
+                                        (set x2 x1)
+                                        (set y2 y1)
+                                        (set x1 -1)
+                                        (set y1 -1) )
+                                (seq    (= <l 21> '[')
+                                        (= <l 28> '-')
+                                        (= <l 35> ']')
+                                        (set x2 (str->num (sub 22 6 l)))
+                                        (integerp x2)
+                                        (set y2 (str->num (sub 29 6 l)))
+                                        (integerp y2) )
+                                (seq    (lmatch remove u " -/-> ??? {")
+                                        (search-and-cut "-" u i)
+                                        (search-and-cut "}" u i)
+                                        (set i (str->num i))
+                                        (integerp i)
+                                        (set x2 (+ y2 1))
+                                        (inc y2 i) ))
+                        (set found (or (and (= which 1) (in pos x1 .. y1))
+                                       (and (= which 2) (in pos x2 .. y2)) )))
+                until found )
+        (search l t pos)
+        (set i (utf8-length (sub 0 pos t)))
+        (set t (sub pos (maxint) t))
+        (set s i)
+        (set u 0)
+        (opt*   (< u 6)
+                (str-readline t pos)
+                (<> pos undef)
+                (inc s (utf8-length pos))
+                (inc u) )
+        (iup-set-int text1 "CARETPOS" s)
+        (set <_kv "gui-text1-hack-caretpos"> i)
+        (set <_kv "gui-text1-hack-selectionpos"> (sprint i ":" (+ i (utf8-length l))))
+        (if now
+        then    (gui-text1-hack-post)
+        else    (iup-post-call (netptr gui-text1-hack-post)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

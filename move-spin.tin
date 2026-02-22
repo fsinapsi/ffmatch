@@ -22,7 +22,7 @@
         then    (if (gui-locked)
                 then    (iup-set-int self "SPINVALUE" vv)
                 else    (iup-set-str-attribute self "VALUE" v)
-                        (gui-update-image) )))
+                        (update-image) )))
 
 (defnet move-spin-kb1-cb (self c)
         (move-spin-kb-low 1 self c) )
@@ -40,11 +40,11 @@
                 (seq    (= c (cmacro K_sDOWN))
                         (move-spin-shortcut-low which self -10) )
                 (seq    (= c (cmacro K_TAB))
-                        (opt (gui-sync-low which false)) )))
+                        (opt (gui-sync-low which false false)) )))
 
 (defnet move-spin-shortcut-low (which spin incr)
         (opt    (gui-spin-set-value which (+ (gui-spin-value which) incr))
-                (gui-update-image) ))
+                (update-image) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

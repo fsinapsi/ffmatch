@@ -53,9 +53,9 @@
 1
 "Lingua"
 
-"Changing the language requires a restart to take effect."
+"Changing the language or hwaccel requires a restart to take effect."
 1
-"Per usufruire della modifica della lingua occorre far ripartire il programma."
+"La modifica della lingua o dell'hwaccel richiede un riavvio per avere effetto."
 
 "File `"
 1
@@ -145,6 +145,14 @@
 1
 "Seleziona il path 2"
 
+"Play movie 1"
+1
+"Riproduci il filmato 1"
+
+"Play movie 2"
+1
+"Riproduci il filmato 2"
+
 "Swap order"
 1
 "Scambia l'ordine"
@@ -185,9 +193,9 @@
 1
 "Stampa i path obsoleti"
 
-"Print selected movie names"
+"Print info about selected movies"
 1
-"Stampa i nomi dei filmati selezionati"
+"Stampa info sui filmati selezionati"
 
 "Print timestamps movie 1"
 1
@@ -325,13 +333,21 @@
 1
 "Ottimizza i dati di \"mapping\""
 
-"Clear obsolete paths"
+"Delete obsolete paths"
 1
 "Cancella i path obsoleti"
 
-"Clear obsolete data"
+"Delete obsolete projects"
+1
+"Cancella i progetti obsoleti"
+
+"Delete obsolete data"
 1
 "Cancella i dati obsoleti"
+
+"Delete orphan data"
+1
+"Cancella i dati orfani"
 
 "Clear top text"
 1
@@ -389,13 +405,17 @@
 1
 "path obsoleti verranno cancellati."
 
-"1 obsolete data will be deleted."
+"There is no data to delete."
 1
-"1 dato obsoleto verrà cancellato."
+"Non ci sono dati da cancellare."
 
-" obsolete data will be deleted."
+"A piece of data will be deleted."
 1
-" dati obsoleti verranno cancellati."
+"Un dato verrà cancellato."
+
+" data will be deleted."
+1
+" dati verranno cancellati."
 
 "movie"
 1
@@ -412,6 +432,10 @@
 "duration"
 1
 "durata"
+
+"video stream duration"
+1
+"durata dello stream video"
 
 "Aborted"
 1
@@ -457,10 +481,6 @@
 1
 "Seleziona srt"
 
-"It seems like the audio track contains extraneous data. Please fix it."
-1
-"Sembra che la traccia audio contenga dati estranei. È consigliabile ripararla."
-
 "Please, select a valid frame rate"
 1
 "Seleziona un frame rate valido"
@@ -489,9 +509,9 @@
 1
 "Salva srt come..."
 
-"It seems like stream lengths are inconsistent:"
+"It seems like stream lengths are inconsistent"
 1
-"Sembra che le lunghezze degli stream siano inconsistenti:"
+"Sembra che le lunghezze degli stream siano inconsistenti"
 
 "duration of video"
 1
@@ -629,10 +649,6 @@
 1
 "Non ci sono progetti obsoleti."
 
-"Clear obsolete projects"
-1
-"Cancella i progetti obsoleti"
-
 "obsolete project will be deleted."
 1
 "progetto obsoleto verrà cancellato."
@@ -753,21 +769,21 @@
 1
 "Numero massimo di threads"
 
-"Try to disable cuvid..."
+"Try disabling hardware acceleration."
 1
-"Prova a disabilitare cuvid..."
+"Prova a disabilitare l'accelerazione hardware."
 
 "Print buffers content"
 1
 "Stampa il contenuto dei buffers"
 
-"hole"
+"duplicate"
 1
-"buco"
+"duplicato"
 
-"holes"
+"duplicates"
 1
-"buchi"
+"duplicati"
 
 "none"
 1
@@ -792,6 +808,138 @@
 "Thanks to:"
 1
 "Grazie a:"
+
+"Recover previous names"
+1
+"Recupera nomi precedenti"
+
+"Libraries"
+1
+"Librerie"
+
+"Font"
+1
+"Fonte caratteri"
+
+"Optimize map"
+1
+"Ottimizza la mappa"
+
+"Fit"
+1
+"Adatta"
+
+"note: no valid audio tracks were selected"
+1
+"nota: non sono state selezionate tracce audio valide"
+
+"ignore"
+1
+"ignora"
+
+"Edit"
+1
+"Modifica"
+
+"Original framerate of movie"
+1
+"Framerate originale del filmato"
+
+"Current framerate of movie"
+1
+"Framerate attuale del filmato"
+
+"New framerate"
+1
+"Nuovo framerate"
+
+"original framerate"
+1
+"framerate originale"
+
+"original aspect ratio"
+1
+"aspect ratio originale"
+
+"Deinterlacing"
+1
+"Deinterlacciamento"
+
+"deinterlacing"
+1
+"deinterlacciamento"
+
+"Gamma correction"
+1
+"Correzione gamma"
+
+"gamma correction"
+1
+"correzione gamma"
+
+"Contrast"
+1
+"Contrasto"
+
+"contrast"
+1
+"contrasto"
+
+"Temperature"
+1
+"Temperatura"
+
+"Hue"
+1
+"Tonalità"
+
+"hue"
+1
+"tonalità"
+
+"saturation"
+1
+"saturazione"
+
+"temperature"
+1
+"temperatura"
+
+"angle"
+1
+"angolo"
+
+"Rotation"
+1
+"Rotazione"
+
+"Data management"
+1
+"Gestione dati"
+
+"The segment will be shortened to the left by"
+1
+"Il segmento verrà accorciato a sinistra di"
+
+"The segment will be shortened to the right by"
+1
+"Il segmento verrà accorciato a destra di"
+
+"Movie"
+1
+"Filmato"
+
+"related data:"
+1
+"dati collegati:"
+
+"Undo"
+1
+"Annulla"
+
+"Redo"
+1
+"Rifai"
 
         )
 

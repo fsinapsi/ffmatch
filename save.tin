@@ -1,0 +1,380 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet save-text1-cb (self)
+        (opt (save-text-low self 1)) )
+
+(defnet save-text2-cb (self)
+        (opt (save-text-low self 2)) )
+
+(defnet save-text-low (self which)
+        (deflocal path f s)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ "Save" ' ' <[ "top" "bottom" ] (- which 1)> " text as...")
+                path
+                (+ "info-text" which ".txt")
+                true ))
+        (stringp path)
+
+        (set f (fcreate path))
+        (if (= f undef)
+        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
+                (fail) )
+        (cfg-set "save-path" path)
+        (set s (iup-get-str-attribute <_kv (+ "text" which)> "VALUE"))
+        (if (<> (utf8-length s) (length s))
+        then    (set s (+ (utf8-bom) s)) )
+        (fprint f
+                (if (cms-windows)
+                        (find-and-replace s "\n" "\r\n")
+                        s )
+                (if (cms-windows)
+                        "\r\n"
+                        nl ))
+        (close f) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet save-frame1-cb (self)
+        (opt (save-frame-low self 1)) )
+
+(defnet save-frame2-cb (self)
+        (opt (save-frame-low self 2)) )
+
+(defnet save-frame-low (self which)
+        (deflocal path n av pix)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set n (gui-spin-value which))
+        (set path (iup-choose-file-save self
+                (+ $"Save frame " which $" as...")
+                path
+                (+ "movie-" which "-frame-" (int->str n 6 '0') ".png")
+                true ))
+        (stringp path)
+
+        (cfg-set "save-path" path)
+
+        (alt    (iup-progress
+                    (thread-create (netptr save-frame-th) (thread-self) <_kv (+ "av" which)> n path)
+                    self "Saving frame..." true false false true true )
+                (iup-error60 self "Operation failed.") ))
+
+(defnet save-frame-th (th av n path)
+        (alt    (seq    (save-frame-th-low av n path)
+                        (send "q" to th) )
+                (send "a" to th) ))
+
+(defnet save-frame-th-low (av n path)
+        (deflocal pix)
+
+        (set pix (pix-create (width av) (height av)))
+        (pixp pix)
+        (alt    (av-read-frame av pix n)
+                (pix-clear pix) )
+        (alt    (if (rmatch case path ".jpg" ".jpeg")
+                then    (pix-save-jpg pix path)
+                else    (pix-save-png pix path) )
+                (seq    (close pix)
+                        (fail) ))
+        (close pix) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet save-actual-map-cb (self)
+        (opt (save-actual-map self)) )
+
+(defnet save-actual-map (self)
+        (deflocal path f s i p q n)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                $"Save the actual map as..."
+                path
+                "info-text.txt"
+                true ))
+        (stringp path)
+        (set f (fcreate path))
+        (if (= f undef)
+        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
+                (fail) )
+        (cfg-set "save-path" path)
+        (set s "")
+        (for i in (map-segment (car (get-map)) 1 (maxint)) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (<> n undef)
+                then    (inc s "[" (int->str p 6 '0') "-" (int->str q 6 '0') "] ---> [" (int->str n 6 '0') "-" (int->str (+ n q -p) 6 '0') "]" nl) ))
+        (fprint f
+                (if (cms-windows)
+                        (find-and-replace s "\n" "\r\n")
+                        s ))
+        (close f) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet save-vid-script-1-cb (self)
+        (opt (save-vid-script self 1)) )
+
+(defnet save-vid-script-2-cb (self)
+        (opt (save-vid-script self 2)) )
+
+(defnet save-vid-script (self which)
+        (deflocal path f w h odar fr osdtempl s i p q n)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ $"Save" " vid script " which $" as...")
+                path
+                (+ "vid-script-" which ".sh")
+                true ))
+        (stringp path)
+        (set f (fcreate path))
+        (if (= f undef)
+        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
+                (fail) )
+        (cfg-set "save-path" path)
+        (set w (width <_kv (+ "av" (- 3 which))>))
+        (set h (height <_kv (+ "av" (- 3 which))>))
+        (set odar (av-dar <_kv (+ "av" (- 3 which))>))
+        (set odar (sprint (num odar) (if (= (den odar) 1) "" (+ ":" (den odar)))))
+        (set fr (av-video-frame-rate <_kv (+ "av" which)>))
+        (if (< (abs (- fr (/ 24000 1001))) 0.0005)
+        then    (set fr (/ 24000 1001)) )
+        (set fr (sprint (num fr) (if (= (den fr) 1) "" (+ ":" (den fr)))))
+        (set osdtempl (cfg-get-or-default "osdtempl" <_kv "default">))
+        (find-and-replace osdtempl "\"" "")
+        (if (<> osdtempl "")
+        then    (set osdtempl (+ " -osdtempl \"" osdtempl "\"")) )
+        (set s (+ "fr='" fr "'" nl
+                  "movie1=\"" (fullpath->name (av-path <_kv "av1">)) "\"" nl
+                  "movie2=\"" (fullpath->name (av-path <_kv "av2">)) "\"" nl
+                  "prefix=\"vid -ifps $fr -odar " odar "\"" nl
+                  "scale=' -hscale " w " -vscale " h "'" nl ))
+        (for i in (map-segment (if (= which 1) (car (get-map)) (cdr (get-map))) which (maxint)) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (or (= p 1) (= n 1))
+                then    (dec p)
+                        (dec n) )
+                (inc s "$prefix -save 'seg [" (int->str p 6 '0') "-" (int->str q 6 '0') "]")
+                (if (= n undef)
+                then    (inc s " (" which ").vid' \"$movie" which "\"" osdtempl " $scale -skip " p)
+                else    (inc s " - [" (int->str n 6 '0') "-" (int->str (+ n q -p) 6 '0') "] (" (- 3 which) ").vid' \"$movie" (- 3 which) "\" -skip " n) )
+                (inc s "f -dur " (- q p -1) "f" nl) )
+        (fprint f
+                (if (cms-windows)
+                        (find-and-replace s "\n" "\r\n")
+                        s ))
+        (close f) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet save-wavcat-script-1-cb (self)
+        (opt (save-wavcat-script self 1)) )
+
+(defnet save-wavcat-script-2-cb (self)
+        (opt (save-wavcat-script self 2)) )
+
+(defnet save-wavcat-script (self which)
+        (deflocal path f fr s i p q n)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ $"Save" " wavcat script " which $" as...")
+                path
+                (+ "wavcat-script-" which ".sh")
+                true ))
+        (stringp path)
+        (set f (fcreate path))
+        (if (= f undef)
+        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
+                (fail) )
+        (cfg-set "save-path" path)
+        (set fr (av-video-frame-rate <_kv (+ "av" which)>))
+        (if (< (abs (- fr (/ 24000 1001))) 0.0005)
+        then    (set fr (/ 24000 1001)) )
+        (set fr (sprint (num fr) (if (= (den fr) 1) "" (+ ":" (den fr)))))
+        (set s (+ "fr='" fr "'" nl
+                  "#movie1=\"" (fullpath->name (av-path <_kv "av1">)) "\"" nl
+                  "#movie2=\"" (fullpath->name (av-path <_kv "av2">)) "\"" nl
+                  "audio1='audio1.wav'" nl
+                  "audio2='audio2.wav'" nl
+                  "prefix=\"wavcat -fps $fr\"" nl ))
+        (for i in (map-segment (if (= which 1) (car (get-map)) (cdr (get-map))) which (maxint)) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (or (= p 1) (= n 1))
+                then    (dec p)
+                        (dec n) )
+                (inc s "$prefix -o 'seg [" (int->str p 6 '0') "-" (int->str q 6 '0') "]")
+                (if (= n undef)
+                then    (inc s " (" which ").wav' -seg " p "f " (- q p -1)
+                                "f \"$audio" which "\"" nl )
+                else    (inc s " - [" (int->str n 6 '0') "-" (int->str (+ n q -p) 6 '0') "] (" (- 3 which) ").wav' -seg "
+                                n "f " (- q p -1)
+                                "f \"$audio" (- 3 which) "\"" nl )))
+        (fprint f
+                (if (cms-windows)
+                        (find-and-replace s "\n" "\r\n")
+                        s ))
+        (close f) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet save-junction-script-1-cb (self)
+        (opt (save-junction-script self 1)) )
+
+(defnet save-junction-script-2-cb (self)
+        (opt (save-junction-script self 2)) )
+
+(defnet save-junction-script (self which)
+        (deflocal path context f fr s i p q n st junst vskip vdur)
+
+        (set path (cfg-get "save-path"))
+        (if (not (stringp path))
+        then    (set path (cfg-get "path")) )
+        (set path (iup-choose-file-save self
+                (+ $"Save" " junction script " which $" as...")
+                path
+                (+ "junction-script-" which ".sh")
+                true ))
+        (stringp path)
+        ; context è il numero di frame da lasciare prima e dopo il punto di giunzione
+        (set context (cfg-get-or-default-num "junction-context" <_kv "default">))
+        (set f (fcreate path))
+        (if (= f undef)
+        then    (sound-iup-error60 self (+ $"Creation of file `" path $"' failed."))
+                (fail) )
+        (cfg-set "save-path" path)
+        (set fr (av-video-frame-rate <_kv (+ "av" which)>))
+        (if (< (abs (- fr (/ 24000 1001))) 0.0005)
+        then    (set fr (/ 24000 1001)) )
+        (set fr (sprint (num fr) (if (= (den fr) 1) "" (+ ":" (den fr)))))
+        (set s (+ "fr='" fr "'" nl
+                  "movie=\"" (fullpath->name (av-path <_kv (+ "av" which)>)) "\"" nl
+                  "audio1='audio1.wav'" nl
+                  "audio2='audio2.wav'" nl
+                  "vprefix=\"vid -hscale 1024 -osdtempl %rd%n%id/%md -ifps $fr\"" nl
+                  "aprefix=\"wavcat -fps $fr\"" nl ))
+        (set st (stack))
+        (set vskip 0)
+        (for i in (map-segment (if (= which 1) (car (get-map)) (cdr (get-map))) which (maxint)) do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (or (= p 1) (= n 1))
+                then    (dec p)
+                        (dec n) )
+                (set vdur (- q p -1))
+                (if (and (> (for-pos) 0) (>= vdur context))
+                then    (inc vskip) )
+                (if (= n undef)
+                then    (push st (list vdur p p which))
+                else    (push st (list vdur p n (- 3 which))) ))
+        (if (>= vdur context)
+        then    (dec vskip) )
+        (set i vskip)
+        (set junst (stack))
+        (while (> (length st) 1) do
+                (set p (pop st))
+                (push junst (list (min <p 0> context) <p 1> <p 2> <p 3>))
+                (repeat (set p (pop st))
+                        (set n (min <p 0> context))
+                        (push junst (list n (+ <p 1> (- <p 0> n)) (+ <p 2> (- <p 0> n)) <p 3>))
+                        until (= n context)
+                        until (= (length st) 0) )
+                (push st p)
+                (inc s "$aprefix -o junction-" (int->str i 4 '0') ".wav")
+                (clr vskip)
+                (set vdur 0)
+                (while (> (length junst) 0) do
+                        (set p (pop junst))
+                        (inc s " -seg " <p 2> "f " <p 0> "f \"$audio" <p 3> "\"")
+                        (if (= vskip undef)
+                        then    (set vskip <p 1>) )
+                        (inc vdur <p 0>) )
+                (inc s nl
+                     "$vprefix -save junction-" (int->str i 4 '0') ".vid \"$movie\" -skip " vskip "f -dur " vdur "f" nl)
+                (dec i) )
+        (inc s "#wavcat -o __tmp__.wav junction-*wav" nl
+               "#vid -cat junction-*vid -o lavc junction-all.mkv -audio __tmp__.wav" nl
+               "#rm __tmp__.wav" nl )
+        (fprint f
+                (if (cms-windows)
+                        (find-and-replace s "\n" "\r\n")
+                        s ))
+        (close f) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

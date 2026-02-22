@@ -1,0 +1,484 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet play-cb (self)
+        (opt (play-low true)) )
+
+(defnet play-no-dub-cb (self)
+        (opt (play-low false)) )
+
+(defnet play-low (dub)
+        (deflocal info which av zoom-level)
+
+        (gui-not-locked)
+        (= <_kv "th"> undef)
+        (set info <_kv "audio">)
+        (assocp info)
+        (set <info "dub"> dub)
+        (set which <info "which">)
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+        (set <_abort 0> false)
+        (set zoom-level <_kv "zoom-level">)
+        (if (<> zoom-level 0)
+        then    (set <_kv "zoom-level"> 0)
+                (gui-resize-post) )
+        (set <_kv "th"> "play")
+        (gui-disable-menu)
+        (update-buttons)
+        (opt (play-main-loop info which av))
+        (gui-enable-menu)
+        (if (<> zoom-level 0)
+        then    (set <_kv "zoom-level"> zoom-level) )
+        (assoc-clr _kv "th")
+        (update-buttons)
+        (gui-resize-post)
+        (move-text1-on-current-value 1) )
+
+(defnet play-main-loop (info which av)
+        (deflocal fps dar pld pos map done newpos)
+
+        (set fps <info "fps">)
+        (set dar (av-dar av))
+        (set pld (rint (* (cfg-get-or-default-num "play-delay" <_kv "default">) fps)))
+        ;(set newpos (max 0 (+ (gui-spin-value which) pld)))
+        ;(if (= pld 0)
+        ;then    (set pos newpos)
+        ;else    (set pos (av-nearest-keyframe av newpos (< pld 0)))
+        ;        (if (= pos undef)
+        ;        then    (set pos (av-nearest-keyframe av newpos (> pld 0))) )
+        ;        (if (= pos undef)
+        ;        then    (set pos newpos) ))
+        (set pos (max 0 (+ (gui-spin-value which) pld)))
+
+        (set map (get-map))
+        (if (= map undef)
+        then    (set map (map-create 1 1))
+                (set <info "dub"> false) )
+        (set map (map-segment (if (= which 1) (car map) (cdr map)) which (maxint)))
+
+        (iup-text-append-and-go-end <_kv "text2"> (sprint nl
+                "Esc: quit" nl
+                "+/-: gain" nl
+                "arrow keys (←, →, ↑, ↓): skip back/forward" nl
+                "space: pause/resume" nl
+                "Ctrl+D: not dubbed/dubbed" nl
+                "Ctrl+1/Ctrl+2: delay 1" nl
+                "Ctrl+3/Ctrl+4: delay 2" nl
+                nl
+                (if (not (play-audio-exists info))
+                        (+ $"note: no valid audio tracks were selected" nl)
+                        "" )
+                "video: " which nl
+                "frame rate: " (approx3 fps) " fps" nl
+                "gain: " <info "gain"> nl
+                "delay 1: " <info "delay1"> nl
+                "delay 2: " <info "delay2"> nl ))
+
+        (set <info "pause"> false)
+        (set <_kv "running"> "player")
+
+        (repeat (set <info "action"> undef)
+                (play-sync-loop info which av fps pos map)
+                until (= <info "action"> undef)
+                (set <_abort 0> false)
+                (set done false)
+                (clr newpos)
+                (case <info "action"> of
+                        "space"         (seq    (repeat (set <info "action"> undef)
+                                                        (iup-flush)
+                                                        until <_abort 0>
+                                                        (sdl-delay 50) )
+                                                (if <info "pause">
+                                                then    (gui-spin-set-value which pos)
+                                                        (gui-sync-low which true true)
+                                                        (set done true) ))
+                        "left"          (set newpos (- pos (* 10 fps)))
+                        "right"         (set newpos (+ pos (* 10 fps)))
+                        "down"          (set newpos (- pos (* 60 fps)))
+                        "up"            (set newpos (+ pos (* 60 fps)))
+                        ;"sleft"         (set pos (max 0 (- pos (rint (* 10 fps)))))
+                        ;"sright"        (set pos (+ pos (rint (* 10 fps))))
+                        "goto"          (seq    (set newpos (+ (gui-spin-value which) pld))
+                                                (set pos (+ newpos (if (<= pld 0) 1 -1))) ))
+                until done
+                (if (rationalp newpos)
+                then    (set newpos (rint newpos))
+                        (set pos (av-nearest-keyframe av newpos (< newpos pos)))
+                        (if (= pos undef)
+                        then    (set pos (av-nearest-keyframe av newpos (> newpos pos))) )
+                        (if (= pos undef)
+                        then    (set pos newpos) )))
+
+        (if (<> (av-dar av) dar)
+        then    (key-mod-set-dar av (av-dar av)) )
+
+        (assoc-clr info "pause")
+        (assoc-clr _kv "running")
+        (iup-text-append-and-go-end <_kv "text2"> "quit\n") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet play-sync-loop (info which av fps @pos map)
+        (deflocal video-th audio-th finished lbl img imn ts-step ts pix idx idx-prv)
+
+        (set <_abort 0> false)
+
+        (set @pos (max 1 @pos))
+
+        (set video-th (thread-create (netptr play-video-th) (thread-self) map which av @pos (width <_kv "pix">) (height <_kv "pix">) info fps))
+        (set audio-th (thread-create (netptr play-audio-th) (thread-self) map which info fps @pos))
+        (set finished (array default false 1))
+
+        (set lbl <_kv "sbx" 0>)
+        (set img <_kv "img">)
+
+        (receive pix from video-th)
+        (if (= pix "bye")
+        then    (set <finished 0> true)
+        else    (set imn (iup-image-rgba pix))
+                (close pix)
+                (set idx 0) )
+
+        (set ts-step (/ 1000000000 fps))
+        (sendbuf 100 true to audio-th)
+        (receive ts from audio-th)
+
+        (opt*   (not <finished 0>)
+                (iup-set-attribute-handle lbl "IMAGE" imn)
+                (iup-flush)
+                (close img)
+                (set img imn)
+                (not <_abort 0>)
+                (receive pix from video-th)
+                (if (= pix "bye")
+                then    (set <finished 0> true)
+                else    (set imn (iup-image-rgba pix))
+                        (close pix)
+                        (play-video-update map idx @pos)
+                        (if (<> idx idx-prv)
+                        then    (move-text1-now which @pos)
+                                (set idx-prv idx) ))
+                (not <finished 0>)
+                (play-sleep ts ts-step) )
+
+        (set <_abort 0> true)
+        (set <_kv "img"> img)
+
+        (if (not <finished 0>)
+        then    (opt*   (receive pix from video-th)
+                        (<> pix "bye")
+                        (close pix) ))
+
+        (thread-join video-th)
+        (thread-join audio-th) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet play-video-th (th map which av pos wo ho info fps)
+        (deflocal maxpos red1 red2 green1 green2 idx read-th finished pixi pixo dar ws hs x y pixs)
+
+        (set maxpos (av-approximated-number-of-frames av))
+
+        (set x (rint (linear wo 0 860 0 30)))
+        (set red1 (rsvg-load-size (raw-load-static "svg/one-red.svg") x x))
+        (set red2 (rsvg-load-size (raw-load-static "svg/two-red.svg") x x))
+        (set green1 (rsvg-load-size (raw-load-static "svg/one-green.svg") x x))
+        (set green2 (rsvg-load-size (raw-load-static "svg/two-green.svg") x x))
+
+        (set read-th (thread-create (netptr play-video-read-th) (thread-self) av pos))
+        (set finished (array default false 1))
+
+        (set idx 0)
+        (play-video-update map idx pos)
+
+        (set pixo (pix-create wo ho))
+        (pix-black pixo)
+
+        (set dar (av-dar av))
+        (play-video-update-resolution dar wo ho ws hs x y pixs)
+
+        (opt*   (not <_abort 0>)
+                (receive pixi from read-th)
+                (if (= pixi "bye")
+                then    (set <finished 0> true) )
+                (not <finished 0>)
+                (if (<> (av-dar av) dar)
+                then    (set dar (av-dar av))
+                        (pix-black pixo)
+                        (close pixs)
+                        (play-video-update-resolution dar wo ho ws hs x y pixs) )
+                (pix-sws-scale-lanczos pixi pixs)
+                (close pixi)
+                (play-video-draw-text pixs (+ (date-s2hhmmss (/ (- pos 1) fps)) " " (rint (/ pos maxpos 0.01)) "% (" (- pos 1) ")"))
+                (play-video-update map idx pos)
+                (if (and <info "dub"> (< idx (length map)))
+                then    (pix-draw-pix-alpha pixs 5 5
+                                (if (= <map idx 2> undef)
+                                        (if (= which 1) red1 red2)
+                                        (if (= which 1) green2 green1) )))
+                (pix-draw-pix pixo x y pixs)
+                (sendbuf 10 (pix-clone pixo) to th) )
+
+        (close pixo pixs red1 red2 green1 green2)
+
+        (send "bye" to th)
+        (opt*   (not <finished 0>)
+                (receive pixi from read-th)
+                (if (= pixi "bye")
+                then    (set <finished 0> true)
+                else    (close pixi) ))
+        (thread-join read-th) )
+
+(defnet play-video-update-resolution (dar wo ho @ws @hs @x @y @pixs)
+        (if (>= dar (/ wo ho))
+        then    (set @ws wo)
+                (set @hs (rint (/ @ws dar)))
+                (set @x 0)
+                (set @y (div (- ho @hs) 2))
+        else    (set @hs ho)
+                (set @ws (rint (* @hs dar)))
+                (set @x (div (- wo @ws) 2))
+                (set @y 0) )
+        (set @pixs (pix-create @ws @hs)) )
+
+(defnet play-video-update (map @idx @pos)
+        (repeat until (= @idx (length map))
+                until (<= @pos <map @idx 1>)
+                (inc @idx) )
+        (inc @pos) )
+
+(defnet play-video-draw-text (pix s)
+        (deflocal pixt)
+
+        (set pixt (pix-text s))
+        (pix-negative pixt)
+        (pix-draw-pix-alpha pix 5 (- (height pix) (height pixt) 5) pixt)
+        (close pixt) )
+
+(defnet play-video-read-th (th av pos)
+        (deflocal w h pix)
+
+        (set w (width av))
+        (set h (height av))
+        (opt*   (not <_abort 0>)
+                (set pix (pix-create w h))
+                (alt    (av-read-frame av pix pos)
+                        (seq    (close pix)
+                                (fail) ))
+                (inc pos)
+                (sendbuf 10 pix to th) )
+        (send "bye" to th) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet play-audio-th (th map which info fps pos)
+        (deflocal info1 info2 idx gain delay1 delay2 pos1 pos2 samplesize frequency len raw s ts-step ts i)
+
+        (play-audio-open info info1 info2)
+        (if (or (not (assocp info1)) (not (assocp info2)))
+        then    (play-audio-close info1 info2)
+                (receive ts from th)
+                (send (sdl-get-ticks-ns) to th)
+                (fail) )
+
+        (set gain <info "gain">)
+        (set delay1 <info "delay1">)
+        (set delay2 <info "delay2">)
+
+        (set samplesize (wav-samplesize info1))
+        (set frequency (wav-frequency info1))
+
+        (set len (* samplesize (rint (/ frequency fps))))
+        (set raw (raw len))
+
+        (set idx 0)
+        (play-audio-update map idx pos raw pos1 pos2 which info1 info2 fps delay1 delay2 info)
+
+        (set s (sdl-open-audio-stream (wav-channels info1) frequency (wav-bps info1)))
+
+        (set ts-step (* (/ len samplesize frequency) 1000000000))
+        ; il rendez-vous stretto serve per generare ts quando sono entrambi pronti;
+        ; è meglio che ts lo generi l'audio perché il video ha la possibilità di recuperare
+        (receive ts from th)
+        (set ts (sdl-get-ticks-ns))
+        (sendbuf 100 ts to th)
+
+        (if (or (= s undef) (= len 0))
+        then    (close raw)
+                (fail) )
+
+        (sdl-set-audio-stream-gain s gain)
+
+        ; questo hack ha l'effetto di inviare subito allo stream mezzo secondo di dati
+        ; allo scopo di riempire i buffer di sdl
+        (dec ts (* 0.5 1000000000))
+
+        (sdl-resume-audio-stream-device s)
+
+        (opt*   (not <_abort 0>)
+                (sdl-put-audio-stream-data s raw)
+                (play-audio-update map idx pos raw pos1 pos2 which info1 info2 fps delay1 delay2 info)
+                (not <_abort 0>)
+                (play-sleep ts ts-step)
+                (set i <info "gain">)
+                (if (<> i gain)
+                then    (set gain i)
+                        (sdl-set-audio-stream-gain s gain) )
+                (set i <info "delay1">)
+                (if (<> i delay1)
+                then    (set delay1 i)
+                        (clr pos1) )
+                (set i <info "delay2">)
+                (if (<> i delay2)
+                then    (set delay2 i)
+                        (clr pos2) ))
+
+        (sdl-pause-audio-stream-device s)
+        (sdl-clear-audio-stream s)
+        (close raw s)
+        (play-audio-close info1 info2) )
+
+(defnet play-audio-update (map @idx @pos raw @pos1 @pos2 which info1 info2 fps delay1 delay2 info)
+        (deflocal f1 f2 n)
+
+        (set f1 (wav-fp info1))
+        (set f2 (wav-fp info2))
+        (repeat until (= @idx (length map))
+                until (<= @pos <map @idx 1>)
+                (inc @idx) )
+        (raw-set raw (int->char 0))
+        (if (< @idx (length map))
+        then    (if <info "dub">
+                then    (set n <map @idx 2>) )
+                (if (= n undef)
+                then    (if (= which 1)
+                        then    (play-audio-read @pos1 @pos info1 raw fps delay1)
+                        else    (play-audio-read @pos2 @pos info2 raw fps delay2) )
+                else    (inc n @pos -<map @idx 0>)
+                        (if (= which 1)
+                        then    (play-audio-read @pos2 n info2 raw fps delay2)
+                        else    (play-audio-read @pos1 n info1 raw fps delay1) )))
+        (inc @pos) )
+
+(defnet play-audio-read (@pos newpos info raw fps delay)
+        (deflocal f i)
+
+        (set f (wav-fp info))
+        (alt    (seq    (= @pos newpos)
+                        (skip (raw-read raw f))
+                        (inc @pos) )
+                (seq    (set i (- (/ newpos fps) delay))
+                        (>= i 0)
+                        (set i (wav-timestamp->sample info i))
+                        (< i (wav-samples info))
+                        (fsetpos (+ (wav-offset info) (* (wav-samplesize info) i)) f)
+                        (set @pos newpos)
+                        (skip (raw-read raw f))
+                        (inc @pos) )
+                (success) ))
+
+(defnet play-audio-open (info @info1 @info2)
+        (set @info1 (wav-open <info "path1">))
+        (set @info2 (wav-open <info "path2">)) )
+
+(defnet play-audio-close (info1 info2)
+        (if (assocp info1)
+        then    (wav-close info1) )
+        (if (assocp info2)
+        then    (wav-close info2) ))
+
+(defun play-audio-exists (info) net play-audio-exists)
+(defnet play-audio-exists (info @res)
+        (deflocal info1 info2)
+
+        (play-audio-open info info1 info2)
+        (set @res (and (assocp info1) (assocp info2)))
+        (play-audio-close info1 info2) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet play-sleep (@ts ts-step)
+        (inc @ts ts-step)
+        (sdl-delay-ns (rint (- @ts (sdl-get-ticks-ns)))) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet play-movie1-cb (self)
+        (opt (play-movie 1)) )
+
+(defnet play-movie2-cb (self)
+        (opt (play-movie 2)) )
+
+(defnet play-movie (which)
+        (deflocal info which-org fps-org)
+
+        (set info <_kv "audio">)
+        (assocp info)
+        (set which-org <info "which">)
+        (set <info "which"> which)
+        (if (= <info "path1"> undef)
+        then    (set fps-org <info "fps">)
+                (set <info "fps"> (av-video-frame-rate <_kv (+ "av" which)>)) )
+        (opt (play-low true))
+        (set <info "which"> which-org)
+        (if (= <info "path1"> undef)
+        then    (set <info "fps"> fps-org) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

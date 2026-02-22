@@ -1,0 +1,80 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet update-image ()
+        (update-image-low 0) )
+
+(defnet update-image-low (draw-keypoints)
+        (if (= <_kv "gui-update-image-concurrent-lock"> undef)
+        then    (set <_kv "gui-update-image-concurrent-lock"> true)
+                (opt (update-image-low-low draw-keypoints))
+                (assoc-clr _kv "gui-update-image-concurrent-lock") ))
+
+(defnet update-image-low-low (draw-keypoints)
+        (deflocal default-info pix av1 av2 n1 n2 thclk th1 th2 pix1 pix2 a res1 res2 delay-step delay cnt i)
+
+        (set default-info <_kv "default">)
+        (set pix <_kv "pix">)
+        (set av1 <_kv "av1">)
+        (set av2 <_kv "av2">)
+        (if (or (= av1 undef) (= av2 undef))
+        then    (pix-logo pix)
+                (gui-draw-image)
+        else    (set n1 (gui-spin-value 1))
+                (set n2 (perm-convert (gui-spin-value 2)))
+                (set thclk <_kv "th-clock">)
+                (set th1 <_kv "th-read-frame1">)
+                (set th2 <_kv "th-read-frame2">)
+                (iup-set-str-attribute <_kv "time-label1"> "TITLE" (date-s2hhmmss (/ n1 (av-video-frame-rate av1))))
+                (iup-set-str-attribute <_kv "time-label2"> "TITLE" (date-s2hhmmss (/ n2 (av-video-frame-rate av2))))
+                (pix-create-pixfrm pix av1 av2 pix1 pix2)
+                (send (list av1 pix1 n1) to th1)
+                (send (list av2 pix2 n2) to th2)
+                (set delay-step 0.01)
+                (set delay 0)
+                (th-clock-send delay-step)
+                (thread-case*
+                    priority 1 (not (booleanp res1)) (receive res1 from th1) ->
+                        (alt    (seq    (truep res1)
+                                        (case draw-keypoints of
+                                                1       (pix-draw-keypoints pix1 (green)) ))
+                                (pix-error pix1) )
+                 [] priority 1 (not (booleanp res2)) (receive res2 from th2) ->
+                        (alt    (seq    (truep res2)
+                                        (case draw-keypoints of
+                                                1       (pix-draw-keypoints pix2 (green)) ))
+                                (pix-error pix2) )
+                 [] priority 0 (not (and (booleanp res1) (booleanp res2))) (receive i from thclk) ->
+                        (inc delay delay-step)
+                        (if (>= delay (if (integerp cnt) 1 0.3))
+                        then    (set cnt (if (integerp cnt) (% (+ cnt 1) 3) 0))
+                                (pix-draw-box pix 10 10 20 20 <(list (pix-color 0xff 0 0) (pix-color 0 0xff 0) (pix-color 0 0 0xff)) cnt>)
+                                (gui-draw-image)
+                                (set delay 0) )
+                        (send delay-step to thclk) )
+                (pix-clear pix)
+                (set a (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
+                (pix-draw-pix pix (/ (- (width pix) (width pix1)) 2) a pix1)
+                (pix-draw-pix pix (/ (- (width pix) (width pix2)) 2) (+ a (height pix1) (space)) pix2)
+                (close pix1 pix2)
+                (gui-draw-image)
+                (iup-set-double <_kv "slide1"> "VALUE" (linear n1 1 (+ (iup-get-int <_kv "spin1"> "SPINMAX") 0.00000000000001) 0 1))
+                (iup-set-double <_kv "slide2"> "VALUE" (linear n2 1 (+ (iup-get-int <_kv "spin2"> "SPINMAX") 0.00000000000001) 0 1)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

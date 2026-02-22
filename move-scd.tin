@@ -39,10 +39,10 @@
         (gui-not-locked)
         (set av <_kv (+ "av" which)>)
         (if (or (= which 1) (= <_kv "prm"> undef))
-        then    (set scd (cfg-get (key-scd av (fullpath->name <_kv (+ "path" which)>))))
+        then    (set scd (cfg-get (key-scd av)))
                 (listp scd)
                 (set scd <scd 4>)
-        else    (set scd (cdr (cfg-get (key-prm <_kv "av1"> <_kv "av2"> (fullpath->name <_kv "path1">) (fullpath->name <_kv "path2">)))))
+        else    (set scd (cdr (cfg-get (key-prm <_kv "av1"> <_kv "av2">))))
                 (<> scd undef) )
         (set thres (iup-text-spin-ratio-val <_kv (+ "scd-spin" which)>))
         (set o (gui-spin-value which))
@@ -50,12 +50,12 @@
         then    (for n in 1 .. (- o 1) rev do
                         (if (>= <scd n> thres)
                         then    (gui-spin-set-value which n)
-                                (gui-update-image)
+                                (update-image)
                                 (fail) ))
         else    (for n in (+ o 1) .. (- (av-approximated-number-of-frames av) 2) do
                         (if (>= <scd n> thres)
                         then    (gui-spin-set-value which n)
-                                (gui-update-image)
+                                (update-image)
                                 (fail) ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

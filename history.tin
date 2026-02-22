@@ -8,59 +8,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet move-sync-left-cb (self)
-        (deflocal n1 n2 lm rm left right)
-
-        (opt    (movie-sync-pre n1 n2 lm rm left right)
-                (not lm)
-                (if (= left 0)
-                then    (sound-pop) )
-                (move-sync-post n1 n2 -1) ))
-
-(defnet move-sync-right-cb (self)
-        (deflocal n1 n2 lm rm left right)
-
-        (opt    (movie-sync-pre n1 n2 lm rm left right)
-                (not rm)
-                (if (= right 0)
-                then    (sound-pop) )
-                (move-sync-post n1 n2 1) ))
-
-(defnet move-sync-left-fast-cb (self)
-        (deflocal n1 n2 lm rm left right n)
-
-        (opt    (movie-sync-pre n1 n2 lm rm left right)
-                (not lm)
-                (if (= left 0)
-                then    (sound-pop)
-                        (set n -1)
-                else    (set n (max -(cfg-get-or-default-num "supervision-skip-double" <_kv "default">) left)) )
-                (move-sync-post n1 n2 n) ))
-
-(defnet move-sync-right-fast-cb (self)
-        (deflocal n1 n2 lm rm left right n)
-
-        (opt    (movie-sync-pre n1 n2 lm rm left right)
-                (not rm)
-                (if (= right 0)
-                then    (sound-pop)
-                        (set n 1)
-                else    (set n (min (cfg-get-or-default-num "supervision-skip-double" <_kv "default">) right)) )
-                (move-sync-post n1 n2 n) ))
-
-(defnet move-sync-left-first-cb (self)
-        (deflocal n1 n2 lm rm left right)
-
-        (opt    (movie-sync-pre n1 n2 lm rm left right)
-                (not lm)
-                (move-sync-post n1 n2 left) ))
-
-(defnet move-sync-right-last-cb (self)
-        (deflocal n1 n2 lm rm left right)
-
-        (opt    (movie-sync-pre n1 n2 lm rm left right)
-                (not rm)
-                (move-sync-post n1 n2 right) ))
+(defnet history-clear ()
+        (db-comm "DELETE FROM history")
+        (set <_kv "history-max"> -1)
+        (set <_kv "history-pos"> -1)
+        (history-update) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -72,38 +24,68 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet movie-sync-pre (@n1 @n2 @left-is-min @right-is-max @left @right)
-        (deflocal k map i1 i2)
+(defnet history-update ()
+        (opt (history-update-low)) )
+
+(defnet history-update-low ()
+        (deflocal av1 av2 p key-map key-prm)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set p (+ <_kv "history-pos"> 1))
+        (set key-map (key-map av1 av2))
+        (set key-prm (key-prm av1 av2))
+        (sqlite3-exec _db undef "DELETE FROM history WHERE idx>=" p)
+        (sqlite3-exec _db undef "INSERT INTO history VALUES(" p ",'"
+                (list (cons key-map (cfg-get key-map)))
+                "')" )
+        (set <_kv "history-pos"> p)
+        (set <_kv "history-max"> p) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet history-undo-cb (self)
+        (opt (history-undo)) )
+
+(defnet history-undo ()
+        (deflocal p i)
 
         (gui-not-locked)
-        (set k (cfg-get (key-map <_kv "av1"> <_kv "av2">)))
-        (<> k undef)
-        (set @n1 (gui-spin-value 1))
-        (set @n2 (gui-spin-value 2))
-        (set @left-is-min (or (= @n1 1) (= @n2 1)))
-        (set @right-is-max (or (= @n1 <k 0>) (= @n2 <k 1>)))
-        (set map (get-map-low k))
-        (for i1 in (car map) do
-                until (in @n1 <i1 0> .. <i1 1>) )
-        (for i2 in (cdr map) do
-                until (in @n2 <i2 0> .. <i2 1>) )
-        (set @left (max (- <i1 0> @n1) (- <i2 0> @n2)))
-        (set @right (min (- <i1 1> @n1) (- <i2 1> @n2))) )
+        (set p <_kv "history-pos">)
+        (> p 0)
+        (history-set-pos (- p 1)) )
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defnet history-redo-cb (self)
+        (opt (history-redo)) )
 
-(defnet move-sync-post (n1 n2 n)
-        (gui-spin-set-value 1 (+ n1 n))
-        (gui-spin-set-value 2 (+ n2 n))
-        (update-image) )
+(defnet history-redo ()
+        (deflocal p i)
+
+        (gui-not-locked)
+        (set p <_kv "history-pos">)
+        (< p <_kv "history-max">)
+        (history-set-pos (+ p 1)) )
+
+(defnet history-set-pos (p)
+        (deflocal i)
+
+        (for i in <(sqlite3-exec _db "SELECT val FROM history WHERE idx=" p) 0 0> do
+                (cfg-set (car i) (cdr i)) )
+        (set <_kv "history-pos"> p)
+        (perm-set-local)
+        (gui-report-low false)
+        (move-text1-on-current-value 1)
+        (update-buttons) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

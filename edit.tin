@@ -1,0 +1,471 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet edit-framerate1-cb (self)
+        (opt (edit-framerate self 1)) )
+
+(defnet edit-framerate2-cb (self)
+        (opt (edit-framerate self 2)) )
+
+(defnet edit-framerate (self which)
+        (deflocal av edit-info q vbox dlg org-fr cur-fr fr)
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+
+        (set org-fr (approx6 (av-original-video-frame-rate av)))
+        (set cur-fr (approx6 (av-video-frame-rate av)))
+
+        (set edit-info (assoc))
+        (set <_kv "edit-info"> edit-info)
+        (set <edit-info "confirmed"> false)
+
+        (set q (queue))
+
+        (set vbox (iup-vbox
+                        (iup-hbox (iup-label (+ $"Original framerate of movie" " " which ": "))
+                                  (iup-fill)
+                                  (iup-label (sprint org-fr " fps")) )
+                        (iup-hbox (iup-label (+ $"Current framerate of movie" " " which ": "))
+                                  (iup-fill)
+                                  (iup-label (sprint cur-fr " fps")) )
+                        (edit-framerate-setup-combo cur-fr q)
+                        (iup-horizontal-separator)
+                        (edit-setup-bottom q) ))
+        (iup-set-str-attribute vbox "NMARGIN" "12x12")
+        (iup-set-int vbox "NGAP" 10)
+
+        (set dlg (iup-dialog vbox))
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" (+ $"Edit" " framerate " which))
+        (iup-set-attribute-handle dlg "ICON" (edit-icon q))
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-callback dlg "K_ANY" (netptr edit-kb-cb))
+
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
+
+        (set fr (str->num (iup-get-str-attribute <edit-info "framerate-combo"> "VALUE")))
+
+        (close dlg)
+        (iup-close-queue q)
+        (set q <edit-info "confirmed">)
+        (assoc-clr _kv "edit-info")
+        (truep q)
+
+        (rationalp fr)
+        (<> (approx6 fr) cur-fr)
+
+        (key-mod-set-framerate av fr)
+        (open-common which (av-path av))
+        (gui-report)
+        (update-image)
+        (update-buttons) )
+
+(defun edit-framerate-setup-combo (fr q) net edit-framerate-setup-combo)
+(defnet edit-framerate-setup-combo (fr q @wid)
+        (deflocal edit-info l i)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set l (iup-list))
+        (set <edit-info "framerate-combo"> l)
+        (iup-set-bool l "DROPDOWN" true)
+        (iup-set-bool l "EDITBOX" true)
+        (iup-set-str-attribute l "EXPAND" "HORIZONTAL")
+        (iup-set-str-attribute l "MASK" "(/d+/.?/d*|/./d+)")
+        (for i in (framerates) do
+                (iup-set-str-attribute l (+ (for-pos) 1) (approx3 i)) )
+        (iup-set-str-attribute l "VALUE" fr)
+
+        (set @wid (iup-hbox (iup-label (+ $"New framerate" ": ")) l))
+        (iup-set-int @wid "NGAP" 4)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet edit-deinterlacing1-cb (self)
+        (opt (edit-deinterlacing self 1)) )
+
+(defnet edit-deinterlacing2-cb (self)
+        (opt (edit-deinterlacing self 2)) )
+
+(defnet edit-deinterlacing (self which)
+        (deflocal av edit-info q vbox dlg cur-v v)
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+
+        (set cur-v (av-get-filter-rows av))
+
+        (set edit-info (assoc))
+        (set <_kv "edit-info"> edit-info)
+        (set <edit-info "confirmed"> false)
+
+        (set q (queue))
+
+        (set vbox (iup-vbox
+                        (edit-deinterlacing-setup-list cur-v q)
+                        (iup-horizontal-separator)
+                        (edit-setup-bottom q) ))
+        (iup-set-str-attribute vbox "NMARGIN" "12x12")
+        (iup-set-int vbox "NGAP" 10)
+
+        (set dlg (iup-dialog vbox))
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" (+ $"Deinterlacing" " " which))
+        (iup-set-attribute-handle dlg "ICON" (edit-icon q))
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-callback dlg "K_ANY" (netptr edit-kb-cb))
+
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
+
+        (set v (iup-get-int <edit-info "deinterlacing-list"> "VALUE"))
+
+        (close dlg)
+        (iup-close-queue q)
+        (set q <edit-info "confirmed">)
+        (assoc-clr _kv "edit-info")
+        (truep q)
+
+        (integerp v)
+        (dec v)
+        (<> v cur-v)
+
+        (key-mod-set av "deint" (if (= v 0) undef v))
+        (key-mod-apply av)
+        (print-info-on-selected-file which)
+        (gui-report)
+        (update-image)
+        (update-buttons) )
+
+(defun edit-deinterlacing-setup-list (cur-v q) net edit-deinterlacing-setup-list)
+(defnet edit-deinterlacing-setup-list (cur-v q @wid)
+        (deflocal edit-info l i)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set l (iup-list))
+        (set <edit-info "deinterlacing-list"> l)
+        (iup-set-bool l "DROPDOWN" true)
+        (for i in (deinterlacing) do
+                (iup-set-str-attribute l (+ (for-pos) 1) (if (= (for-pos) 0) $"none" i)) )
+        (iup-set-int l "VALUE" (+ cur-v 1))
+
+        (set @wid (iup-hbox (iup-label $"Deinterlacing") l))
+        (iup-set-int @wid "NGAP" 4)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet edit-aspect-ratio1-cb (self)
+        (opt (edit-aspect-ratio self 1)) )
+
+(defnet edit-aspect-ratio2-cb (self)
+        (opt (edit-aspect-ratio self 2)) )
+
+(defnet edit-aspect-ratio (self which)
+        (deflocal av edit-info q vbox dlg
+                  cur-dar cur-rot cur-hflip cur-vflip
+                  dar rot hflip vflip )
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+
+        (set cur-dar (approx3 (av-dar av)))
+        (set cur-rot 0) ; FIXME
+        (set cur-hflip (av-get-hflip av))
+        (set cur-vflip (av-get-vflip av))
+
+        (set edit-info (assoc))
+        (set <_kv "edit-info"> edit-info)
+        (set <edit-info "confirmed"> false)
+
+        (set q (queue))
+
+        (set vbox (iup-vbox
+                        (edit-aspect-ratio-setup-dar cur-dar cur-hflip q)
+                        (edit-aspect-ratio-setup-rot cur-rot cur-vflip q)
+                        (iup-horizontal-separator)
+                        (edit-setup-bottom q) ))
+        (iup-set-str-attribute vbox "NMARGIN" "12x12")
+        (iup-set-int vbox "NGAP" 10)
+
+        (set dlg (iup-dialog vbox))
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" (+ "Aspect ratio " which))
+        (iup-set-attribute-handle dlg "ICON" (edit-icon q))
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-callback dlg "K_ANY" (netptr edit-kb-cb))
+
+        ; FIXME
+        (iup-set-active <edit-info "rot-spin">  false)
+
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
+
+        (set dar (approx3 (iup-text-spin-ratio-val <edit-info "dar-spin">)))
+        (set rot (approx3 (iup-text-spin-ratio-val <edit-info "rot-spin">)))
+        (set hflip (iup-get-bool <edit-info "hflip-tb"> "VALUE"))
+        (set vflip (iup-get-bool <edit-info "vflip-tb"> "VALUE"))
+
+        (close dlg)
+        (iup-close-queue q)
+        (set q <edit-info "confirmed">)
+        (assoc-clr _kv "edit-info")
+        (truep q)
+
+        (or (<> dar cur-dar) (<> rot cur-rot) (<> hflip cur-hflip) (<> vflip cur-vflip))
+
+        (key-mod-set-dar av dar)
+        ;(key-mod-set av "rot" (if (in rot [ 0 360 -360 ]) undef rot)) FIXME
+        (key-mod-set av "hflip" hflip)
+        (key-mod-set av "vflip" vflip)
+        (key-mod-apply av)
+        (print-info-on-selected-file which)
+        (update-image) )
+
+(defun edit-aspect-ratio-setup-dar (cur-dar cur-hflip q) net edit-aspect-ratio-setup-dar)
+(defnet edit-aspect-ratio-setup-dar (cur-dar cur-hflip q @wid)
+        (deflocal edit-info s t)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set s (iup-text-spin-ratio 0.1 10 cur-dar 0.01))
+        (set <edit-info "dar-spin"> s)
+
+        (set t (iup-toggle "mirror"))
+        (set <edit-info "hflip-tb"> t)
+        (iup-set-bool t "VALUE" cur-hflip)
+
+        (set @wid (iup-hbox t (iup-fill) (iup-label "Aspect ratio") s))
+        (iup-set-int @wid "NGAP" 4)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+(defun edit-aspect-ratio-setup-rot (cur-rot cur-vflip q) net edit-aspect-ratio-setup-rot)
+(defnet edit-aspect-ratio-setup-rot (cur-rot cur-vflip q @wid)
+        (deflocal edit-info s t)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set s (iup-text-spin-ratio -360 360 cur-rot 0.1))
+        (set <edit-info "rot-spin"> s)
+
+        (set t (iup-toggle "flip"))
+        (set <edit-info "vflip-tb"> t)
+        (iup-set-bool t "VALUE" cur-vflip)
+
+        (set @wid (iup-hbox t (iup-fill) (iup-label $"Rotation") s))
+        (iup-set-int @wid "NGAP" 4)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet edit-filters1-cb (self)
+        (opt (edit-filters self 1)) )
+
+(defnet edit-filters2-cb (self)
+        (opt (edit-filters self 2)) )
+
+(defnet edit-filters (self which)
+        (deflocal av edit-info q vbox dlg
+                  cur-gamma cur-contrast cur-hue cur-temperature
+                  gamma contrast hue temperature )
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+
+        (set cur-gamma (av-get-gamma av))
+        (set cur-contrast (av-get-contrast av))
+        (set cur-hue (av-get-hue av))
+        (set cur-temperature (av-get-temperature av))
+
+        (set edit-info (assoc))
+        (set <_kv "edit-info"> edit-info)
+        (set <edit-info "confirmed"> false)
+
+        (set q (queue))
+
+        (set vbox (iup-vbox
+                        (edit-filters-setup-spin-gamma cur-gamma cur-contrast q)
+                        (edit-filters-setup-spin-hue cur-hue q)
+                        (edit-filters-setup-spin-temperature cur-temperature q)
+                        (iup-horizontal-separator)
+                        (edit-setup-bottom q) ))
+        (iup-set-str-attribute vbox "NMARGIN" "12x12")
+        (iup-set-int vbox "NGAP" 10)
+
+        (set dlg (iup-dialog vbox))
+        (iup-set-dlg-parent self dlg)
+        (iup-set-str-attribute dlg "TITLE" (+ $"Filters" " " which))
+        (iup-set-attribute-handle dlg "ICON" (edit-icon q))
+        (iup-set-bool dlg "DIALOGFRAME" true)
+        (iup-set-callback dlg "K_ANY" (netptr edit-kb-cb))
+
+        (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
+
+        (set gamma (iup-text-spin-ratio-val <edit-info "gamma-spin">))
+        (set contrast (iup-text-spin-ratio-val <edit-info "contrast-spin">))
+        (set hue (cons (iup-text-spin-ratio-val <edit-info "hue-h-spin">)
+                       (iup-text-spin-ratio-val <edit-info "hue-s-spin">) ))
+        (set temperature (cons (iup-text-spin-ratio-val <edit-info "temperature-t-spin">)
+                               (iup-text-spin-ratio-val <edit-info "temperature-a-spin">) ))
+
+        (close dlg)
+        (iup-close-queue q)
+        (set q <edit-info "confirmed">)
+        (assoc-clr _kv "edit-info")
+        (truep q)
+
+        (or (<> gamma cur-gamma) (<> contrast cur-contrast)
+            (<> hue cur-hue) (<> temperature cur-temperature) )
+
+        (key-mod-set av "gamma" (if (= gamma 1) undef gamma))
+        (key-mod-set av "contrast" (if (= contrast 1) undef contrast))
+        (key-mod-set av "hue" (if (= hue [ 0 . 0 ]) undef hue))
+        (key-mod-set av "temperature" (if (= temperature [ 0 . 0 ]) undef temperature))
+        (key-mod-apply av)
+        (print-info-on-selected-file which)
+        (update-image) )
+
+(defun edit-filters-setup-spin-gamma (cur-gamma cur-contrast q) net edit-filters-setup-spin-gamma)
+(defnet edit-filters-setup-spin-gamma (cur-gamma cur-contrast q @wid)
+        (deflocal edit-info sg sc)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set sg (iup-text-spin-ratio 0.01 10 cur-gamma 0.01))
+        (set <edit-info "gamma-spin"> sg)
+
+        (set sc (iup-text-spin-ratio 0 10 cur-contrast 0.01))
+        (set <edit-info "contrast-spin"> sc)
+
+        (set @wid (iup-hbox sg (iup-label (+ $"Gamma correction" "    ")) (iup-fill) (iup-label $"Contrast") sc))
+        (iup-set-int @wid "NGAP" 4)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+(defun edit-filters-setup-spin-hue (cur-v q) net edit-filters-setup-spin-hue)
+(defnet edit-filters-setup-spin-hue (cur-v q @wid)
+        (deflocal edit-info sh ss)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set sh (iup-text-spin-ratio -90 90 (car cur-v) 1))
+        (set <edit-info "hue-h-spin"> sh)
+
+        (set ss (iup-text-spin-ratio -10 10 (cdr cur-v) 0.1))
+        (set <edit-info "hue-s-spin"> ss)
+
+        (set @wid (iup-hbox sh (iup-label $"Hue") (iup-fill) (iup-label $"saturation") ss))
+        (iup-set-int @wid "NGAP" 4)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+(defun edit-filters-setup-spin-temperature (cur-v q) net edit-filters-setup-spin-temperature)
+(defnet edit-filters-setup-spin-temperature (cur-v q @wid)
+        (deflocal edit-info st sa)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set st (iup-text-spin-ratio -1 1 (car cur-v) 0.01))
+        (set <edit-info "temperature-t-spin"> st)
+
+        (set sa (iup-text-spin-ratio 0 180 (cdr cur-v) 1))
+        (set <edit-info "temperature-a-spin"> sa)
+
+        (set @wid (iup-hbox st (iup-label $"Temperature") (iup-fill) (iup-label $"angle") sa))
+        (iup-set-int @wid "NGAP" 4)
+        (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun edit-setup-bottom (q) net edit-setup-bottom)
+(defnet edit-setup-bottom (q @wid)
+        (deflocal btn-ok btn-close)
+
+        (set btn-ok (iup-button-icon-ok (netptr edit-ok-cb) q))
+        (set btn-close (iup-button-icon-cancel (netptr iup-cancel-cb) q))
+
+        (set @wid (iup-hbox (iup-fill) btn-ok btn-close))
+        (iup-set-int @wid "NGAP" 4) )
+
+(defnet edit-ok-cb (self)
+        (opt (edit-ok-low)) )
+
+(defnet edit-ok-low ()
+        (deflocal edit-info i)
+
+        (set edit-info <_kv "edit-info">)
+
+        (set i <edit-info "framerate-combo">)
+        (if (<> i undef)
+        then    (set i (str->num (iup-get-str-attribute i "VALUE")))
+                (rationalp i)
+                (in i 1 .. 1000) )
+
+        (set <edit-info "confirmed"> true)
+        (iup-exit-loop) )
+
+(defnet edit-kb-cb (dlg c)
+        (case c of
+                (cmacro K_ESC)          (iup-exit-loop)
+                (cmacro K_CR)           (edit-ok-cb undef)
+                default                 (fail) ))
+
+(defun edit-icon (q) net edit-icon)
+(defnet edit-icon (q @img)
+        (deflocal raw pix)
+
+        (set raw (svg->svg-size (raw-load-static "svg/editar.svg") 64 64))
+        (set pix (rsvg-load raw))
+        (close raw)
+        (set @img (iup-image-rgba pix))
+        (close pix)
+        (queue-put q @img) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

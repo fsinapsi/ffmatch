@@ -1,0 +1,465 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-info-on-selected-file (which)
+        (opt (print-info-on-selected-file-low which)) )
+
+(defnet print-info-on-selected-file-low (which)
+        (deflocal av text2 vidx s t)
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+        (set text2 <_kv "text2">)
+        (set vidx (av-video-stream-idx av))
+        (iup-text-append-and-go-end text2 (+ $"movie" " " which ": "))
+        (iup-text-append-and-go-end-color text2 (blue)
+                (+ (fullpath->name (av-path av)) nl) )
+        (set s (av-get-accel av))
+        (if (> s 0)
+        then    (iup-text-append-and-go-end text2 "hw accel: ")
+                (iup-text-append-and-go-end-color text2 (blue) (+ <(hwaccels) s> nl)) )
+        (set s (av-last-error av))
+        (if (<> s [ "" . "no error" ])
+        then    (iup-text-append-and-go-end text2 "last error: ")
+                (iup-text-append-and-go-end-color text2 (blue) (cdr s))
+                (iup-text-append-and-go-end text2 " [")
+                (iup-text-append-and-go-end-color text2 (blue) (car s))
+                (iup-text-append-and-go-end text2 "]\n") )
+        (iup-text-append-and-go-end text2
+                (+ $"resolution" ": ") )
+        (iup-text-append-and-go-end-color text2 (blue)
+                (sprint (width av) " x " (height av) nl) )
+        (set s (av-par av))
+        (if (<> s 1)
+        then    (iup-text-append-and-go-end text2
+                        (+ $"display resolution" ": ") )
+                (iup-text-append-and-go-end-color text2 (blue)
+                        (if (< s 1)
+                        (sprint (width av) " x " (rint (/ (height av) s)) nl)
+                        (sprint (rint (* (width av) s)) " x " (height av) nl) )))
+        (set s (av-dar av))
+        (set t (av-original-dar av))
+        (iup-text-append-and-go-end text2 "aspect ratio: ")
+        (iup-text-append-and-go-end-color text2 (blue) (+
+                (if (and (< (num s) 1000) (< (den s) 1000))
+                        (sprint (num s) ":" (den s) " = ")
+                        "" )
+                (approx3 s)
+                (dump-ar-circa s (/ 4 3) "4:3")
+                (dump-ar-circa s (/ 16 9) "16:9")
+                (dump-ar-circa s 1.85 "1.85:1")
+                (dump-ar-circa s 2.35 "2.35:1")
+                nl ))
+        (if (<> s t)
+        then    (iup-text-append-and-go-end text2 (+ $"original aspect ratio" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (+
+                        (if (and (< (num t) 1000) (< (den t) 1000))
+                                (sprint (num t) ":" (den t) " = ")
+                                "" )
+                        (approx3 t)
+                        (dump-ar-circa t (/ 4 3) "4:3")
+                        (dump-ar-circa t (/ 16 9) "16:9")
+                        (dump-ar-circa t 1.85 "1.85:1")
+                        (dump-ar-circa t 2.35 "2.35:1")
+                        nl )))
+        (set s (av-video-frame-rate av))
+        (set t (av-original-video-frame-rate av))
+        (iup-text-append-and-go-end text2 "framerate: ")
+        (iup-text-append-and-go-end-color text2 (blue) (approx6 s))
+        (iup-text-append-and-go-end text2 (+ " fps" nl))
+        (if (<> s t)
+        then    (iup-text-append-and-go-end text2 (+ $"original framerate" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (approx6 t))
+                (iup-text-append-and-go-end text2 (+ " fps" nl)) )
+        (set s (av-duration av))
+        (set t (av-video-duration av))
+        (iup-text-append-and-go-end text2 (+ $"duration" ": "))
+        (iup-text-append-and-go-end-color text2 (blue) (date-s2hhmmss s))
+        (iup-text-append-and-go-end text2 " (")
+        (iup-text-append-and-go-end-color text2 (blue) (approx3 s))
+        (iup-text-append-and-go-end text2 (+ " s)" nl))
+        (if (and (rationalp t) (<> s t))
+        then    (iup-text-append-and-go-end text2 (+ $"video stream duration" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (date-s2hhmmss t))
+                (iup-text-append-and-go-end text2 " (")
+                (iup-text-append-and-go-end-color text2 (blue) (approx3 t))
+                (iup-text-append-and-go-end text2 (+ " s)" nl)) )
+        (iup-text-append-and-go-end text2 (+ $"approximate number of frames" ": "))
+        (iup-text-append-and-go-end-color text2 (blue)
+                (sprint (av-approximated-number-of-frames av) nl) )
+        (iup-text-append-and-go-end text2 "pixel format: ")
+        (iup-text-append-and-go-end-color text2 (blue) (+ (av-get-pix-fmt av) nl))
+        (set s (av-get-hw-pix-fmt av))
+        (if (stringp s)
+        then    (iup-text-append-and-go-end text2 "accel pixel format: ")
+                (iup-text-append-and-go-end-color text2 (blue) (+ s nl)) )
+        (iup-text-append-and-go-end text2 "codec: ")
+        (iup-text-append-and-go-end-color text2 (blue) (av-codec-id av vidx))
+        (iup-text-append-and-go-end text2 " (decoder: ")
+        (iup-text-append-and-go-end-color text2 (blue) (av-codec-name av vidx))
+        (iup-text-append-and-go-end text2 (+ ")" nl))
+        (set s (av-get-filter-rows av))
+        (if (> s 0)
+        then    (iup-text-append-and-go-end text2 (+ $"deinterlacing" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (+ <(deinterlacing) s> nl)) )
+        (set s (av-get-filter av))
+        (if (stringp s)
+        then    (iup-text-append-and-go-end text2 "avfilter chain: ")
+                (iup-text-append-and-go-end-color text2 (blue) (+ s nl)) )
+        (set s (av-get-gamma av))
+        (if (<> s 1)
+        then    (iup-text-append-and-go-end text2 (+ $"gamma correction" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (sprint (approx3 s) nl)) )
+        (set s (av-get-contrast av))
+        (if (<> s 1)
+        then    (iup-text-append-and-go-end text2 (+ $"contrast" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (sprint (approx3 s) nl)) )
+        (set s (av-get-hue av))
+        (if (<> s [ 0 . 0 ])
+        then    (iup-text-append-and-go-end text2 (+ $"hue" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (sprint (approx3 (car s))))
+                (iup-text-append-and-go-end text2 (+ " " $"saturation" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (sprint (approx3 (cdr s)) nl)) )
+        (set s (av-get-temperature av))
+        (if (<> s [ 0 . 0 ])
+        then    (iup-text-append-and-go-end text2 (+ $"temperature" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (sprint (approx3 (car s))))
+                (iup-text-append-and-go-end text2 (+ " " $"angle" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (sprint (approx3 (cdr s)) nl)) )
+        (if (av-get-hflip av)
+        then    (iup-text-append-and-go-end text2 "mirror: ")
+                (iup-text-append-and-go-end-color text2 (blue) (+ $"enabled" nl)) )
+        (if (av-get-vflip av)
+        then    (iup-text-append-and-go-end text2 "flip: ")
+                (iup-text-append-and-go-end-color text2 (blue) (+ $"enabled" nl)) )
+        (iup-text-append-and-go-end text2 nl) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-selected-cb (self)
+        (deflocal av1 av2 text2 n)
+
+        (set av1 <_kv "av1">)
+        (set av2 <_kv "av2">)
+        (set text2 <_kv "text2">)
+        (iup-text-set-and-go-end text2 "")
+        (print-info-on-selected-file 1)
+        (print-info-on-selected-file 2)
+        (set n <(sqlite3-exec _db
+                        "SELECT name FROM projects WHERE path1='" (sqlite3-escape-strings (av-path av1))
+                        "' AND path2='" (sqlite3-escape-strings (av-path av2)) "' LIMIT 1") 0 0> )
+        (if (stringp n)
+        then    (iup-text-append-and-go-end text2 (+ $"Project name" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (+ n nl nl)) )
+        (opt    (<> <_kv "prm"> undef)
+                (set n (length (car (cfg-get (key-prm av1 av2)))))
+                (integerp n)
+                (iup-text-append-and-go-end text2 (+ $"Movements" ": "))
+                (iup-text-append-and-go-end-color text2 (blue) (sprint n nl nl)) )
+        (update-buttons) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-timestamps1-cb (self)
+        (opt (print-timestamps 1)) )
+
+(defnet print-timestamps2-cb (self)
+        (opt (print-timestamps 2)) )
+
+(defnet print-timestamps (which)
+        (deflocal av text2 vidx ts ts-prev ts-avg cnt frameno)
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+        (set av (open-av-low (av-path av) (av-get-accel av) false))
+        (<> av undef)
+        (set text2 <_kv "text2">)
+        (set vidx (av-video-stream-idx av))
+        (iup-text-clear text2)
+        (print-info-on-selected-file which)
+
+        (set ts-avg 0)
+        (set frameno 1)
+        (set cnt 0)
+
+        (opt*   (set ts (av-ts av frameno))
+                (iup-text-append-and-go-end text2 (+ "[" (int->str frameno 6 '0') "] " (approx4 ts)))
+                (if (rationalp ts-prev)
+                then    (inc ts-avg (- ts ts-prev))
+                        (inc cnt)
+                        (iup-text-append-and-go-end text2 " (diff: ")
+                        (iup-text-append-and-go-end-color text2 (blue) (approx4 (- ts ts-prev)))
+                        (iup-text-append-and-go-end text2 ")") )
+                (iup-text-append-and-go-end text2 nl)
+                (< frameno 50)
+                (inc frameno)
+                (set ts-prev ts) )
+
+        (close av)
+
+        (set ts-avg (/ ts-avg cnt))
+        (iup-text-append-and-go-end text2 "\naverage frame rate: ")
+        (iup-text-append-and-go-end-color text2 (blue) (approx3 (/ 1 ts-avg)))
+        (iup-text-append-and-go-end text2 " fps\n") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-buffers-content-cb (self)
+        (opt (print-buffers-content-low 1))
+        (opt (print-buffers-content-low 2)) )
+
+(defnet print-buffers-content-low (which)
+        (deflocal av text2 i fmin fmax ts skip dupl)
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+        (set text2 <_kv "text2">)
+        (iup-text-append-and-go-end text2 (+ "Buffer content - movie " which " (size=" (av-get-buf-size av) "): " nl nl))
+        (for i in (av-get-buf-content av) do
+                (iup-text-append-and-go-end text2 (+ "[" (int->str (+ (for-pos) 1) 4 '0') "] "))
+                (if (= i undef)
+                then    (iup-text-append-and-go-end text2 "~~~ break ~~~\n")
+                else    (set fmin <i 0>)
+                        (set fmax <i 1>)
+                        (set ts <i 2>)
+                        (set skip <i 3>)
+                        (set dupl (- fmax fmin))
+                        (iup-text-append-and-go-end text2 (+
+                                (int->str fmin 6 '0') "-" (int->str fmax 6 '0') " ts=" (approx4 ts)
+                                (if (> dupl 0) (+ " ← " dupl " " (if (= dupl 1) $"duplicate" $"duplicates")) "")
+                                (if (> skip 0) (+ " ← " skip " " "skipped") "")
+                                nl ))))
+        (iup-text-append-and-go-end text2 nl) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-valid-paths-cb (self)
+        (print-paths-low false) )
+
+(defnet print-obsolete-paths-cb (self)
+        (print-paths-low true) )
+
+(defnet print-paths-low (obsolete)
+        (deflocal text2 a)
+
+        (set text2 <_kv "text2">)
+        (set a (array 3))
+        (set <a 0 > 0)
+        (set <a 1 > text2)
+        (set <a 2 > obsolete)
+        (iup-text-set-and-go-end text2 (+ (if obsolete $"Obsolete paths" $"Valid paths") ":" nl nl))
+        (sqlite3-exec-data _db (netptr print-paths-cback) a
+                "SELECT path FROM paths ORDER BY path" )
+        (if (= <a 0> 0)
+        then    (iup-text-append-and-go-end text2 (+ (if obsolete $"There are no obsolete paths." $"There are no valid paths.") nl)) )
+        (update-buttons) )
+
+(defnet print-paths-cback (a path)
+        (deflocal x)
+
+        (set x (pathexists path))
+        (if <a 2>
+        then    (set x (not x)) )
+        (if x
+        then    (inc <a 0>)
+                (iup-text-append-and-go-end <a 1> (+ "[" (int->str <a 0> 5 '0') "] " path nl)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-obsolete-projects-cb (self)
+        (deflocal text2 a)
+
+        (set text2 <_kv "text2">)
+        (set a (array 2))
+        (set <a 0 > 0)
+        (set <a 1 > text2)
+        (iup-text-set-and-go-end text2 (+ $"Obsolete projects" ":" nl nl))
+        (sqlite3-exec-data _db (netptr print-obsolete-projects-cback) a
+                "SELECT name,path1,path2 FROM projects ORDER BY name" )
+        (if (= <a 0> 0)
+        then    (iup-text-append-and-go-end text2 (+ $"There are no obsolete projects." nl)) )
+        (update-buttons) )
+
+(defnet print-obsolete-projects-cback (a name path1 path2)
+        (if (or (not (pathexists path1)) (not (pathexists path2)))
+        then    (inc <a 0>)
+                (iup-text-append-and-go-end <a 1> (+ "[" (int->str <a 0> 5 '0') "] " name nl)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-previous-names1-cb (self)
+        (opt (print-previous-names-low self 1)) )
+
+(defnet print-previous-names2-cb (self)
+        (opt (print-previous-names-low self 2)) )
+
+(defnet print-previous-names-low (self which)
+        (deflocal av name text2 a i)
+
+        (set av <_kv (+ "av" which)>)
+        (<> av undef)
+        (set name (fullpath->name (av-path av)))
+        (set text2 <_kv "text2">)
+        (iup-text-set-and-go-end text2 (+ name ":" nl nl))
+        (set a (array 9))
+        (set <a 0> (queue))
+        (set <a 1> (width av))
+        (set <a 2> (height av))
+        (set <a 3> (av-approximated-number-of-frames av))
+        (set <a 4> name)
+        (set <a 5> (thread-self))
+        (opt (iup-progress (thread-create (netptr print-previous-names-th) a)
+                           self "Work in progress..." false true true true true ))
+        (if (= (length <a 0>) 0)
+        then    (iup-text-append-and-go-end text2 (+ $"none" nl))
+        else    (for i in <a 0> do
+                        (iup-text-append-and-go-end text2 (+ i nl)) ))
+        (iup-text-append-and-go-end text2 "\n") )
+
+(defnet print-previous-names-th (a)
+        (deflocal th res)
+
+        (set th <a 5>)
+        (send "dlg" to th)
+        (receive res from th)
+        (set <a 6> res)
+        (set <a 7> (key-count-scd))
+        (set <a 8> 0)
+        (alt    (seq    (sqlite3-exec-data _db (netptr print-previous-names-cback) a
+                                "SELECT key,value" (key-query-range-scd) )
+                        (set res "q") )
+                (set res "a") )
+        (send res to th) )
+
+(defnet print-previous-names-cback (a key val)
+        (not (iup-progress-aborted <a 6>))
+        (inc <a 8>)
+        (if (= (% <a 8> 10) 0)
+        then    (sendbuf 50 (/ <a 8> <a 7>) to <a 5>) )
+        (opt    (= (length key) 44)
+                (= <val 0> <a 1>)
+                (= <val 1> <a 2>)
+                (= <val 2> <a 3>)
+                (<> <val 3> <a 4>)
+                (queue-put <a 0> <val 3>)
+                (sendbuf 50 (cons "m" (+ "Found: " (format-num (length <a 0>)))) to <a 5>) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet print-diff-stats-cb (self)
+        (opt (print-diff-stats-low)) )
+
+(defnet print-diff-stats-low ()
+        (deflocal map d1 d2 a1 a2 t1 t2 fr1 fr2 i)
+
+        (set map (get-map))
+        (<> map undef)
+        (set d1 (array 0))
+        (set d2 (array 0))
+        (set a1 (car map))
+        (set a2 (cdr map))
+        (for i in 1 .. (- (length a1) 2) do
+                (if (= <a1 i 2> undef)
+                then    (set t1 (- <a1 i 1> <a1 i 0> -2))
+                        (set t2 (- <a2 i 1> <a2 i 0> -2))
+                        (if (in (/ t1 t2) (/ 2 3) .. (/ 3 2))
+                        then    (if (>= t1 t2)
+                                then    (array-append d1 (cons t1 t2)) )
+                                (if (<= t1 t2)
+                                then    (array-append d2 (cons t1 t2)) ))))
+        (if (> (length d2) (length d1))
+        then    (set i d1)
+                (set d1 d2)
+                (set d2 i) )
+        (if (> (length d1) (* (length d2) 2))
+        then    (set t1 0)
+                (set t2 0)
+                (for i in d1 do
+                        (inc t1 (car i))
+                        (inc t2 (cdr i)) )
+                (set fr1 (av-video-frame-rate <_kv "av1">))
+                (set fr2 (av-video-frame-rate <_kv "av2">))
+                (iup-text-append-and-go-end <_kv "text2"> (sprint
+                        nl
+                        t1 " - " t2 nl
+                        t1 "/" t2 "=" (approx6 (/ t1 t2)) nl
+                        t2 "/" t1 "=" (approx6 (/ t2 t1)) nl
+                        "movie 1: [" (approx3 fr1) " → " (approx6 (* fr1 (/ t2 t1)))
+                        "] or [" (approx6 (* fr1 (/ t1 t2))) " → " (approx3 fr1) "]" nl
+                        "movie 2: [" (approx3 fr2) " → " (approx6 (* fr2 (/ t1 t2)))
+                        "] or [" (approx6 (* fr2 (/ t2 t1))) " → " (approx3 fr2) "]" nl ))
+        else    (iup-text-append-and-go-end <_kv "text2"> (+ "\n" $"Try adding more links." nl)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

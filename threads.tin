@@ -13,7 +13,7 @@
 
         (repeat (receive delay from th)
                 until (= delay undef)
-                (sleep delay)
+                (sdl-delay-ns (rint (* delay 1000000000)))
                 (send true to th) ))
 
 (defnet th-clock-send (delay)
@@ -28,7 +28,7 @@
                                 (set done true) )
                         (success) )
                 until done
-                (sleep 0.01) ))
+                (sdl-delay 10) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,9 +45,8 @@
 
         (repeat (receive req from th)
                 until (= req undef)
-                (alt    (seq    (if (= (length req) 2)
-                                then    (av-read-frame <req 0> <req 1>)
-                                else    (av-read-frame <req 0> <req 1> <req 2>) )
+                (alt    (seq    (= (length req) 3)
+                                (av-read-frame <req 0> <req 1> <req 2>)
                                 (set req true) )
                         (set req false) )
                 (send req to th) ))
@@ -85,9 +84,7 @@
                 until (= snd undef)
                 (set t (now))
                 (opt    (truep <_kv "sound-enabled">)
-                        ;(if (> (- t prev-t) 30)
-                        ;then    (wav-play-memory (raw-load-static "silence.wav")) )
-                        (wav-play-memory snd) )
+                        (wav-play snd) )
                 (set prev-t t) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

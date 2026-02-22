@@ -9,25 +9,27 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet move-slide-changed1-cb (self)
-        (move-slide-changed self 1) )
+        (opt (move-slide-changed self 1)) )
 
 (defnet move-slide-changed2-cb (self)
-        (move-slide-changed self 2) )
+        (opt (move-slide-changed self 2)) )
 
 (defnet move-slide-changed (self which)
-        (deflocal v vmax kf)
+        (deflocal av vcur vsel vkey)
 
-        (opt    (gui-not-locked)
-                (set v (iup-get-double self "VALUE"))
-                (if (<= v 0.025)
-                then    (set v 1)
-                else    (set vmax (iup-get-int <_kv (+ "spin" which)> "SPINMAX"))
-                        (set v (rint (linear v 0 1 1 vmax)))
-                        (set kf (av-nearest-keyframe <_kv (+ "av" which)> v (div vmax 500)))
-                        (if (integerp kf)
-                        then    (set v (max 1 kf)) ))
-                (gui-spin-set-value which v)
-                (gui-update-image) ))
+        (gui-not-locked)
+        (set vcur (gui-spin-value which))
+        (set vsel (rint (linear (iup-get-double self "VALUE") 0 1 1 (iup-get-int <_kv (+ "spin" which)> "SPINMAX"))))
+        (<> vsel vcur)
+        (set av <_kv (+ "av" which)>)
+        (set vkey (av-nearest-keyframe av vsel (< vsel vcur)))
+        (if (= vkey undef)
+        then    (set vkey (av-nearest-keyframe av vsel (> vsel vcur))) )
+        (integerp vkey)
+        (set vkey (max 1 vkey))
+        (<> vkey vcur)
+        (gui-spin-set-value which vkey)
+        (update-image) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

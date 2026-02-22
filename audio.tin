@@ -14,10 +14,7 @@
 (defnet audio-low (self)
         (deflocal audio-info q vbox dlg)
 
-        (truep (cfg-exists (key-map <_kv "av1">
-                                    <_kv "av2">
-                                    (fullpath->name <_kv "path1">)
-                                    (fullpath->name <_kv "path2">) )))
+        (truep (cfg-exists (key-map <_kv "av1"> <_kv "av2">)))
 
         (set audio-info (assoc))
         (set <_kv "audio-info"> audio-info)
@@ -32,13 +29,16 @@
                         (audio-setup-label 2)
                         (iup-horizontal-separator)
                         (audio-setup-bottom q) ))
-        (iup-set-str-attribute vbox "MARGIN" "4x4")
-        (iup-set-int vbox "GAP" 0)
+        (iup-set-str-attribute vbox "NMARGIN" "12x12")
+        (iup-set-int vbox "NGAP" 10)
+
+        (audio-setup-init-with-previous-data)
 
         (set dlg (iup-dialog vbox))
         (set <audio-info "dlg"> dlg)
         (iup-set-dlg-parent self dlg)
         (iup-set-str-attribute dlg "TITLE" $"Audio tracks")
+        (iup-set-attribute-handle dlg "ICON" <_kv "icon-audio">)
         (iup-set-bool dlg "DIALOGFRAME" true)
         (iup-set-callback dlg "K_ANY" (netptr audio-kb-cb))
 
@@ -46,7 +46,24 @@
 
         (close dlg)
         (iup-close-queue q)
-        (assoc-clr _kv "audio-info") )
+        (assoc-clr _kv "audio-info")
+        (update-buttons) )
+
+(defnet audio-setup-init-with-previous-data ()
+        (opt (audio-setup-init-with-previous-data-low)) )
+
+(defnet audio-setup-init-with-previous-data-low ()
+        (deflocal info audio-info)
+
+        (set info <_kv "audio">)
+        (assocp info)
+        (set audio-info <_kv "audio-info">)
+        (opt    (audio-open-low-low 1 <info "path1">)
+                (iup-set-int <audio-info "sb-delay1"> "SPINVALUE" (rint (* <info "delay1"> 1000))) )
+        (opt    (audio-open-low-low 2 <info "path2">)
+                (iup-set-int <audio-info "sb-delay2"> "SPINVALUE" (rint (* <info "delay2"> 1000))) )
+        (iup-set-str-attribute <audio-info "combo1"> "VALUE" (approx3 <info "fps">))
+        (iup-set-str-attribute <audio-info "combo2"> "VALUE" <info "which">) )
 
 (defun audio-setup-open (which q) net audio-setup-open)
 (defnet audio-setup-open (which q @wid)
@@ -54,11 +71,11 @@
 
         (set audio-info <_kv "audio-info">)
 
-        (set but (iup-button-icon (+ $"select audio" ' ' which)
+        (set but (iup-button-icon-svg-little (+ $"select audio" ' ' which)
                 (if (= which 1)
                     (netptr audio-open1-cb)
                     (netptr audio-open2-cb) )
-                (pix-load-static "16x16/document-open-5.png")
+                (raw-load-static "svg/document-open2.svg")
                 q ))
 
         (set text (iup-text))
@@ -71,25 +88,21 @@
         (iup-set-active spin false)
 
         (set @wid (iup-hbox but text (iup-label $"delay (ms): ") spin))
-        (iup-set-int @wid "GAP" 3)
+        (iup-set-int @wid "NGAP" 4)
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
 
 (defun audio-setup-label (which) net audio-setup-label)
 (defnet audio-setup-label (which @wid)
         (deflocal label)
 
-        (set label (iup-label))
-        (set <_kv "audio-info" (+ "label" which)> label)
-        (iup-set-bool label "EXPAND" true)
-        ;(iup-set-str-attribute label "ALIGNMENT" "ARIGHT")
-        (iup-set-str-attribute label "ALIGNMENT" "ACENTER")
-
-        (set @wid (iup-hbox label))
+        (set @wid (iup-label))
+        (set <_kv "audio-info" (+ "label" which)> @wid)
+        (iup-set-str-attribute @wid "EXPAND" "HORIZONTAL")
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
 
 (defun audio-setup-bottom (q) net audio-setup-bottom)
 (defnet audio-setup-bottom (q @wid)
-        (deflocal audio-info l1 l2 btn-save btn-ok i)
+        (deflocal audio-info l1 l2 btn-save btn-ok btn-close i)
 
         (set audio-info <_kv "audio-info">)
 
@@ -109,16 +122,99 @@
         (iup-set-str-attribute l2 2 "video 2 + audio 1")
         (iup-set-int l2 "VALUE" (if (>= (width <_kv "av1">) (width <_kv "av2">)) 1 2))
 
-        (set btn-save (iup-button-icon $"save track as..." (netptr audio-save-as-cb) (pix-load-static "16x16/document-save-5.png") q))
+        (set btn-save (iup-button-icon-svg-little $"save track as..." (netptr audio-save-as-cb) (raw-load-static "svg/oxygen480-actions-document-save2.svg") q))
         (set <audio-info "btn-save"> btn-save)
         (iup-set-active btn-save false)
 
-        (set btn-ok (iup-button-icon-ok (netptr iup-cancel-cb) q))
+        (set btn-ok (iup-button-icon-ok (netptr audio-ok-cb) q))
         (set <audio-info "btn-ok"> btn-ok)
+        (iup-set-active btn-ok false)
 
-        (set @wid (iup-hbox l1 l2 btn-save (iup-fill) btn-ok))
-        (iup-set-int @wid "GAP" 3)
+        (set btn-close (iup-button-icon-close (netptr iup-cancel-cb) q))
+
+        (set @wid (iup-hbox l1 l2 btn-save (iup-fill) btn-ok btn-close))
+        (iup-set-int @wid "NGAP" 4)
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet audio-check (@audio-info @dlg @fps @which)
+        (set @audio-info <_kv "audio-info">)
+        (set @dlg <@audio-info "dlg">)
+        (set @fps (str->num (iup-get-str-attribute <@audio-info "combo1"> "VALUE")))
+        (if (or (not (rationalp @fps)) (<= @fps 0))
+        then    (iup-warning60 @dlg $"Please, select a valid frame rate")
+                (fail) )
+        (case @fps of
+                23.976  (set @fps (/ 24000 1001))
+                29.97   (set @fps (/ 30000 1001)) )
+        (set @which (iup-get-int <@audio-info "combo2"> "VALUE"))
+        (if (or (<> <@audio-info "codec1"> <@audio-info "codec2">)
+                (<> <@audio-info "mode1"> <@audio-info "mode2">)
+                (<> <@audio-info "frequency1"> <@audio-info "frequency2">)
+                (<> <@audio-info "smplsize1"> <@audio-info "smplsize2">)
+                (<> <@audio-info "bps1"> <@audio-info "bps2">) )
+        then    (iup-warning60 @dlg $"Audio tracks are not compatible")
+                (fail) )
+        (audio-check-duration @audio-info @dlg @fps) )
+
+(defnet audio-check-duration (audio-info dlg fps)
+        (deflocal v1 v2 a1 a2 in1 in2)
+
+        (set v1 (/ (av-approximated-number-of-frames <_kv "av1">) fps))
+        (set a1 <audio-info "duration1">)
+        (set in1 (< (/ (min a1 v1) (max a1 v1)) 0.98))
+        (set v2 (/ (av-approximated-number-of-frames <_kv "av2">) fps))
+        (set a2 <audio-info "duration2">)
+        (set in2 (< (/ (min a2 v2) (max a2 v2)) 0.98))
+        (if (or in1 in2)
+        then    (iup-confirm60 dlg (+ $"It seems like stream lengths are inconsistent" ':' nl
+                        (if in1 (+    $"duration of video" " 1: " (date-s2hhmmss v1) nl
+                                      $"duration of audio" " 1: " (date-s2hhmmss a1) nl ) "" )
+                        (if in2 (+    $"duration of video" " 2: " (date-s2hhmmss v2) nl
+                                      $"duration of audio" " 2: " (date-s2hhmmss a2) nl ) "" )
+                                      $"Do you want to continue?" ))
+        else    (if (<> (audio-guess-framerate 1 a1) (audio-guess-framerate 2 a2))
+                then    (iup-confirm60 dlg (+ $"It seems like stream lengths are inconsistent" '.' nl
+                                              $"Do you want to continue?" )))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet audio-ok-cb (self)
+        (opt (audio-ok-low)) )
+
+(defnet audio-ok-low ()
+        (deflocal audio-info dlg fps which info)
+
+        (audio-check audio-info dlg fps which)
+        (set info <_kv "audio">)
+        (if (not (assocp info))
+        then    (set info (default-audio)) )
+        (set <info "path1"> <audio-info "path1">)
+        (set <info "path2"> <audio-info "path2">)
+        (set <info "fps"> fps)
+        (set <info "which"> which)
+        (set <info "delay1"> (/ (iup-get-int <audio-info "sb-delay1"> "VALUE") 1000))
+        (set <info "delay2"> (/ (iup-get-int <audio-info "sb-delay2"> "VALUE") 1000))
+        (cfg-set (key-aud <_kv "av1"> <_kv "av2">) info)
+        (set <_kv "audio"> info)
+        (iup-exit-loop) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -149,24 +245,27 @@
 
 (defun audio-setup-open-delay (which) 0)
 
-(defun audio-setup-open-delay- (which) net audio-setup-open-delay)
-(defnet audio-setup-open-delay (which @t)
-        (deflocal av aidx i)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-        (alt    (seq    (set av (av-avformat-open-input <_kv (+ "path" which)>))
-                        (<> av undef)
-                        (for i in 0 .. (- (av-nb-streams av) 1) do
-                                (if (= (av-codec-type av i) (cmacro AVMEDIA_TYPE_AUDIO))
-                                then    (set aidx i) )
-                                until (integerp aidx) )
-                        (if (not (integerp aidx))
-                        then    (close av)
-                                (fail) )
-                        (set @t (rint (* (- (* (av-first-ts av aidx) (av-time-base av aidx))
-                                            (* (av-first-ts av) (av-time-base av (av-video-stream-idx av))) )
-                                         1000 )))
-                        (close av) )
-                (set @t 0) ))
+(defun audio-guess-framerate (which duration) net audio-guess-framerate)
+(defnet audio-guess-framerate (which duration @fr)
+        (deflocal fr1 fr2 r rmax)
+
+        (set rmax 0.999)
+        (set fr1 (/ (av-approximated-number-of-frames <_kv (+ "av" which)>) duration))
+        (for fr2 in (framerates) do
+                (set r (/ (min fr1 fr2) (max fr1 fr2)))
+                (if (>= r rmax)
+                then    (set rmax r)
+                        (set @fr fr2) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -185,103 +284,56 @@
         (opt (audio-open-low self 2)) )
 
 (defnet audio-open-low (self which)
-        (deflocal audio-info duration path f i j)
+        (deflocal path)
 
         (set path (cfg-get "audio-path"))
         (if (not (stringp path))
         then    (set path (cfg-get "path")) )
         (set path (iup-choose-file-open self (+ $"Select audio" ' ' which) path undef true))
+        (audio-open-low-low which path)
+        (cfg-set "audio-path" path) )
+
+(defnet audio-open-low-low (which path)
+        (deflocal audio-info self duration i)
+
         (stringp path)
-        (set f (fopenro path))
-        (<> f undef)
-        (cfg-set "audio-path" path)
         (set audio-info <_kv "audio-info">)
-        (alt    (audio-open-wav f which audio-info duration)
-                (audio-open-sox f which audio-info duration)
-                (seq    (close f)
-                        (sound-iup-error60 self (+ path ": " $"unrecognized audio format"))
+        (set self <audio-info "dlg">)
+        (alt    (audio-open-path path which audio-info duration)
+                (seq    (sound-iup-error60 self (+ path ": " $"unrecognized audio format"))
                         (fail) ))
-        (close f)
         (iup-set-str-attribute <audio-info (+ "label" which)> "TITLE" <duration 1>)
         (if (<> <duration 2> undef)
         then    (iup-warning60 self <duration 2>) )
         (set duration <duration 0>)
         (iup-set-str-attribute <audio-info (+ "text" which)> "VALUE" (fullpath->name path))
-        (set j (/ (av-approximated-number-of-frames <_kv (+ "av" which)>) duration))
-        (for i in (framerates) rev do
-                (if (>= (/ (min i j) (max i j)) 0.9991)
-                then    (iup-set-str-attribute <audio-info "combo1"> "VALUE" (approx3 i)) ))
+        (set i (audio-guess-framerate which duration))
+        (if (rationalp i)
+        then    (iup-set-str-attribute <audio-info "combo1"> "VALUE" (approx3 i)) )
         (set <audio-info (+ "duration" which)> duration)
         (set <audio-info (+ "path" which)> path)
         (iup-set-active <audio-info (+ "sb-delay" which)> (in <audio-info (+ "codec" which)> [ "WAV" "SOX" ]))
-        (iup-set-active <audio-info "btn-save"> (stringp <audio-info (+ "path" (- 3 which))>)) )
+        (set i (stringp <audio-info (+ "path" (- 3 which))>))
+        (iup-set-active <audio-info "btn-save"> i)
+        (iup-set-active <audio-info "btn-ok"> i) )
 
-(defnet audio-open-wav (f which audio-info @duration)
-        (deflocal ch freq smplsize bps offset smpl)
+(defnet audio-open-path (path which audio-info @duration)
+        (deflocal info)
 
-        (fsetpos 0 f)
-        (= (freadstr f 4) "RIFF")
-        (skip (freaduint-le f 32))
-        (= (freadstr f 8) "WAVEfmt ")
-        (set offset (freaduint-le f 32))
-        (>= offset 16)
-        (skip (freaduint-le f 16))
-        (set ch (freaduint-le f 16))
-        (set freq (freaduint-le f 32))
-        (skip (freaduint-le f 32))
-        (set smplsize (freaduint-le f 16))
-        (set bps (freaduint-le f 16))
-        (fsetpos (+ offset 20) f)
-        (while (<> (freadstr f 4) "data") do
-                (set offset (freaduint-le f 32))
-                (fsetpos (+ (fpos f) offset) f) )
-        (skip (freaduint-le f 32))
-        (set offset (fpos f))
-        (set smpl (div (- (length f) offset) smplsize))
-        (> smpl 0)
-        (set @duration (/ smpl freq))
+        (set info (wav-open path))
+        (assocp info)
+        (set @duration (wav-duration info))
         (set @duration (list @duration
-                             (+ "WAVE " ch "ch " freq "Hz " bps "bps " (date-s2hhmmss @duration))
+                             (+ (wav-codec info) " " (wav-channels info) "ch " (wav-frequency info) "Hz " (wav-bps info) "bps " (date-s2hhmmss @duration))
                              undef ))
-        (set <audio-info (+ "codec" which)> "WAV")
-        (set <audio-info (+ "mode" which)> ch)
-        (set <audio-info (+ "frequency" which)> freq)
-        (set <audio-info (+ "smplsize" which)> smplsize)
-        (set <audio-info (+ "bps" which)> bps)
-        (set <audio-info (+ "smpl" which)> smpl)
-        (set <audio-info (+ "ts" which)> offset) )
-
-(defnet audio-open-sox (f which audio-info @duration)
-        (deflocal ch freq smplsize bps offset smpl comment-size)
-
-        (fsetpos 0 f)
-        (= (freadstr f 4) ".SoX")
-        (set offset (freaduint-le f 32))
-        (skip (freaduint-le f 64))
-        (set freq (floor (freadfloat-le f 64)))
-        (set ch (freaduint-le f 32))
-        (set comment-size (freaduint-le f 32))
-        (<= comment-size (- 0xFFFFFFFF (+ 4 8 8 4 4) 4))
-        (> freq 0)
-        (< freq (maxint))
-        (> ch 0)
-        (< ch (maxint))
-        (set smplsize (* 4 ch))
-        (set bps 32)
-        (inc offset 4)
-        (set smpl (div (- (length f) offset) smplsize))
-        (> smpl 0)
-        (set @duration (/ smpl freq))
-        (set @duration (list @duration
-                             (+ "SoX " ch "ch " freq "Hz " bps "bps " (date-s2hhmmss @duration))
-                             undef ))
-        (set <audio-info (+ "codec" which)> "SOX")
-        (set <audio-info (+ "mode" which)> ch)
-        (set <audio-info (+ "frequency" which)> freq)
-        (set <audio-info (+ "smplsize" which)> smplsize)
-        (set <audio-info (+ "bps" which)> bps)
-        (set <audio-info (+ "smpl" which)> smpl)
-        (set <audio-info (+ "ts" which)> offset) )
+        (set <audio-info (+ "codec" which)> (wav-codec info))
+        (set <audio-info (+ "mode" which)> (wav-channels info))
+        (set <audio-info (+ "frequency" which)> (wav-frequency info))
+        (set <audio-info (+ "smplsize" which)> (wav-samplesize info))
+        (set <audio-info (+ "bps" which)> (wav-bps info))
+        (set <audio-info (+ "smpl" which)> (wav-samples info))
+        (set <audio-info (+ "ts" which)> (wav-offset info))
+        (wav-close info) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -299,24 +351,7 @@
 (defnet audio-save-as-low (self)
         (deflocal audio-info dlg fps which path g)
 
-        (set audio-info <_kv "audio-info">)
-        (set dlg <audio-info "dlg">)
-        (set fps (str->num (iup-get-str-attribute <audio-info "combo1"> "VALUE")))
-        (if (or (not (rationalp fps)) (<= fps 0))
-        then    (iup-warning60 dlg $"Please, select a valid frame rate")
-                (fail) )
-        (case fps of
-                23.976  (set fps (/ 24000 1001))
-                29.97   (set fps (/ 30000 1001)) )
-        (set which (iup-get-int <audio-info "combo2"> "VALUE"))
-        (if (or (<> <audio-info "codec1"> <audio-info "codec2">)
-                (<> <audio-info "mode1"> <audio-info "mode2">)
-                (<> <audio-info "frequency1"> <audio-info "frequency2">)
-                (<> <audio-info "smplsize1"> <audio-info "smplsize2">)
-                (<> <audio-info "bps1"> <audio-info "bps2">) )
-        then    (iup-warning60 dlg $"Audio tracks are not compatible")
-                (fail) )
-        (audio-save-as-check-duration audio-info dlg fps)
+        (audio-check audio-info dlg fps which)
         (set path (iup-choose-file-save dlg
                 (+ $"Save audio track" ' ' (- 3 which) ' ' $"for video" ' ' which ' ' $"as...")
                 (cfg-get "audio-path")
@@ -336,23 +371,6 @@
                         (fail) ))
         (close g)
         (sound-iup-info60 dlg (+ $"Audio track successfully saved as `" path "'.")) )
-
-(defnet audio-save-as-check-duration (audio-info dlg fps)
-        (deflocal v1 v2 a1 a2 in1 in2)
-
-        (set v1 (/ (av-approximated-number-of-frames <_kv "av1">) fps))
-        (set a1 <audio-info "duration1">)
-        (set in1 (< (/ (min a1 v1) (max a1 v1)) 0.98))
-        (set v2 (/ (av-approximated-number-of-frames <_kv "av2">) fps))
-        (set a2 <audio-info "duration2">)
-        (set in2 (< (/ (min a2 v2) (max a2 v2)) 0.98))
-        (if (or in1 in2)
-        then    (iup-confirm60 dlg (+ $"It seems like stream lengths are inconsistent:" nl
-                        (if in1 (+    $"duration of video" " 1: " (date-s2hhmmss v1) nl
-                                      $"duration of audio" " 1: " (date-s2hhmmss a1) nl ) "" )
-                        (if in2 (+    $"duration of video" " 2: " (date-s2hhmmss v2) nl
-                                      $"duration of audio" " 2: " (date-s2hhmmss a2) nl ) "" )
-                                      $"Do you want to continue?" ))))
 
 (defnet audio-save-as-ok-low (audio-info dlg fps which g)
         (deflocal path f1 f2)
@@ -419,7 +437,7 @@
         (set ts 0)
         (set err 0)
         (filecopy-basic f1 g a1 buf)
-        (for i in (audio-segment map which (audio-segment-max)) do
+        (for i in (map-segment map which (audio-segment-max)) do
                 (not (iup-progress-aborted dlg))
                 (set p (/ (+ <i 1> 1) fps))
                 (set n (- p ts))
@@ -474,45 +492,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun audio-segment-max () 2000)
-
-(defun audio-segment (map which audio-segment-max) net audio-segment)
-(defnet audio-segment (map which audio-segment-max @a)
-        (deflocal prm i p q n real-p real-n a)
-
-        (set prm <_kv "prm">)
-        (set @a (array 0))
-        (for i in map do
-                (set p <i 0>)
-                (set q <i 1>)
-                (set n <i 2>)
-                (repeat (if (= which 1)
-                        then    (set real-p p)
-                                (if (integerp n)
-                                then    (if (= prm undef)
-                                        then    (set real-n n)
-                                        else    (set real-n <prm n>) )
-                                else    (set real-n n) )
-                        else    (if (= prm undef)
-                                then    (set real-p p)
-                                else    (set real-p <prm p>) )
-                                (set real-n n) )
-                        (alt    (seq    (= <@a -1 1> (- real-p 1))
-                                        (if (integerp real-n)
-                                        then    (integerp <@a -1 2>)
-                                                (= (- real-n <@a -1 2>) (- real-p <@a -1 0>))
-                                        else    (not (integerp <@a -1 2>)) )
-                                        (< (- <@a -1 1> <@a -1 0> -1) audio-segment-max)
-                                        (inc <@a (- (length @a) 1) 1>) )
-                                (seq    (set a (array 3))
-                                        (set <a 0> real-p)
-                                        (set <a 1> real-p)
-                                        (set <a 2> real-n)
-                                        (array-append @a a) ))
-                        until (= p q)
-                        (inc p)
-                        (if (integerp n)
-                        then    (inc n) )))
-        (sort @a (funptr less0)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

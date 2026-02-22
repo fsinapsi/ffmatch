@@ -9,13 +9,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (include "common.tin")
-(include "lang.tin")
 (include "init.tin")
+(include "lang.tin")
 (include "gui.tin")
+(include "menu.tin")
+(include "kb.tin")
+(include "setup.tin")
+(include "edit.tin")
+(include "update-buttons.tin")
+(include "update-image.tin")
 (include "move-sync.tin")
 (include "move-scd.tin")
 (include "move-spin.tin")
 (include "move-slide.tin")
+(include "move-text1.tin")
 (include "force.tin")
 (include "cfg.tin")
 (include "utils.tin")
@@ -32,7 +39,12 @@
 (include "clear.tin")
 (include "open.tin")
 (include "project.tin")
+(include "save.tin")
+(include "print.tin")
+(include "play.tin")
 (include "info.tin")
+(include "key.tin")
+(include "history.tin")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

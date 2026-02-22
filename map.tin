@@ -204,11 +204,11 @@
 
 (defnet map-report (m)
         (map-report-low (match-th-main m) (match-map m)
-                (match-name1 m) (match-name2 m)
+                (match-av1 m) (match-av2 m)
                 (match-rx m) (match-ry m)
                 (length (match-cache m)) (match-passed m) true ))
 
-(defnet map-report-low (target map name1 name2 rx ry nchecks npassed go-home)
+(defnet map-report-low (target map av1 av2 rx ry nchecks npassed go-home)
         (deflocal buf buf2 ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q prv freecnt diffcnt diff diffprv i)
 
         (if (listp target)
@@ -219,8 +219,8 @@
         (set buf (iup-text-buffer))
         (set buf2 (iup-text-buffer))
         (map-report-print (cons "p1" (+
-                "(1) " name1 nl
-                "(2) " name2 nl
+                "(1) " (fullpath->name (av-path av1)) nl
+                "(2) " (fullpath->name (av-path av2)) nl
                 nl
                 "free (1): " (map-free-low (map-undef-low (car map) (cdr map))) "/" map-max1 nl
                 "free (2): " (map-free-low (map-undef-low (cdr map) (car map))) "/" map-max2 nl
@@ -317,6 +317,55 @@
         (case req of
             "p1"    (iup-text-buffer-append buf msg)
             "p1c"   (iup-text-buffer-append-color buf (car msg) (cdr msg)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun map-segment (map which map-segment-max) net map-segment)
+(defnet map-segment (map which map-segment-max @a)
+        (deflocal prm i p q n real-p real-n a)
+
+        (set prm <_kv "prm">)
+        (set @a (array 0))
+        (for i in map do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (repeat (if (= which 1)
+                        then    (set real-p p)
+                                (if (integerp n)
+                                then    (if (= prm undef)
+                                        then    (set real-n n)
+                                        else    (set real-n <prm n>) )
+                                else    (set real-n n) )
+                        else    (if (= prm undef)
+                                then    (set real-p p)
+                                else    (set real-p <prm p>) )
+                                (set real-n n) )
+                        (alt    (seq    (= <@a -1 1> (- real-p 1))
+                                        (if (integerp real-n)
+                                        then    (integerp <@a -1 2>)
+                                                (= (- real-n <@a -1 2>) (- real-p <@a -1 0>))
+                                        else    (not (integerp <@a -1 2>)) )
+                                        (< (- <@a -1 1> <@a -1 0> -1) map-segment-max)
+                                        (inc <@a (- (length @a) 1) 1>) )
+                                (seq    (set a (array 3))
+                                        (set <a 0> real-p)
+                                        (set <a 1> real-p)
+                                        (set <a 2> real-n)
+                                        (array-append @a a) ))
+                        until (= p q)
+                        (inc p)
+                        (if (integerp n)
+                        then    (inc n) )))
+        (sort @a (funptr less0)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -1,0 +1,159 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet kb-cb (dlg c)
+        (if (gui-locked)
+        then    (opt    (if (= <_kv "running"> "player")
+                        then    (kb-player dlg c)
+                        else    (<> <_kv "th"> undef)
+                                (= c (cmacro K_ESC))
+                                (gui-abort-low dlg) ))
+        else    (kb-default dlg c) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet kb-default (dlg c)
+        (case c of
+                (cmacro K_cQ)           (iup-exit-loop)
+                ;(cmacro K_PGDN)         (skip)
+                ;(cmacro K_PGUP)         (skip)
+                ;(cmacro K_HOME)         (skip)
+                ;(cmacro K_END)          (skip)
+                (cmacro K_ESC)          (update-image)
+                (cmacro K_cI)           (print-selected-cb dlg)
+                (cmacro K_cP)           (cfg-cb dlg)
+                (cmacro K_cPlus)        (gui-zoom-in-cb dlg)
+                (cmacro K_cMinus)       (gui-zoom-out-cb dlg)
+                (cmacro K_c0)           (gui-zoom-zero-cb dlg)
+                (cmacro K_P)            (gui-restore-default-cb dlg)
+                (cmacro K_F1)           (open1-cb dlg)
+                (cmacro K_F2)           (open2-cb dlg)
+                (cmacro K_sF1)          (open-path1-cb dlg)
+                (cmacro K_sF2)          (open-path2-cb dlg)
+                (cmacro K_cO)           (project-open-corner-cb dlg)
+                (cmacro K_cS)           (project-save-cb dlg)
+                (cmacro K_F5)           (gui-start-cb dlg)
+                (cmacro K_F8)           (audio-cb dlg)
+                (cmacro K_F9)           (srt-cb dlg)
+                (cmacro K_F12)          (play-cb dlg)
+                (cmacro K_sF12)         (play-no-dub-cb dlg)
+                (cmacro K_c1)           (gui-text1-move1 dlg)
+                (cmacro K_c2)           (gui-text1-move2 dlg)
+                (cmacro K_sLEFT)        (move-sync-left-cb dlg)
+                (cmacro K_sRIGHT)       (move-sync-right-cb dlg)
+                (cmacro K_cLEFT)        (move-sync-left-fast-cb dlg)
+                (cmacro K_cRIGHT)       (move-sync-right-fast-cb dlg)
+                (cmacro K_csLEFT)       (move-sync-left-first-cb dlg)
+                (cmacro K_csRIGHT)      (move-sync-right-last-cb dlg)
+                (cmacro K_msLEFT)       (force-shorten-left-cb dlg)
+                (cmacro K_msRIGHT)      (force-shorten-right-cb dlg)
+                (cmacro K_cCR)          (force-cb dlg)
+                (cmacro K_TAB)          (seq    (set dlg <_kv "spin1">)
+                                                (iup-set-focus dlg)
+                                                (move-spin-kb1-cb dlg c) )
+                default                 (fail) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet kb-player (dlg c)
+        (deflocal info av msg i)
+
+        (set info <_kv "audio">)
+        (assocp info)
+        (not <_abort 0>)
+        (= <info "action"> undef)
+        (set av <_kv (+ "av" <info "which">)>)
+        (avcodecp av)
+        (case c of
+                (cmacro K_ESC)          (set <_abort 0> true)
+                (cmacro K_SP)           (seq    (set <info "action"> "space")
+                                                (set i (not <info "pause">))
+                                                (set <info "pause"> i)
+                                                (set msg (if i "paused" "resumed"))
+                                                (set <_abort 0> true) )
+                (cmacro K_LEFT)         (if (not <info "pause">)
+                                        then    (set <info "action"> "left")
+                                                (set <_abort 0> true) )
+                (cmacro K_RIGHT)        (if (not <info "pause">)
+                                        then    (set <info "action"> "right")
+                                                (set <_abort 0> true) )
+                (cmacro K_DOWN)         (if (not <info "pause">)
+                                        then    (set <info "action"> "down")
+                                                (set <_abort 0> true) )
+                (cmacro K_UP)           (if (not <info "pause">)
+                                        then    (set <info "action"> "up")
+                                                (set <_abort 0> true) )
+                ;(cmacro K_sLEFT)        (if (not <info "pause">)
+                ;                        then    (set <info "action"> "sleft")
+                ;                                (set <_abort 0> true) )
+                ;(cmacro K_sRIGHT)       (if (not <info "pause">)
+                ;                        then    (set <info "action"> "sright")
+                ;                                (set <_abort 0> true) )
+                (cmacro K_plus)         (seq    (set i <info "gain">)
+                                                (if (< i 1)
+                                                then    (inc i 0.1)
+                                                        (set <info "gain"> i)
+                                                        (set msg (+ "gain: " i)) ))
+                (cmacro K_minus)        (seq    (set i <info "gain">)
+                                                (if (> i 0)
+                                                then    (dec i 0.1)
+                                                        (set <info "gain"> i)
+                                                        (set msg (+ "gain: " i)) ))
+                (cmacro K_asterisk)     (seq    (av-set-dar av (* (av-dar av) 1.02))
+                                                (set msg (+ "ar: " (approx3 (av-dar av)))) )
+                (cmacro K_underscore)   (seq    (av-set-dar av (/ (av-dar av) 1.02))
+                                                (set msg (+ "ar: " (approx3 (av-dar av)))) )
+                (cmacro K_equal)        (seq    (if (<> (av-dar av) (av-original-dar av))
+                                                then    (av-set-dar av)
+                                                        (set msg (+ "ar: " (approx3 (av-dar av)))) ))
+                (cmacro K_c1)           (seq    (set i (+ <info "delay1"> 0.05))
+                                                (set <info "delay1"> i)
+                                                (set msg (+ "delay 1: " i)) )
+                (cmacro K_c2)           (seq    (set i (- <info "delay1"> 0.05))
+                                                (set <info "delay1"> i)
+                                                (set msg (+ "delay 1: " i)) )
+                (cmacro K_c3)           (seq    (set i (+ <info "delay2"> 0.05))
+                                                (set <info "delay2"> i)
+                                                (set msg (+ "delay 2: " i)) )
+                (cmacro K_c4)           (seq    (set i (- <info "delay2"> 0.05))
+                                                (set <info "delay2"> i)
+                                                (set msg (+ "delay 2: " i)) )
+                (cmacro K_cD)           (seq    (set i (not <info "dub">))
+                                                (set <info "dub"> i)
+                                                (set msg (if i "dubbed" "not dubbed")) ))
+        (if (stringp msg)
+        then    (iup-text-append-and-go-end <_kv "text2"> (+ msg nl)) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

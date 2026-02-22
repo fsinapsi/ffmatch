@@ -1,0 +1,123 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet update-buttons ()
+        (deflocal menu-info btn-info av1 av2 running
+                  supervision map-exists i )
+
+        (set menu-info <_kv "menu">)
+        (set btn-info <_kv "toolbar">)
+        (set av1 <_kv "av1">)
+        (set av2 <_kv "av2">)
+        (set running (<> <_kv "th"> undef))
+        (set supervision (and (not running) (<> av1 undef) (<> av2 undef)))
+        (set <_kv "supervision"> supervision)
+        (set map-exists false)
+        (if (not running)
+        then    (set map-exists (cfg-exists (key-map av1 av2)))
+
+                (set i (and (<> av1 undef) (<> av2 undef)))
+                (iup-set-active <menu-info "save-project"> i)
+                (if i
+                then    (set i (stringp <(sqlite3-exec _db
+                                "SELECT name FROM projects WHERE path1='" (sqlite3-escape-strings (av-path av1))
+                                "' AND path2='" (sqlite3-escape-strings (av-path av2)) "' LIMIT 1") 0 0>)) )
+                (iup-set-active <menu-info "delete-project"> i)
+                (iup-set-active <menu-info "export-project"> i)
+
+                (iup-set-active <menu-info "swap-order"> supervision)
+                (iup-set-active <menu-info "clear-scd1">
+                        (if (= av1 undef) false (cfg-exists (key-scd av1))) )
+                (iup-set-active <menu-info "clear-scd2">
+                        (if (= av2 undef) false (cfg-exists (key-scd av2))) )
+
+                (set i (if (or (= av1 undef) (= av2 undef))
+                                false
+                                (cfg-exists (key-sck av1 av2)) ))
+                (iup-set-active <menu-info "clear-sck"> i)
+                (iup-set-active <menu-info "clear-failed-sck"> i)
+                (iup-set-active <menu-info "report-failed"> i)
+
+                (set i (if (or (= av1 undef) (= av2 undef))
+                                false
+                                map-exists ))
+                (iup-set-active <menu-info "clear-map"> i)
+                (iup-set-active <menu-info "optimize-map"> i)
+                (iup-set-active <menu-info "final-closure"> i)
+                (iup-set-active <menu-info "print-diff-stats"> i)
+
+                (iup-set-active <menu-info "save-actual-map"> i)
+                (iup-set-active <menu-info "save-vid-script-1"> i)
+                (iup-set-active <menu-info "save-vid-script-2"> i)
+                (iup-set-active <menu-info "save-wavcat-script-1"> i)
+                (iup-set-active <menu-info "save-wavcat-script-2"> i)
+                (iup-set-active <menu-info "save-junction-script-1"> i)
+                (iup-set-active <menu-info "save-junction-script-2"> i)
+
+                (iup-set-active <menu-info "recover-previous-names1"> (<> av1 undef))
+                (iup-set-active <menu-info "recover-previous-names2"> (<> av2 undef))
+
+                (set i (> (iup-get-int <_kv "text1"> "COUNT") 0))
+                (iup-set-active <menu-info "save-text1"> i)
+                (iup-set-active <menu-info "clear-text1"> i)
+
+                (set i (> (iup-get-int <_kv "text2"> "COUNT") 0))
+                (iup-set-active <menu-info "save-text2"> i)
+                (iup-set-active <menu-info "clear-text2"> i)
+
+                (iup-set-active <menu-info "save-frame1"> supervision)
+                (iup-set-active <menu-info "save-frame2"> supervision)
+                (iup-set-active <menu-info "print-selected">
+                        (or (<> av1 undef) (<> av2 undef)) )
+                (iup-set-active <menu-info "print-buffers-content">
+                        (or (<> av1 undef) (<> av2 undef)) )
+                (iup-set-active <menu-info "print-timestamps1"> (<> av1 undef))
+                (iup-set-active <menu-info "print-timestamps2"> (<> av2 undef))
+                (iup-set-active <menu-info "play-movie1"> (<> av1 undef))
+                (iup-set-active <menu-info "play-movie2"> (<> av2 undef))
+                (iup-set-active <menu-info "edit-framerate1"> (<> av1 undef))
+                (iup-set-active <menu-info "edit-framerate2"> (<> av2 undef))
+                (iup-set-active <menu-info "deinterlacing1"> (<> av1 undef))
+                (iup-set-active <menu-info "deinterlacing2"> (<> av2 undef))
+                (iup-set-active <menu-info "aspect-ratio1"> (<> av1 undef))
+                (iup-set-active <menu-info "aspect-ratio2"> (<> av2 undef))
+                (iup-set-active <menu-info "gamma1"> (<> av1 undef))
+                (iup-set-active <menu-info "gamma2"> (<> av2 undef))
+                (iup-set-active <menu-info "draw-keypoints"> (and (<> av1 undef) (<> av2 undef)))
+                (iup-set-active <menu-info "undo-last-movement"> (<> <_kv "prm"> undef))
+
+                (set i <_kv "history-pos">)
+                (iup-set-active <menu-info "history-undo"> (> i 0))
+                (iup-set-active <menu-info "history-redo"> (< i <_kv "history-max">)) )
+
+        (iup-set-active <menu-info "widget"> (not running))
+        (iup-set-active <_kv "supervision-toolbar"> (and (not running) supervision))
+        (iup-set-active <btn-info "open1"> (not running))
+        (iup-set-active <btn-info "open2"> (not running))
+        (iup-set-active <btn-info "open-project"> (not running))
+        (iup-set-active <btn-info "save-project"> (and (not running)  (<> av1 undef) (<> av2 undef)))
+        (iup-set-active <btn-info "start"> supervision)
+        (iup-set-active <btn-info "play"> (and (assocp <_kv "audio">) (not running)))
+        (iup-set-active <btn-info "abort">
+                (and running (not <_abort 0>)) )
+        (iup-set-active <btn-info "audio"> map-exists)
+        (iup-set-active <btn-info "srt"> map-exists)
+        (iup-set-active <btn-info "prefs"> (not running)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

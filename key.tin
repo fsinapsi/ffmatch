@@ -1,0 +1,222 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun key-mod (av) net key-mod)
+(defnet key-mod (av @key)
+        (deflocal fr deint)
+
+        (set fr (av-video-frame-rate av))
+        (set deint (av-get-filter-rows av))
+        (av-set-video-frame-rate av)
+        (av-set-filter-rows av 0)
+        (set @key (+ "mod-" (key-basic av)))
+        (av-set-video-frame-rate av fr)
+        (av-set-filter-rows av deint) )
+
+(defun key-scd (av)
+        (+ "scd-" (key-basic av)) )
+
+(defun key-sck (av1 av2)
+        (+ "sck-" (key-basic av1) (key-basic av2)) )
+
+(defun key-map (av1 av2)
+        (+ "map-" (key-basic av1) (key-basic av2)) )
+
+(defun key-prm (av1 av2)
+        (+ "prm-" (key-basic av1) (key-basic av2)) )
+
+(defun key-aud (av1 av2)
+        (+ "aud-" (key-basic av1) (key-basic av2)) )
+
+(defun key-basic (av) net key-basic)
+(defnet key-basic (av @key)
+        (deflocal v)
+
+        (set v (av-get-filter-rows av))
+        (set @key (gcry-sha1sum-fast (+
+                              ;<[ "" "qsv" "amf" "cuvid" ] (av-get-accel av)>
+                              (if (= v 0) "" (+ "deint=" v))
+                              (int->str (width av) 5 '0')
+                              (int->str (height av) 5 '0')
+                              (int->str (av-approximated-number-of-frames av) 6 '0')
+                              (fullpath->name (av-path av)) ))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun key-query-range (prefix)
+        (+ " FROM config WHERE key>='" prefix "-' AND key<'" (str-succ (+ prefix "-")) "'") )
+
+(defun key-query-range-mod ()
+        (key-query-range "mod") )
+
+(defun key-query-range-scd ()
+        (key-query-range "scd") )
+
+(defun key-query-range-sck ()
+        (key-query-range "sck") )
+
+(defun key-query-range-map ()
+        (key-query-range "map") )
+
+(defun key-query-range-prm ()
+        (key-query-range "prm") )
+
+(defun key-query-range-aud ()
+        (key-query-range "aud") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun key-count (prefix)
+        (db-num-expr (+ "SELECT count(*)" (key-query-range prefix))) )
+
+(defun key-count-mod ()
+        (key-count "mod") )
+
+(defun key-count-scd ()
+        (key-count "scd") )
+
+(defun key-count-sck ()
+        (key-count "sck") )
+
+(defun key-count-map ()
+        (key-count "map") )
+
+(defun key-count-prm ()
+        (key-count "prm") )
+
+(defun key-count-aud ()
+        (key-count "aud") )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun key-code->name (code)
+        <(sqlite3-exec _db "SELECT value FROM config WHERE key='scd-" code "'") 0 0 3> )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet key-mod-set (av field val)
+        (deflocal key m)
+
+        (set key (key-mod av))
+        (set m (cfg-get key))
+        (if (not (assocp m))
+        then    (set m (assoc)) )
+        (set <m field> val)
+        (if (= (length m) 0)
+        then    (cfg-clr key)
+        else    (cfg-set key m) ))
+
+(defnet key-mod-clr (av field)
+        (key-mod-set av field undef) )
+
+(defnet key-mod-set-framerate (av val)
+        (set val (approx6 val))
+        (if (= val (approx6 (av-original-video-frame-rate av)))
+        then    (clr val)
+        else    (case (approx3 val) of
+                        "23.976"        (set val (/ 24000 1001))
+                        "29.97"         (set val (/ 30000 1001)) ))
+        (key-mod-set av "framerate" val) )
+
+(defnet key-mod-set-dar (av val)
+        (set val (approx3 val))
+        (key-mod-set av "dar" (if (= val (approx3 (av-original-dar av))) undef val)) )
+
+(defun key-mod-get (av field) net key-mod-get)
+(defnet key-mod-get (av field @val)
+        (deflocal m)
+
+        (set m (cfg-get (key-mod av)))
+        (assocp m)
+        (set @val <m field>) )
+
+(defnet key-mod-apply (av)
+        (deflocal m v)
+
+        (set m (cfg-get (key-mod av)))
+        (if (assocp m)
+        then    (set v <m "framerate">)
+                (if (rationalp v)
+                then    (av-set-video-frame-rate av v)
+                else    (av-set-video-frame-rate av) )
+                (set v <m "dar">)
+                (if (rationalp v)
+                then    (av-set-dar av v)
+                else    (av-set-dar av) )
+                (case <m "deint"> of
+                        1       (av-set-filter-rows av 1)
+                        2       (av-set-filter-rows av 2)
+                        default (av-set-filter-rows av) )
+                (set v <m "gamma">)
+                (av-set-gamma av (if (rationalp v) v 1))
+                (set v <m "contrast">)
+                (av-set-contrast av (if (rationalp v) v 1))
+                (set v <m "hue">)
+                (av-set-hue av (if (listp v) v [ 0 . 0 ]))
+                (set v <m "temperature">)
+                (av-set-temperature av (if (listp v) v [ 0 . 0 ]))
+                (set v <m "hflip">)
+                (av-set-hflip av (if (booleanp v) v false))
+                (set v <m "vflip">)
+                (av-set-vflip av (if (booleanp v) v false))
+                (av-set-filter av)
+        else    (av-set-video-frame-rate av)
+                (av-set-dar av)
+                (av-set-filter-rows av)
+                (av-set-gamma av)
+                (av-set-contrast av)
+                (av-set-hue av)
+                (av-set-temperature av)
+                (av-set-hflip av false)
+                (av-set-vflip av false)
+                (av-set-filter av) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

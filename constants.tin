@@ -13,16 +13,21 @@
 (defun zoom-step () 1.1)
 (defun space () 10)
 (defun framerates () [ 25 (/ 24000 1001) 24 ])
+(defun split-min () 300)
+(defun split-max () 990)
+(defun split-minmax () (sprint (split-min) ":" (split-max)))
 
-(defun deint-filters ()
+(defun deinterlacing ()
         [ "none"
-          "kerndeint"
-          ])
-
-(defun row-filters ()
-        [ "entire frame"
           "top field"
           "bottom field"
+          ])
+
+(defun hwaccels ()
+        [ "none"
+          "Intel Quick Sync Video"
+          "AMD AMF"
+          "Nvidia CUDA (CUVID)"
           ])
 
 (defun default-parameters ()
@@ -43,33 +48,30 @@
           [ "sift-proportionality-threshold" . 0.9 ]
           [ "sift-scale" . true ]
           [ "sift-scale-pixels" . (* 500 500) ]
-          [ "filter-gamma1" . 1 ]
-          [ "filter-gamma2" . 1 ]
-          [ "filter-mirror1" . false ]
-          [ "filter-mirror2" . false ]
-          [ "filter-flip1" . false ]
-          [ "filter-flip2" . false ]
-          [ "filter-rotate1" . 0 ]
-          [ "filter-rotate2" . 0 ]
-          [ "filter-rows1" . 0 ]
-          [ "filter-rows2" . 0 ]
-          [ "filter-deint1" . 0 ]
-          [ "filter-deint2" . 0 ]
-          [ "filter-ar1-auto" . true ]
-          [ "filter-ar1" . 1.78 ]
-          [ "filter-ar2-auto" . true ]
-          [ "filter-ar2" . 1.78 ]
           [ "sift-draw-lines" . true ]
+          [ "optimize-map" . true ]
           [ "supervision-skip-double" . 10 ]
-          [ "scd-threads" . 4 ]
+          [ "scd-threads" . 6 ]
+          [ "frame-buf-size" . 50 ]
           [ "debug-enabled" . false ]
           [ "sound-enabled" . true ]
-          [ "cuvid-enabled" . false ]
-          [ "frame-buf-size" . 20 ]
+          [ "ignore-invalid-data" . false ]
+          [ "hwaccel" . 0 ]
           [ "junction-context" . 200 ]
+          [ "play-delay" . -5 ]
           [ "osdtempl" . "" ]
           [ "scaling-mode" . 0 ]
           ])
+
+(defun default-audio ()
+        (list->assoc
+        [
+          [ "fps" . 24 ]
+          [ "which" . 1 ]
+          [ "gain" . 1 ]
+          [ "delay1" . 0 ]
+          [ "delay2" . 0 ]
+          ]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

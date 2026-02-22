@@ -18,8 +18,8 @@
         (set i (iup-vbox
                         (info-setup-tabs q)
                         butbox ))
-        (iup-set-str-attribute i "MARGIN" "4x4")
-        (iup-set-int i "GAP" 0)
+        (iup-set-str-attribute i "NMARGIN" "12x12")
+        (iup-set-int i "NGAP" 10)
 
         (set dlg (iup-dialog i))
         (iup-set-dlg-parent self dlg)
@@ -35,26 +35,38 @@
 
 (defun info-setup-tabs (q) net info-setup-tabs)
 (defnet info-setup-tabs (q @wid)
-        (set @wid (iup-tabs (info-setup-page1 q) (info-setup-page2) (info-setup-page3) (info-setup-page4)))
+        (set @wid (iup-tabs (info-setup-page1 q) (info-setup-page2) (info-setup-page3) (info-setup-page4) (info-setup-page5)))
         (iup-set-str-attribute @wid "TABTITLE0" $"Version")
         (iup-set-str-attribute @wid "TABTITLE1" $"Authors")
-        (iup-set-str-attribute @wid "TABTITLE2" "Lavc")
-        (iup-set-str-attribute @wid "TABTITLE3" $"License")
+        (iup-set-str-attribute @wid "TABTITLE2" $"Libraries")
+        (iup-set-str-attribute @wid "TABTITLE3" "Lavc")
+        (iup-set-str-attribute @wid "TABTITLE4" $"License")
         (if (clinux)
         then    (iup-set-bgcolor @wid (white)) )
         (iup-set-bool @wid "EXPAND" true) )
 
 (defun info-setup-page1 (q) net info-setup-page1)
 (defnet info-setup-page1 (q @wid)
-        (deflocal i img remote-version vbox)
+        (deflocal i pix img remote-version vbox default-font text-font ram)
 
         (set i (iup-label))
         (iup-set-str-attribute i "EXPAND" "VERTICAL")
-        (set img (iup-image-rgba (pix-load-static "logo.png")))
+        (set pix (rint (linear (fullsize-width) 0 1366 0 280)))
+        (set pix (pix-create pix pix))
+        (pix-logo pix)
+        (set img (iup-image-rgba pix))
+        (close pix)
         (iup-set-attribute-handle i "IMAGE" img)
         (queue-put q img)
 
         (set remote-version (remote-version-cached))
+
+        (set default-font (iup-get-global "DEFAULTFONT"))
+        (set text-font (cfg-get "text-font"))
+        (if (= text-font undef)
+        then    (set text-font default-font) )
+
+        (set ram (/ (sdl-get-system-ram) 1024))
 
         (set vbox (iup-vbox
                 (iup-fill)
@@ -64,28 +76,26 @@
                         (iup-link (+ (url-home-page) "/code/ffmatch/index.html") $"There is an update" ": " (date->version remote-version))
                         (iup-label $"There are no updates") )
                 (iup-label
-                        "CPUs: " (openjp2-get-num-cpus) nl
+                        "RAM: " (approx1 ram) " Gib" nl
+                        "Logical CPU cores: " (sdl-get-num-logical-cpu-cores) nl
                         $"Current number of threads" ": " (thread-cur) nl
                         $"Max number of threads" ": " (thread-max) nl
                         $"Selected language" ": " <(languages) (lang)> nl
                         ;$"Sound" ": " (if <_kv "enabled-sound"> $"enabled" $"disabled") nl
-                        "CC version (rts): " (sub 0 30 (cc-version)) nl
-                        "GC version: " (gc-version) nl
-                        "GMP version: " (gmp-version) nl
-                        "IUP version: " (iup-version) nl
-                        "IUP system: " (iup-get-global "SYSTEM") nl
-                        (if (clinux) (+ "GTK version: " (iup-get-global "GTKVERSION") nl) "")
-                        "IUP DEFAULTFONT: " (iup-get-global "DEFAULTFONT") nl
-                        "libavcodec version: " (av-codec-version) "/" (av-avcodec-version) nl )
+                        "Display: " (display-name) nl
+                        "Full display size: " (fullsize-width) 'x' (fullsize-height) nl
+                        "Screen display size: " (screensize-width) 'x' (screensize-height) nl
+                        "Default font: " default-font nl
+                        "Text font: " text-font )
                 (iup-fill) ))
-        (iup-set-int vbox "GAP" 0)
         (set @wid (iup-hbox (iup-fill) i vbox (iup-fill)))
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER")
-        (iup-set-int @wid "GAP" 40) )
+        (iup-set-int @wid "NGAP" 10) )
 
 (defun info-setup-page2 () net info-setup-page2)
 (defnet info-setup-page2 (@wid)
         (set @wid (iup-vbox
+                (iup-fill)
                 (iup-label "FFmatch " $"was coded in TreeP by" " Frank Sinapsi")
                 (iup-link (url-home-page))
                 (iup-label "\n" $"Please report bugs to")
@@ -95,11 +105,28 @@
                 (iup-label "\n" $"Source code of" " " "FFmatch")
                 (iup-link "https://github.com/fsinapsi/ffmatch")
                 (iup-label "\n" $"Thanks to:"
-                           "\n" "HoHoHo, Devilman1, ErTenebra" )))
-        (iup-set-str-attribute @wid "MARGIN" "20x20") )
+                           "\n" "HoHoHo, Devilman1, ErTenebra" )
+                (iup-fill) ))
+        (iup-set-str-attribute @wid "NMARGIN" "20x20") )
 
 (defun info-setup-page3 () net info-setup-page3)
 (defnet info-setup-page3 (@wid)
+        (set @wid (iup-vbox
+                (iup-fill)
+                (iup-label
+                        "CC version (rts): " (sub 0 50 (cc-version)) nl
+                        "GC version: " (gc-version) nl
+                        "GMP version: " (gmp-version) nl
+                        "IUP version: " (iup-version) nl
+                        "IUP system: " (iup-get-global "SYSTEM") nl
+                        (if (clinux) (+ "GTK version: " (iup-get-global "GTKVERSION") nl) "")
+                        "libavcodec version: " (av-codec-version) "/" (av-avcodec-version) nl
+                        "SDL version: " (sprintl (sdl-version) '.') "/" (sprintl (sdl-get-version) '.') )
+                (iup-fill) ))
+        (iup-set-str-attribute @wid "NMARGIN" "20x20") )
+
+(defun info-setup-page4 () net info-setup-page4)
+(defnet info-setup-page4 (@wid)
         (deflocal s c a)
 
         (set a (array 0))
@@ -125,7 +152,7 @@
                 (inc s nl c) )
         (set @wid (iup-text-generic s true)) )
 
-(defun info-setup-page4 ()
+(defun info-setup-page5 ()
         (iup-text-generic (+
                 (if (= (lang) 1)
                 "FFmatch è un software libero: puoi ridistribuirlo e/o\n" \
@@ -173,8 +200,8 @@
         (set text (iup-text-generic (info-keyboard-shortcuts) false))
 
         (set i (iup-vbox text butbox))
-        (iup-set-str-attribute i "MARGIN" "4x4")
-        (iup-set-int i "GAP" 0)
+        (iup-set-str-attribute i "NMARGIN" "12x12")
+        (iup-set-int i "NGAP" 10)
 
         (set dlg (iup-dialog i))
         (iup-set-dlg-parent self dlg)

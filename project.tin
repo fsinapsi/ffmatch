@@ -8,29 +8,44 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet project-open-cb (self)
-        (opt (project-open-low self)) )
+(defnet project-open-mouse-cb (self)
+        (iup-post-call (netptr project-open-mouse-post)) )
 
-(defnet project-open-low (self)
-        (deflocal a i path)
+(defnet project-open-corner-cb (self)
+        (iup-post-call (netptr project-open-corner-post)) )
 
+(defnet project-open-mouse-post ()
+        (project-open-low (cmacro IUP_MOUSEPOS)
+                          (cmacro IUP_MOUSEPOS) ))
+
+(defnet project-open-corner-post ()
+        (deflocal dlg)
+
+        (set dlg <_kv "dlg">)
+        (project-open-low (+ (iup-get-int dlg "SCREENPOSITION") 30)
+                          (+ (iup-get-int2 dlg "SCREENPOSITION") 60) ))
+
+(defnet project-open-low (x y)
+        (deflocal dlg a i path)
+
+        (set dlg <_kv "dlg">)
         (set a (cons (queue) (queue)))
         (sqlite3-exec-data _db (netptr project-open-cback) a
                 "SELECT name,path1,path2 FROM projects ORDER BY name" )
         (if (= (length (car a)) 0)
-        then    (iup-warning60 self $"There are no valid projects.")
+        then    (iup-warning60 dlg $"There are no valid projects.")
                 (fail) )
-        (set i (iup-choose-menu (car a)))
+        (set i (iup-choose-menu-xy (car a) x y))
         (integerp i)
         (set path (car <(cdr a) i>))
         (alt    (open-common-low 1 path false)
-                (sound-iup-error60 self (+ "can't open `" path "'")) )
+                (sound-iup-error60 dlg (+ "can't open `" path "'")) )
         (set path (cdr <(cdr a) i>))
         (alt    (open-common 2 path)
-                (sound-iup-error60 self (+ "can't open `" path "'")) )
+                (sound-iup-error60 dlg (+ "can't open `" path "'")) )
         (gui-report)
-        (gui-update-image)
-        (gui-update) )
+        (update-image)
+        (update-buttons) )
 
 (defnet project-open-cback (a name path1 path2)
         (if (and (pathexists path1) (pathexists path2))
@@ -51,15 +66,15 @@
         (sqlite3-begin _db)
         (alt    (seq    (project-save-low self)
                         (sqlite3-end _db)
-                        (gui-update) )
+                        (update-buttons) )
                 (sqlite3-rollback _db) ))
 
 (defnet project-save-low (self)
         (deflocal path1 path2 name newname)
 
-        (set path1 <_kv "path1">)
+        (set path1 (av-path <_kv "av1">))
         (stringp path1)
-        (set path2 <_kv "path2">)
+        (set path2 (av-path <_kv "av2">))
         (stringp path2)
         (set path1 (sqlite3-escape-strings path1))
         (set path2 (sqlite3-escape-strings path2))
@@ -112,7 +127,7 @@
 
 (defnet project-delete-cb (self)
         (opt    (project-delete-low self)
-                (gui-update) ))
+                (update-buttons) ))
 
 (defnet project-delete-low (self)
         (deflocal av1 av2 path1 path2 name)
@@ -122,8 +137,8 @@
         (set av2 <_kv "av2">)
         (<> av2 undef)
         (set name <(sqlite3-exec _db
-            "SELECT name FROM projects WHERE path1='" (sqlite3-escape-strings <_kv "path1">)
-            "' AND path2='" (sqlite3-escape-strings <_kv "path2">) "' LIMIT 1") 0 0> )
+            "SELECT name FROM projects WHERE path1='" (sqlite3-escape-strings (av-path <_kv "av1">))
+            "' AND path2='" (sqlite3-escape-strings (av-path <_kv "av2">)) "' LIMIT 1") 0 0> )
         (stringp name)
         (iup-confirm60 self (+ $"Project `" name $"' will be deleted." ' ' $"Are you sure?"))
         (sqlite3-exec _db undef
@@ -150,8 +165,8 @@
         (<> av1 undef)
         (set av2 <_kv "av2">)
         (<> av2 undef)
-        (set path1 <_kv "path1">)
-        (set path2 <_kv "path2">)
+        (set path1 (av-path av1))
+        (set path2 (av-path av2))
         (set name1 (fullpath->name path1))
         (set name2 (fullpath->name path2))
         (set path1 (sqlite3-escape-strings path1))
@@ -227,15 +242,21 @@
                     "','" path2
                     "')" ))
 
-        (set key (key-scd av1 name1))
+        (set key (key-mod av1))
         (cfg-set-low db key (cfg-get key))
-        (set key (key-scd av2 name2))
+        (set key (key-mod av2))
         (cfg-set-low db key (cfg-get key))
-        (set key (key-sck av1 av2 name1 name2))
+        (set key (key-scd av1))
         (cfg-set-low db key (cfg-get key))
-        (set key (key-map av1 av2 name1 name2))
+        (set key (key-scd av2))
         (cfg-set-low db key (cfg-get key))
-        (set key (key-prm av1 av2 name1 name2))
+        (set key (key-sck av1 av2))
+        (cfg-set-low db key (cfg-get key))
+        (set key (key-map av1 av2))
+        (cfg-set-low db key (cfg-get key))
+        (set key (key-prm av1 av2))
+        (cfg-set-low db key (cfg-get key))
+        (set key (key-aud av1 av2))
         (cfg-set-low db key (cfg-get key))
 
         (sqlite3-exec db undef

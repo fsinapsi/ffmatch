@@ -43,34 +43,20 @@
                 (cfg-set "last-check-for-updates-version" @s)
                 (cfg-set "last-check-for-updates" now) ))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defun display-name ()
+        <_kv "display-name"> )
 
-(defun key-scd (av name)
-        (+ "scd-" (key-basic av name)) )
+(defun fullsize-width ()
+        <_kv "fullsize-width"> )
 
-(defun key-sck (av1 av2 name1 name2)
-        (+ "sck-" (key-basic av1 name1) (key-basic av2 name2)) )
+(defun fullsize-height ()
+        <_kv "fullsize-height"> )
 
-(defun key-map (av1 av2 name1 name2)
-        (+ "map-" (key-basic av1 name1) (key-basic av2 name2)) )
+(defun screensize-width ()
+        <_kv "screensize-width"> )
 
-(defun key-prm (av1 av2 name1 name2)
-        (+ "prm-" (key-basic av1 name1) (key-basic av2 name2)) )
-
-(defun key-basic (av name)
-        (gcry-sha1sum-fast (+ (if (rmatch (av-codec-name av (av-video-stream-idx av)) "_cuvid") "cuvid" "")
-                              (int->str (width av) 5 '0')
-                              (int->str (height av) 5 '0')
-                              (int->str (av-approximated-number-of-frames av) 6 '0')
-                              name )))
+(defun screensize-height ()
+        <_kv "screensize-height"> )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -90,9 +76,7 @@
         (<> av1 undef)
         (set av2 <_kv "av2">)
         (<> av2 undef)
-        (set @map (get-map-low (cfg-get (key-map av1 av2
-                (fullpath->name <_kv "path1">)
-                (fullpath->name <_kv "path2">) )))))
+        (set @map (get-map-low (cfg-get (key-map av1 av2)))) )
 
 (defun get-map-low (key-map) net get-map-low)
 (defnet get-map-low (key-map @map)
@@ -106,6 +90,63 @@
                 (set n <i 2>)
                 (map-bind-low (car @map) p q n)
                 (map-bind-low (cdr @map) q p n) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet optimize-map (quiet)
+        (opt (optimize-map-low quiet)) )
+
+(defnet optimize-map-low (quiet)
+        (deflocal av1 av2 key k a i q)
+
+        (set av1 <_kv "av1">)
+        (<> av1 undef)
+        (set av2 <_kv "av2">)
+        (<> av2 undef)
+        (set key (key-map av1 av2))
+        (set k (cfg-get key))
+        (<> k undef)
+        (set a (array 0))
+        (for i in (car (get-map-low k)) do
+                (set q <i 2>)
+                (if (integerp q)
+                then    (array-append a (list <i 0> q (- <i 1> <i 0> -1))) ))
+        (if (= (length <k 2>) (length a))
+        then    (if (not quiet)
+                then    (iup-info60 <_kv "dlg"> $"The \"mapping\" data are already optimized.") )
+                (fail) )
+        (if (not quiet)
+        then    (iup-confirm60 <_kv "dlg">
+                        (+ $"The \"mapping\" data will be optimized." nl
+                        "(" (length <k 2 >) " -> " (length a) ")" nl
+                        $"Are you sure?" )))
+        (cfg-set key (list <k 0> <k 1> a)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun change-frame-detected (av1 av2) net change-frame-detected)
+(defnet change-frame-detected (av1 av2 @res)
+        (deflocal fr1 fr2)
+
+        (set fr1 (av-video-frame-rate av1))
+        (set fr2 (av-video-frame-rate av2))
+        (set @res (>= (/ (max fr1 fr2) (min fr1 fr2)) 1.1)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -182,20 +223,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun my-av-par (which av) net my-av-par)
-(defnet my-av-par (which av @par)
-        (deflocal default-info)
-
-        (set default-info <_kv "default">)
-        (if (cfg-get-or-default (+ "filter-ar" which "-auto") default-info)
-        then    (set @par (av-sample-aspect-ratio av (av-video-stream-idx av)))
-                (if (= @par 0)
-                then    (set @par 1) )
-        else    (set @par (/ (cfg-get-or-default-num (+ "filter-ar" which) default-info)
-                             (/ (width av) (height av)) ))))
-
-(defun my-av-dar (which av)
-        (* (/ (width av) (height av)) (my-av-par which av)) )
+(defun my-iup-button-icon-svg (cback iconraw w h q) net my-iup-button-icon-svg)
+(defnet my-iup-button-icon-svg (cback iconraw w h q @wid)
+        (set @wid (iup-button-icon-svg undef cback iconraw w h q))
+        (iup-set-bool @wid "CANFOCUS" false) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -206,56 +237,54 @@
 ;;;;                                                                      ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet pix-clear (pix)
-        (pix-draw-box pix 0 0 (maxint) (maxint) (pix-color 0 0 0 0)) )
-
-(defnet pix-clear-and-copy-pix (pix icon)
-        (pix-clear pix)
-        (pix-draw-pix pix
-                (/ (- (width pix) (width icon)) 2)
-                (/ (- (height pix) (height icon)) 2)
-                icon ))
 
 (defnet pix-logo (pix)
-        (pix-clear-and-copy-pix pix
-                ;(pix-load-static "128x128/emblem-videos.png")
-                (pix-load-static "logo.png")
-                ))
+        (deflocal x p)
+
+        (set x (rint (linear (min (width pix) (height pix)) 0 100 0 56)))
+        (set p (rsvg-load-size (raw-load-static "logo.svg") x x))
+        (pix-clear-and-copy-pix pix p)
+        (close p) )
 
 (defnet pix-wip (pix)
-        (pix-clear-and-copy-pix pix
-                (pix-load-static "80x80/work-in-progress.png") ))
+        (deflocal x p)
+
+        (set x (rint (linear (min (width pix) (height pix)) 0 100 0 35)))
+        (set p (rsvg-load-size (raw-load-static "svg/misc/lavori-in-corso.svg") x x))
+        (pix-clear-and-copy-pix pix p)
+        (close p) )
 
 (defnet pix-error (pix)
-        (pix-clear-and-copy-pix pix
-                (pix-load-static "48x48/dialog-error-4.png") ))
+        (deflocal x p)
 
-(defnet pix-copy-frames (pix frm1 frm2 pix1 pix2 gamma1 gamma2)
+        (set x (rint (linear (width pix) 0 100 0 25)))
+        (set p (rsvg-load-size (raw-load-static "svg/dialog-error.svg") x x))
+        (pix-clear-and-copy-pix pix p)
+        (close p) )
+
+(defnet pix-copy-frames (pix frm1 frm2 pix1 pix2)
         (deflocal sy)
 
         (pix-clear pix)
         (pix-sws-scale-bicubic frm1 pix1)
         (pix-sws-scale-bicubic frm2 pix2)
-        (pix-gamma pix1 gamma1)
-        (pix-gamma pix2 gamma2)
         (set sy (/ (- (height pix) (height pix1) (height pix2) (space)) 2))
         (pix-draw-pix pix (/ (- (width pix) (width pix1)) 2) sy pix1)
         (pix-draw-pix pix (/ (- (width pix) (width pix2)) 2) (+ sy (height pix1) (space)) pix2) )
 
 (defnet pix-create-pixfrm (pix av1 av2 @pix1 @pix2)
-        (deflocal default-info w1 h1 w2 h2 ww1 hh1 ww2 hh2 k si co)
+        (deflocal default-info w1 h1 w2 h2 k si co)
 
         (set default-info <_kv "default">)
         (set w1 (width av1))
         (set h1 (height av1))
         (set w2 (width av2))
         (set h2 (height av2))
-        (set k (my-av-par 1 av1))
+        (set k (av-par av1))
         (if (> k 1)
         then    (set w1 (* w1 k))
         else    (set h1 (/ h1 k)) )
-        (set k (my-av-par 2 av2))
+        (set k (av-par av2))
         (if (> k 1)
         then    (set w2 (* w2 k))
         else    (set h2 (/ h2 k)) )
@@ -265,42 +294,8 @@
                             (set w2 (* h2 k)) )
                 1   (seq    (set h2 (* h2 (/ w1 w2)))
                             (set w2 w1) ))
-        (set k (cfg-get-or-default-num "filter-rotate1" default-info))
-        (if (= k 0)
-        then    (set ww1 w1)
-                (set hh1 h1)
-        else    (if (< k 0)
-                then    (inc k 360) )
-                (if (or (= k 90) (= k 270))
-                then    (set ww1 h1)
-                        (set hh1 w1)
-                else    (if (= k 180)
-                        then    (set ww1 w1)
-                                (set hh1 h1)
-                        else    (set k (* (/ k 180) (* (atan 1) 4)))
-                                (set si (abs (sin k)))
-                                (set co (abs (cos k)))
-                                (set ww1 (+ (* w1 co) (* h1 si)))
-                                (set hh1 (+ (* h1 co) (* w1 si))) )))
-        (set k (cfg-get-or-default-num "filter-rotate2" default-info))
-        (if (= k 0)
-        then    (set ww2 w2)
-                (set hh2 h2)
-        else    (if (< k 0)
-                then    (inc k 360) )
-                (if (or (= k 90) (= k 270))
-                then    (set ww2 h2)
-                        (set hh2 w2)
-                else    (if (= k 180)
-                        then    (set ww2 w2)
-                                (set hh2 h2)
-                        else    (set k (* (/ k 180) (* (atan 1) 4)))
-                                (set si (abs (sin k)))
-                                (set co (abs (cos k)))
-                                (set ww2 (+ (* w2 co) (* h2 si)))
-                                (set hh2 (+ (* h2 co) (* w2 si))) )))
-        (set k (min (/ (- (width pix) (* 2 (space))) (max ww1 ww2))
-                    (/ (- (height pix) (* 3 (space))) (+ hh1 hh2)) ))
+        (set k (min (/ (- (width pix) (* 2 (space))) (max w1 w2))
+                    (/ (- (height pix) (* 3 (space))) (+ h1 h2)) ))
         (set @pix1 (pix-create (max 1 (* k w1)) (max 1 (* k h1))))
         (set @pix2 (pix-create (max 1 (* k w2)) (max 1 (* k h2)))) )
 
@@ -360,6 +355,10 @@
 (defnet quit ()
         (deflocal thclk th1 th2 thsnd obj)
 
+        (if (<> <_kv "av1"> undef)
+        then    (close <_kv "av1">) )
+        (if (<> <_kv "av2"> undef)
+        then    (close <_kv "av2">) )
         (set thclk <_kv "th-clock">)
         (th-clock-send undef)
         (set th1 <_kv "th-read-frame1">)
@@ -372,81 +371,10 @@
         (thread-join th1)
         (thread-join th2)
         (thread-join thsnd)
+        (close <_kv "img">)
+        (close <_kv "pix">)
         (for obj in <_kv "da-chiudere"> do
                 (close obj) ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet a ()
-        (deflocal p i j c r g b)
-
-        (set p (pix-load-static "logo.png"))
-        (for i in 0 .. (- (width p) 1) do
-        (for j in 0 .. (- (height p) 1) do
-                (set c (pix-point p i j))
-                (set r (pix-color-red c))
-                (set g (pix-color-green c))
-                (set b (pix-color-blue c))
-                (= r g)
-                (= r b)
-                (pix-draw-point p i j (pix-color r r r (- 255 r))) ))
-        (pix-save-png p "pippo.png") )
-
-(defnet b ()
-        (deflocal p q z i j c r g b)
-
-        (set p (pix-load-static "logo.png"))
-        (set q (pix-load-static "128x128/emblem-videos.png"))
-
-        (pix-draw-pix-alpha p (/ (- (width p) (width q)) 2) (/ (- (height p) (height q)) 2) q)
-
-        (set z (pix-load "icons/logo.png"))
-
-        (for i in 0 .. (- (width z) 1) do
-        (for j in 0 .. (- (height z) 1) do
-                (set c (pix-point z i j))
-                (set r (pix-color-red c))
-                (set g (pix-color-green c))
-                (set b (pix-color-blue c))
-                (pix-draw-point z i j (pix-color r g 0xff (pix-color-alpha c))) ))
-
-        (pix-draw-pix-alpha p 0 0 z)
-
-        (pix-save-png p "pippo.png") )
-
-(defnet c ()
-        (deflocal p q z i j c r g b)
-
-        (set p (pix-load "icons/sfondo2.png"))
-        (set q (pix-load "icons/logo-alt4.png"))
-        (for i in 0 .. (- (width p) 1) do
-        (for j in 0 .. (- (height p) 1) do
-                (set c (pix-point p i j))
-                (pix-draw-point p i j (pix-color
-                        (pix-color-red c)
-                        (pix-color-green c)
-                        (pix-color-blue c)
-                        (pix-color-alpha (pix-point q i j)) ))))
-
-        (set z (pix-clone p))
-
-        (close q)
-
-        (set q (pix-load-static "128x128/emblem-videos.png"))
-
-        (pix-draw-pix-alpha p (/ (- (width p) (width q)) 2) (/ (- (height p) (height q)) 2) q)
-
-        (pix-draw-pix-alpha p 0 0 z)
-
-        (pix-save-png p "pippo.png") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

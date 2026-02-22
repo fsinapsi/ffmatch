@@ -8,7 +8,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet match (th-main name1 name2 av1 av2 scd1 scd2 pix default-info)
+(defnet match (th-main av1 av2 scd1 scd2 pix default-info)
         (deflocal m scd-min-blocks scd-min-avg-block-size thres1 thres2 thres avg1 avg2 alternate i j)
 
         (pix-wip pix)
@@ -17,7 +17,7 @@
         (set scd-min-blocks (cfg-get-or-default-num "scd-min-blocks" default-info))
         (set scd-min-avg-block-size (cfg-get-or-default-num "scd-min-avg-block-size" default-info))
 
-        (set m (match-create name1 name2 av1 av2 scd1 scd2 th-main pix default-info))
+        (set m (match-create av1 av2 scd1 scd2 th-main pix default-info))
         (set i (map-free1 m))
         (map-report m)
 
@@ -272,8 +272,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun match-create (name1 name2 av1 av2 scd1 scd2 th-main pix default-info) net match-create)
-(defnet match-create (name1 name2 av1 av2 scd1 scd2 th-main pix default-info @m)
+(defun match-create (av1 av2 scd1 scd2 th-main pix default-info) net match-create)
+(defnet match-create (av1 av2 scd1 scd2 th-main pix default-info @m)
         (deflocal frm1 frm2 pix1 pix2 k params v)
 
         (set params (assoc))
@@ -289,15 +289,9 @@
                     "sift-match-threshold-min-ratio"
                     "sift-agreements-min"
                     "sift-proportionality-threshold"
-                    "filter-gamma1"
-                    "filter-gamma2"
                   ] do
                 (set <params k> (cfg-get-or-default-num k default-info)) )
-        (for k in [ "filter-mirror1"
-                    "filter-flip1"
-                    "filter-mirror2"
-                    "filter-flip2"
-                    "sift-draw-lines"
+        (for k in [ "sift-draw-lines"
                   ] do
                 (set <params k> (cfg-get-or-default k default-info)) )
         (set pix1 (cfg-get-or-default "sift-scale" default-info))
@@ -309,7 +303,7 @@
         (set pix1 (pix-create (* k (width frm1)) (* k (height frm1))))
         (set pix2 (pix-create (* k (width frm2)) (* k (height frm2))))
         (set @m (array 26))
-        (set k (cfg-get (key-sck av1 av2 name1 name2)))
+        (set k (cfg-get (key-sck av1 av2)))
         (if (<> k undef)
         then    (set <@m  0> <k 0>)
                 (set <@m  1> <k 1>)
@@ -342,8 +336,8 @@
                 (thread-self) frm1 ))
         (set <@m 13> (thread-create (netptr th-sift-features)
                 (thread-self) frm2 ))
-        (set <@m 14> name1)
-        (set <@m 15> name2)
+        ;(set <@m 14> undef) unused
+        ;(set <@m 15> undef) unused
         (set <@m 16> pix1)
         (set <@m 17> pix2)
         (set <@m 18> pix)
@@ -352,16 +346,16 @@
         (set <@m 21> scd2)
         (set <@m 22> params)
         (set <@m 25> false)
-        (set k (cfg-get (key-map av1 av2 name1 name2)))
+        (set k (cfg-get (key-map av1 av2)))
         (if (<> k undef)
-        then    (for k in <k 2> do
-                        (map-bind @m <k 0> <k 1> <k 2>) )))
+        then    (for v in <k 2> do
+                        (map-bind @m <v 0> <v 1> <v 2>) )))
 
 (defun match-create-frm (which av sift-scale sift-scale-pixels) net match-create-frm)
 (defnet match-create-frm (which av sift-scale sift-scale-pixels @frm)
         (deflocal w h k)
 
-        (set w (* (width av) (my-av-par which av)))
+        (set w (* (width av) (av-par av)))
         (set h (height av))
         (if sift-scale
         then    (set k (sqrt (/ (* w h) sift-scale-pixels)))
@@ -372,12 +366,10 @@
 (defnet match-destroy (m store)
         (close (match-frm1 m) (match-frm2 m) (match-pix1 m) (match-pix2 m))
         (if store
-        then    (cfg-set (key-sck (match-av1 m) (match-av2 m)
-                                  (match-name1 m) (match-name2 m) )
+        then    (cfg-set (key-sck (match-av1 m) (match-av2 m))
                          (list (match-cache m) (match-passed m) <m 6> <m 7>
                                <m 8> <m 9> <m 23> <m 24> ))
-                (cfg-set (key-map (match-av1 m) (match-av2 m)
-                                  (match-name1 m) (match-name2 m) )
+                (cfg-set (key-map (match-av1 m) (match-av2 m))
                          (list (- (length (match-scd1 m)) 1)
                                (- (length (match-scd2 m)) 1)
                                (match-map-step m) )))
@@ -433,8 +425,8 @@
 (defun match-th-main (m) <m 11>)
 (defun match-th-sift1 (m) <m 12>)
 (defun match-th-sift2 (m) <m 13>)
-(defun match-name1 (m) <m 14>)
-(defun match-name2 (m) <m 15>)
+;(defun match-unused (m) <m 14>)
+;(defun match-unused (m) <m 15>)
 (defun match-pix1 (m) <m 16>)
 (defun match-pix2 (m) <m 17>)
 (defun match-pix (m) <m 18>)

@@ -11,17 +11,18 @@
 (defglobal _kv _abort)
 
 (defnet init ()
-        ;(if (cmingw)
-        ;then    (iup-set-str-global "DEFAULTFONTSIZE" 10) )
         (set _kv (assoc))
-        (set <_kv "da-chiudere"> (queue))
-        (set <_kv "zoom-level"> 0)
+        (set _abort (array default false 1))
         (init-parse-args)
+        (init-constants)
         (init-db)
+        (history-clear)
         (init-default)
         (init-threads)
         (set <_kv "sound-enabled"> (cfg-get-or-default "sound-enabled" <_kv "default">))
-        (set _abort (array default false 1)) )
+        (if (> (fullsize-width) 1366)
+        then    (iup-set-default-font-size (+ (iup-default-font-size)
+                                              (if (<= (fullsize-width) 1920) 1 2) ))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -42,6 +43,25 @@
                                 (set <_kv "cfg-path"> p) )
                         (seq    (iup-error60 undef (+ (utf8-validate p) $": invalid option"))
                                 (exit -1) ))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet init-constants ()
+        (set <_kv "da-chiudere"> (queue))
+        (set <_kv "zoom-level"> 0)
+        (set <_kv "display-name"> (sdl-get-display-name (sdl-get-primary-display)))
+        (set <_kv "fullsize-width"> (iup-fullsize-width))
+        (set <_kv "fullsize-height"> (iup-fullsize-height))
+        (set <_kv "screensize-width"> (iup-screensize-width))
+        (set <_kv "screensize-height"> (iup-screensize-height)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -103,6 +123,10 @@
                         "CREATE INDEX projects_path1 ON projects(path1)" )
                 (sqlite3-exec _db undef
                         "CREATE INDEX projects_path2 ON projects(path2)" ))
+        (opt    (sqlite3-exec _db undef
+                        "CREATE TABLE history(" \
+                                "idx unique not null," \
+                                "val char not null)" ))
         (db-end)
         (set-lang (cfg-get-lang))
         (set <_kv "debug-enabled"> (= (cfg-get "debug-enabled") true)) )
@@ -118,7 +142,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet init-default ()
-        (set <_kv "default"> (assoc-default (default-parameters))) )
+        (set <_kv "default"> (list->assoc (default-parameters))) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

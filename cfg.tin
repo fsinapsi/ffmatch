@@ -22,30 +22,27 @@
         (set vbox (iup-vbox
                         (cfg-setup-tabs q)
                         butbox ))
-        (iup-set-str-attribute vbox "MARGIN" "4x4")
-        (iup-set-int vbox "GAP" 0)
+        (iup-set-str-attribute vbox "NMARGIN" "12x12")
+        (iup-set-int vbox "NGAP" 10)
 
         (set dlg (iup-dialog vbox))
         (iup-set-dlg-parent self dlg)
         (iup-set-str-attribute dlg "TITLE" $"Preferences")
+        (iup-set-attribute-handle dlg "ICON" <_kv "icon-cfg">)
         (iup-set-bool dlg "DIALOGFRAME" true)
         (iup-set-attribute-handle dlg "DEFAULTENTER" (iup-box-ok-cancel-btn-ok butbox))
         (iup-set-attribute-handle dlg "DEFAULTESC" (iup-box-ok-cancel-btn-cancel butbox))
 
         (iup-set-active <cfg-info "sb-sift-scale-pixels"> (cfg-get-or-default "sift-scale" default-info))
         (iup-set-callback <cfg-info "tb-sift-scale"> "ACTION" (netptr cfg-toggled-sift-scale))
-        (iup-set-active <cfg-info "sb-filter-ar1"> (not (cfg-get-or-default "filter-ar1-auto" default-info)))
-        (iup-set-active <cfg-info "sb-filter-ar2"> (not (cfg-get-or-default "filter-ar2-auto" default-info)))
-        (iup-set-callback <cfg-info "tb-filter-ar1-auto"> "ACTION" (netptr cfg-toggled-fileter-ar1))
-        (iup-set-callback <cfg-info "tb-filter-ar2-auto"> "ACTION" (netptr cfg-toggled-fileter-ar2))
 
         (iup-popup dlg (cmacro IUP_CENTERPARENT) (cmacro IUP_CENTERPARENT))
 
         (close dlg)
         (iup-close-queue q)
         (assoc-clr _kv "cfg-info")
-        (gui-update)
-        (gui-update-image) )
+        (update-buttons)
+        (update-image) )
 
 (defnet cfg-ok (self)
         (sqlite3-begin _db)
@@ -56,22 +53,17 @@
         (iup-exit-loop) )
 
 (defnet cfg-ok-low (self)
-        (deflocal cfg-info c i which av old-lang new-lang)
+        (deflocal cfg-info c i j which av old-lang new-lang)
 
         (set cfg-info <_kv "cfg-info">)
 
         (for c in [ "sift-scale"
                     "sift-draw-lines"
+                    "optimize-map"
                     "final-closure"
-                    "filter-mirror1"
-                    "filter-mirror2"
-                    "filter-flip1"
-                    "filter-flip2"
-                    "filter-ar1-auto"
-                    "filter-ar2-auto"
                     "debug-enabled"
                     "sound-enabled"
-                    "cuvid-enabled"
+                    "ignore-invalid-data"
                     ] do
                 (cfg-set c (iup-get-bool <cfg-info (+ "tb-" c)> "VALUE")) )
 
@@ -80,6 +72,7 @@
                     "frame-buf-size"
                     "scd-threads"
                     "junction-context"
+                    "play-delay"
                     "supervision-skip-double"
                     "checks-per-interval"
                     "checks-per-interval-extra"
@@ -97,19 +90,10 @@
                     "sift-match-threshold-val"
                     "sift-match-threshold-min-ratio"
                     "sift-proportionality-threshold"
-                    "filter-gamma1"
-                    "filter-gamma2"
-                    "filter-rotate1"
-                    "filter-rotate2"
-                    "filter-ar1"
-                    "filter-ar2"
                     ] do
                 (cfg-set c (iup-text-spin-ratio-val <cfg-info (+ "sb-" c)>)) )
 
-        (for c in [ "filter-rows1"
-                    "filter-rows2"
-                    "filter-deint1"
-                    "filter-deint2"
+        (for c in [ "hwaccel"
                     ] do
                 (cfg-set c (- (iup-get-int <cfg-info (+ "cb-" c)> "VALUE") 1)) )
 
@@ -119,27 +103,31 @@
         (set <_kv "sound-enabled"> (cfg-get "sound-enabled"))
 
         (set i (cfg-get-num "frame-buf-size"))
+        (set j (cfg-get "ignore-invalid-data"))
         (for which in 1 .. 2 do
                 (opt    (set av <_kv (+ "av" which)>)
                         (<> av undef)
                         (av-set-buf-size av i)
-                        (av-set-filter-rows av (cfg-get-num (+ "filter-rows" which)))
-                        (set c (cfg-get-num (+ "filter-deint" which)))
-                        (if (= c 0)
-                        then    (av-set-filter av)
-                        else    (av-set-filter av <(deint-filters) c>)
-                                ;(set c (pix-create 10 10))
-                                ;(pixp c)
-                                ;(opt (av-read-frame av c (av-frameno av)))
-                                ;(close c)
-                                )))
+                        (av-set-ignore-invalid-data av j) ))
 
         (set old-lang (lang))
         (set new-lang (- (iup-get-int <cfg-info "cb-languages"> "VALUE") 1))
         (cfg-set "lang" new-lang)
-        (if (<> new-lang old-lang)
-        then    (set-lang new-lang)
-                (iup-warning60 self $"Changing the language requires a restart to take effect.") ))
+        (if (or (<> new-lang old-lang)
+                (<> <cfg-info "old-hwaccel"> (- (iup-get-int <cfg-info "cb-hwaccel"> "VALUE") 1)) )
+        then    (if (<> new-lang old-lang)
+                then    (set-lang new-lang) )
+                (iup-warning60 self $"Changing the language or hwaccel requires a restart to take effect.") )
+
+        (set i (iup-button-font-value <cfg-info "but-text-font">))
+        (if (<> i <cfg-info "old-text-font">)
+        then    (cfg-set "text-font" i)
+                (iup-set-str-attribute <_kv "text1"> "FONT" i)
+                (iup-set-str-attribute <_kv "text2"> "FONT" i)
+                (if (cmingw)
+                then    (gui-report)
+                        (move-text1-on-current-value 1)
+                        (print-selected-cb undef) )))
 
 (defun cfg-setup-tabs (q) net cfg-setup-tabs)
 (defnet cfg-setup-tabs (q @wid)
@@ -147,13 +135,11 @@
                 (cfg-setup-tabs-page1 q)
                 (cfg-setup-tabs-page2 q)
                 (cfg-setup-tabs-page3 q)
-                (cfg-setup-tabs-page4 q)
-                (cfg-setup-tabs-page5 q) ))
+                (cfg-setup-tabs-page4 q) ))
         (iup-set-str-attribute @wid "TABTITLE0" $"Sequences")
         (iup-set-str-attribute @wid "TABTITLE1" $"Checks")
         (iup-set-str-attribute @wid "TABTITLE2" "SIFT")
-        (iup-set-str-attribute @wid "TABTITLE3" $"Filters")
-        (iup-set-str-attribute @wid "TABTITLE4" "Misc")
+        (iup-set-str-attribute @wid "TABTITLE3" "Misc")
         (iup-set-bool @wid "EXPAND" true) )
 
 (defun cfg-setup-tabs-page1 (q) net cfg-setup-tabs-page1)
@@ -185,12 +171,12 @@
         (set hbox3 (iup-hbox
                 (cfg-setup-framed-toggle $"Final closure" $"enabled" (cfg-get-or-default "final-closure" default-info) cfg-info "tb-final-closure") ))
 
-        (iup-set-int hbox1 "GAP" 5)
-        (iup-set-int hbox2 "GAP" 5)
-        (iup-set-int hbox3 "GAP" 5)
+        (iup-set-int hbox1 "NGAP" 5)
+        (iup-set-int hbox2 "NGAP" 5)
+        (iup-set-int hbox3 "NGAP" 5)
 
         (set @wid (iup-vbox hbox1 hbox2 hbox3))
-        (iup-set-int @wid "GAP" 2) )
+        (iup-set-int @wid "NGAP" 5) )
 
 (defun cfg-setup-tabs-page2 (q) net cfg-setup-tabs-page2)
 (defnet cfg-setup-tabs-page2 (q @wid)
@@ -227,12 +213,12 @@
                         (cfg-setup-spin 10000 1000000 (cfg-get-or-default-num "sift-scale-pixels" default-info)
                             cfg-info "sb-sift-scale-pixels" )))))
 
-        (iup-set-int hbox1 "GAP" 5)
-        (iup-set-int hbox2 "GAP" 5)
-        (iup-set-int hbox3 "GAP" 5)
+        (iup-set-int hbox1 "NGAP" 5)
+        (iup-set-int hbox2 "NGAP" 5)
+        (iup-set-int hbox3 "NGAP" 5)
 
         (set @wid (iup-vbox hbox1 hbox2 hbox3))
-        (iup-set-int @wid "GAP" 2) )
+        (iup-set-int @wid "NGAP" 5) )
 
 (defun cfg-setup-tabs-page3 (q) net cfg-setup-tabs-page3)
 (defnet cfg-setup-tabs-page3 (q @wid)
@@ -248,137 +234,79 @@
                         (cfg-setup-spin-ratio 0.01 0.99 (cfg-get-or-default-num "sift-match-threshold-min-ratio" default-info) 0.01
                             cfg-info "sb-sift-match-threshold-min-ratio" )))))
 
-        (iup-set-int hbox1 "GAP" 5)
+        (iup-set-int hbox1 "NGAP" 5)
 
         (set @wid (iup-vbox hbox1))
-        (iup-set-int @wid "GAP" 2) )
+        (iup-set-int @wid "NGAP" 5) )
 
 (defun cfg-setup-tabs-page4 (q) net cfg-setup-tabs-page4)
 (defnet cfg-setup-tabs-page4 (q @wid)
-        (deflocal cfg-info default-info hbox1 hbox2 hbox3 hbox4 hb1 hb2 rows1-list rows2-list deint1-list deint2-list i)
-
-        (set cfg-info <_kv "cfg-info">)
-        (set default-info <_kv "default">)
-
-        (set rows1-list (iup-list))
-        (set rows2-list (iup-list))
-        (set <cfg-info "cb-filter-rows1"> rows1-list)
-        (set <cfg-info "cb-filter-rows2"> rows2-list)
-        (iup-set-bool rows1-list "DROPDOWN" true)
-        (iup-set-bool rows2-list "DROPDOWN" true)
-        (for i in (row-filters) do
-                (iup-set-str-attribute rows1-list (+ (for-pos) 1) i)
-                (iup-set-str-attribute rows2-list (+ (for-pos) 1) i) )
-        (iup-set-int rows1-list "VALUE" (+ (cfg-get-or-default-num "filter-rows1" default-info) 1))
-        (iup-set-int rows2-list "VALUE" (+ (cfg-get-or-default-num "filter-rows2" default-info) 1))
-
-        (set deint1-list (iup-list))
-        (set deint2-list (iup-list))
-        (set <cfg-info "cb-filter-deint1"> deint1-list)
-        (set <cfg-info "cb-filter-deint2"> deint2-list)
-        (iup-set-bool deint1-list "DROPDOWN" true)
-        (iup-set-bool deint2-list "DROPDOWN" true)
-        (for i in (deint-filters) do
-                (iup-set-str-attribute deint1-list (+ (for-pos) 1) (if (= (for-pos) 0) $"none" i))
-                (iup-set-str-attribute deint2-list (+ (for-pos) 1) (if (= (for-pos) 0) $"none" i)) )
-        (iup-set-int deint1-list "VALUE" (+ (cfg-get-or-default-num "filter-deint1" default-info) 1))
-        (iup-set-int deint2-list "VALUE" (+ (cfg-get-or-default-num "filter-deint2" default-info) 1))
-
-        (set hb1 (iup-hbox
-            (cfg-setup-toggle "auto" (cfg-get-or-default "filter-ar1-auto" default-info) cfg-info "tb-filter-ar1-auto")
-            (cfg-setup-spin-ratio 0.1 10 (cfg-get-or-default-num "filter-ar1" default-info) 0.01
-            cfg-info "sb-filter-ar1" )))
-        (iup-set-str-attribute hb1 "ALIGNMENT" "ACENTER")
-
-        (set hb2 (iup-hbox
-            (cfg-setup-toggle "auto" (cfg-get-or-default "filter-ar2-auto" default-info) cfg-info "tb-filter-ar2-auto")
-            (cfg-setup-spin-ratio 0.1 10 (cfg-get-or-default-num "filter-ar2" default-info) 0.01
-            cfg-info "sb-filter-ar2" )))
-        (iup-set-str-attribute hb2 "ALIGNMENT" "ACENTER")
-
-        (set hbox1 (iup-hbox
-                (cfg-setup-framed-spin-ratio "Gamma 1" 0.01 4
-                        (cfg-get-or-default-num "filter-gamma1" default-info) 0.01
-                        cfg-info "sb-filter-gamma1" )
-                (cfg-setup-framed-toggle "Mirror 1" $"enabled"
-                    (cfg-get-or-default "filter-mirror1" default-info) cfg-info "tb-filter-mirror1" )
-                (cfg-setup-framed-toggle "Flip 1" $"enabled"
-                    (cfg-get-or-default "filter-flip1" default-info) cfg-info "tb-filter-flip1" )
-                (cfg-setup-framed-spin-ratio "Rotate 1" (- 0.01 360) (- 360 0.01)
-                        (cfg-get-or-default-num "filter-rotate1" default-info) 0.01
-                        cfg-info "sb-filter-rotate1" )))
-        (set hbox2 (iup-hbox
-                (iup-frame-with-margin "Rows 1" rows1-list)
-                (iup-frame-with-margin "Deint 1" deint1-list)
-                (iup-frame-with-margin "Aspect ratio 1" hb1) ))
-        (set hbox3 (iup-hbox
-                (cfg-setup-framed-spin-ratio "Gamma 2" 0.01 4
-                        (cfg-get-or-default-num "filter-gamma2" default-info) 0.01
-                        cfg-info "sb-filter-gamma2" )
-                (cfg-setup-framed-toggle "Mirror 2" $"enabled"
-                    (cfg-get-or-default "filter-mirror2" default-info) cfg-info "tb-filter-mirror2" )
-                (cfg-setup-framed-toggle "Flip 2" $"enabled"
-                    (cfg-get-or-default "filter-flip2" default-info) cfg-info "tb-filter-flip2" )
-                (cfg-setup-framed-spin-ratio "Rotate 2" (- 0.01 360) (- 360 0.01)
-                        (cfg-get-or-default-num "filter-rotate2" default-info) 0.01
-                        cfg-info "sb-filter-rotate2" )))
-        (set hbox4 (iup-hbox
-                (iup-frame-with-margin "Rows 2" rows2-list)
-                (iup-frame-with-margin "Deint 2" deint2-list)
-                (iup-frame-with-margin "Aspect ratio 2" hb2) ))
-
-        (iup-set-int hbox1 "GAP" 5)
-        (iup-set-int hbox2 "GAP" 5)
-        (iup-set-int hbox3 "GAP" 5)
-        (iup-set-int hbox4 "GAP" 5)
-
-        (set @wid (iup-vbox hbox1 hbox2 hbox3 hbox4))
-        (iup-set-int @wid "GAP" 2) )
-
-(defun cfg-setup-tabs-page5 (q) net cfg-setup-tabs-page5)
-(defnet cfg-setup-tabs-page5 (q @wid)
-        (deflocal cfg-info default-info hbox1 hbox2 hbox3 list i)
+        (deflocal cfg-info default-info hbox1 hbox2 hbox3 hbox4 lang-lst acc-lst i)
 
         (set cfg-info <_kv "cfg-info">)
         (set default-info <_kv "default">)
 
         (set hbox1 (iup-hbox
-                (cfg-setup-framed-spin "Frame buf size" 2 300
+                (cfg-setup-framed-spin "Frame buf size" 2 1000
                         (cfg-get-or-default-num "frame-buf-size" default-info)
                         cfg-info "sb-frame-buf-size" )
                 (cfg-setup-framed-spin "SCD threads" 1 100
                         (cfg-get-or-default-num "scd-threads" default-info)
                         cfg-info "sb-scd-threads" )
-                (cfg-setup-framed-toggle $"Line drawing" $"enabled" (cfg-get-or-default "sift-draw-lines" default-info) cfg-info "tb-sift-draw-lines")
                 (cfg-setup-framed-spin "Sup. step incr." 2 1000
                         (cfg-get-or-default-num "supervision-skip-double" default-info)
-                        cfg-info "sb-supervision-skip-double" )))
+                        cfg-info "sb-supervision-skip-double" )
+                (cfg-setup-framed-text "vid template" (cfg-get-or-default "osdtempl" default-info) cfg-info "text-osdtempl") ))
 
         (set hbox2 (iup-hbox
                 (cfg-setup-framed-toggle "Debug" $"enabled" (cfg-get-or-default "debug-enabled" default-info) cfg-info "tb-debug-enabled")
-                (cfg-setup-framed-toggle $"Sound" $"enabled" (cfg-get-or-default "sound-enabled" default-info) cfg-info "tb-sound-enabled")
-                (cfg-setup-framed-toggle "CUVID" $"enabled" (cfg-get-or-default "cuvid-enabled" default-info) cfg-info "tb-cuvid-enabled")
+                (cfg-setup-framed-toggle $"Line drawing" $"enabled" (cfg-get-or-default "sift-draw-lines" default-info) cfg-info "tb-sift-draw-lines")
+                (cfg-setup-framed-toggle $"Optimize map" $"enabled" (cfg-get-or-default "optimize-map" default-info) cfg-info "tb-optimize-map")
+                (cfg-setup-framed-toggle $"Sound" $"enabled" (cfg-get-or-default "sound-enabled" default-info) cfg-info "tb-sound-enabled") ))
+
+        (set hbox3 (iup-hbox
+                (cfg-setup-framed-toggle "Invalid data" $"ignore" (cfg-get-or-default "ignore-invalid-data" default-info) cfg-info "tb-ignore-invalid-data")
                 (cfg-setup-framed-spin "junct.context" 25 2500
                         (cfg-get-or-default-num "junction-context" default-info)
                         cfg-info "sb-junction-context" )
-                (cfg-setup-framed-text "vid template" (cfg-get-or-default "osdtempl" default-info) cfg-info "text-osdtempl") ))
+                (cfg-setup-framed-spin "Play delay (s)" -30 30
+                        (cfg-get-or-default-num "play-delay" default-info)
+                        cfg-info "sb-play-delay" )))
 
-        (set list (iup-list))
-        (set <cfg-info "cb-languages"> list)
-        (iup-set-bool list "DROPDOWN" true)
+        (set lang-lst (iup-list))
+        (set <cfg-info "cb-languages"> lang-lst)
+        (iup-set-bool lang-lst "DROPDOWN" true)
         (for i in (languages) do
-                (iup-set-str-attribute list (+ (for-pos) 1) i) )
-        (iup-set-int list "VALUE" (+ (lang) 1))
+                (iup-set-str-attribute lang-lst (+ (for-pos) 1) i) )
+        (iup-set-int lang-lst "VALUE" (+ (lang) 1))
 
-        (set hbox3 (iup-hbox
-                (iup-frame-with-margin $"Language" list) ))
+        (set acc-lst (iup-list))
+        (set <cfg-info "cb-hwaccel"> acc-lst)
+        (iup-set-bool acc-lst "DROPDOWN" true)
+        (for i in (hwaccels) do
+                (iup-set-str-attribute acc-lst (+ (for-pos) 1) (if (= (for-pos) 0) $"none" i)) )
+        (set i (cfg-get-or-default-num "hwaccel" default-info))
+        (set <cfg-info "old-hwaccel"> i)
+        (iup-set-int acc-lst "VALUE" (+ i 1))
 
-        (iup-set-int hbox1 "GAP" 5)
-        (iup-set-int hbox2 "GAP" 5)
-        (iup-set-int hbox3 "GAP" 5)
+        (set i (iup-get-str-attribute <_kv "text1"> "FONT"))
+        (set <cfg-info "old-text-font"> i)
+        (set i (iup-button-font i))
+        (iup-set-str-attribute i "EXPAND" "HORIZONTAL")
+        (set <cfg-info "but-text-font"> i)
 
-        (set @wid (iup-vbox hbox1 hbox2 hbox3))
-        (iup-set-int @wid "GAP" 2) )
+        (set hbox4 (iup-hbox
+                (iup-frame-with-margin $"Language" lang-lst)
+                (iup-frame-with-margin "HW Accel" acc-lst)
+                (iup-frame-with-margin $"Font" i) ))
+
+        (iup-set-int hbox1 "NGAP" 5)
+        (iup-set-int hbox2 "NGAP" 5)
+        (iup-set-int hbox3 "NGAP" 5)
+        (iup-set-int hbox4 "NGAP" 5)
+
+        (set @wid (iup-vbox hbox1 hbox2 hbox3 hbox4))
+        (iup-set-int @wid "NGAP" 5) )
 
 (defun cfg-setup-toggle (name status cfg-info key) net cfg-setup-toggle)
 (defnet cfg-setup-toggle (name status cfg-info key @wid)
@@ -427,12 +355,6 @@
 (defnet cfg-toggled-sift-scale (self)
         (iup-set-active <_kv "cfg-info" "sb-sift-scale-pixels"> (iup-get-bool self "VALUE")) )
 
-(defnet cfg-toggled-fileter-ar1 (self)
-        (iup-set-active <_kv "cfg-info" "sb-filter-ar1"> (not (iup-get-bool self "VALUE"))) )
-
-(defnet cfg-toggled-fileter-ar2 (self)
-        (iup-set-active <_kv "cfg-info" "sb-filter-ar2"> (not (iup-get-bool self "VALUE"))) )
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                                                                      ;;;;
@@ -455,7 +377,7 @@
         (if (= db undef)
         then    (sound-iup-error60 self (+ "SQLite3 cannot open `" path "'"))
                 (fail) )
-        (set a (array default 0 6 2))
+        (set a (array default 0 8 2))
 
         (sqlite3-begin _db)
         (alt    (iup-progress
@@ -471,15 +393,17 @@
         (set msg (+
             "imported paths: " <a 0 0> "/" <a 0 1> nl
             "imported projects: " <a 1 0> "/" <a 1 1> nl
-            "imported scd data: " <a 2 0> "/" <a 2 1> nl
-            "imported sift check data: " <a 3 0> "/" <a 3 1> nl
-            "imported mapping data: " <a 4 0> "/" <a 4 1> nl
-            "imported permutation data: " <a 5 0> "/" <a 5 1> nl
+            "imported mod data: " <a 2 0> "/" <a 2 1> nl
+            "imported scd data: " <a 3 0> "/" <a 3 1> nl
+            "imported sift check data: " <a 4 0> "/" <a 4 1> nl
+            "imported mapping data: " <a 5 0> "/" <a 5 1> nl
+            "imported permutation data: " <a 6 0> "/" <a 6 1> nl
+            "imported audio data: " <a 7 0> "/" <a 7 1> nl
             nl ))
         (iup-text-append-and-go-end <_kv "text2"> msg)
         (iup-info60 self msg)
         (gui-report)
-        (gui-update) )
+        (update-buttons) )
 
 (defnet cfg-import-th (th db a)
         (deflocal dlg i)
@@ -533,8 +457,8 @@
         (set dlg <a 2>)
         (set a <a 3>)
         (not (iup-progress-aborted dlg))
-        (opt    (lmatch setidx i key "scd-" "sck-" "map-" "prm-")
-                (= (length key) (if (= i 0) 44 84))
+        (opt    (lmatch setidx i key "mod-" "scd-" "sck-" "map-" "prm-" "aud-")
+                (= (length key) (if (<= i 1) 44 84))
                 (inc i 2)
                 (inc <a i 1>)
                 (set key (sqlite3-escape-strings key))
@@ -545,7 +469,7 @@
                             "INSERT INTO config VALUES('" key "','" value "')" )
                 (close value)
                 (inc <a i 0>)
-                (sendbuf 100 (cons "m" (+ "imported " <[ "scd" "sift check" "mapping" "permutation" ] (- i 2)> " data: " <a i 0>)) to th) ))
+                (sendbuf 100 (cons "m" (+ "imported " <[ "mod" "scd" "sift check" "mapping" "permutation" "audio" ] (- i 2)> " data: " <a i 0>)) to th) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
