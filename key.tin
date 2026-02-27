@@ -41,7 +41,6 @@
 
         (set v (av-get-filter-rows av))
         (set @key (gcry-sha1sum-fast (+
-                              ;<[ "" "qsv" "amf" "cuvid" ] (av-get-accel av)>
                               (if (= v 0) "" (+ "deint=" v))
                               (int->str (width av) 5 '0')
                               (int->str (height av) 5 '0')

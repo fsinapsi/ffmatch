@@ -557,6 +557,7 @@
 
         (set s (set))
         (sqlite3-exec-data _db (netptr clear-orphan-data-cback) s "SELECT key FROM config")
+        ;(sqlite3-exec-data _db (netptr clear-orphan-data-mod-cback) s "SELECT key" (key-query-range-mod))
         (clear-delete-set self s) )
 
 (defnet clear-orphan-data-cback (s key)
@@ -565,7 +566,6 @@
 (defnet clear-orphan-data-cback-low (s key)
         (deflocal idx i)
 
-        ;(lmatch setidx idx key "mod-" "sck-" "map-" "prm-" "aud-")
         (lmatch setidx idx key "sck-" "map-" "prm-" "aud-")
         (set i (length key))
         (or (and (= idx 0) (= i 44)) (and (>= idx 1) (= i 84)))
@@ -573,6 +573,11 @@
         (if (>= idx 1)
         then    (not (cfg-exists (+ "scd-" (sub 44 40 key)))) )
         (set-insert s key) )
+
+(defnet clear-orphan-data-mod-cback (s key)
+        (if (and (= (length key) 44)
+                 (not (cfg-exists (+ "scd-" (sub 4 40 key)))) )
+        then    (set-insert s key) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

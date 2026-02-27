@@ -28,7 +28,7 @@
         (opt (history-update-low)) )
 
 (defnet history-update-low ()
-        (deflocal av1 av2 p key-map key-prm)
+        (deflocal av1 av2 p key-map)
 
         (set av1 <_kv "av1">)
         (<> av1 undef)
@@ -36,7 +36,6 @@
         (<> av2 undef)
         (set p (+ <_kv "history-pos"> 1))
         (set key-map (key-map av1 av2))
-        (set key-prm (key-prm av1 av2))
         (sqlite3-exec _db undef "DELETE FROM history WHERE idx>=" p)
         (sqlite3-exec _db undef "INSERT INTO history VALUES(" p ",'"
                 (list (cons key-map (cfg-get key-map)))
@@ -82,7 +81,7 @@
         (for i in <(sqlite3-exec _db "SELECT val FROM history WHERE idx=" p) 0 0> do
                 (cfg-set (car i) (cdr i)) )
         (set <_kv "history-pos"> p)
-        (perm-set-local)
+        ;(perm-set-local)
         (gui-report-low false)
         (move-text1-on-current-value 1)
         (update-buttons) )

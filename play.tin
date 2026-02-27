@@ -64,16 +64,21 @@
                 (set <info "dub"> false) )
         (set map (map-segment (if (= which 1) (car map) (cdr map)) which (maxint)))
 
+        (if (play-audio-exists info)
+        then    (set <info "force-not-dub"> false)
+        else    (set <info "force-not-dub"> true)
+                (set <info "dub"> false) )
+
         (iup-text-append-and-go-end <_kv "text2"> (sprint nl
                 "Esc: quit" nl
                 "+/-: gain" nl
                 "arrow keys (←, →, ↑, ↓): skip back/forward" nl
-                "space: pause/resume" nl
-                "Ctrl+D: not dubbed/dubbed" nl
+                "space: pause/resume" nl (if <info "dub"> (+
+                "Ctrl+D: not dubbed/dubbed" nl ) "" )
                 "Ctrl+1/Ctrl+2: delay 1" nl
                 "Ctrl+3/Ctrl+4: delay 2" nl
                 nl
-                (if (not (play-audio-exists info))
+                (if <info "force-not-dub">
                         (+ $"note: no valid audio tracks were selected" nl)
                         "" )
                 "video: " which nl
@@ -81,6 +86,9 @@
                 "gain: " <info "gain"> nl
                 "delay 1: " <info "delay1"> nl
                 "delay 2: " <info "delay2"> nl ))
+
+        (if (not <info "dub">)
+        then    (set <info "force-not-dub"> true) )
 
         (set <info "pause"> false)
         (set <_kv "running"> "player")
@@ -142,7 +150,7 @@
         (set @pos (max 1 @pos))
 
         (set video-th (thread-create (netptr play-video-th) (thread-self) map which av @pos (width <_kv "pix">) (height <_kv "pix">) info fps))
-        (set audio-th (thread-create (netptr play-audio-th) (thread-self) map which info fps @pos))
+        (set audio-th (thread-create (netptr play-audio-th) (thread-self) map which av info fps @pos))
         (set finished (array default false 1))
 
         (set lbl <_kv "sbx" 0>)
@@ -199,9 +207,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet play-video-th (th map which av pos wo ho info fps)
-        (deflocal maxpos red1 red2 green1 green2 idx read-th finished pixi pixo dar ws hs x y pixs)
+        (deflocal maxpos dur red1 red2 green1 green2 idx read-th finished pixi pixo dar ws hs x y pixs)
 
         (set maxpos (av-approximated-number-of-frames av))
+        (set dur (date-s2hhmmss (/ maxpos fps)))
 
         (set x (rint (linear wo 0 860 0 30)))
         (set red1 (rsvg-load-size (raw-load-static "svg/one-red.svg") x x))
@@ -233,7 +242,7 @@
                         (play-video-update-resolution dar wo ho ws hs x y pixs) )
                 (pix-sws-scale-lanczos pixi pixs)
                 (close pixi)
-                (play-video-draw-text pixs (+ (date-s2hhmmss (/ (- pos 1) fps)) " " (rint (/ pos maxpos 0.01)) "% (" (- pos 1) ")"))
+                (play-video-draw-text pixs (+ (date-s2hhmmss (/ (- pos 1) fps)) "/" dur " " (rint (/ pos maxpos 0.01)) "% (" (- pos 1) ")"))
                 (play-video-update map idx pos)
                 (if (and <info "dub"> (< idx (length map)))
                 then    (pix-draw-pix-alpha pixs 5 5
@@ -303,14 +312,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet play-audio-th (th map which info fps pos)
+(defnet play-audio-th (th map which av info fps pos)
         (deflocal info1 info2 idx gain delay1 delay2 pos1 pos2 samplesize frequency len raw s ts-step ts i)
 
         (play-audio-open info info1 info2)
         (if (or (not (assocp info1)) (not (assocp info2)))
         then    (play-audio-close info1 info2)
-                (receive ts from th)
-                (send (sdl-get-ticks-ns) to th)
+                (play-audio-alternate-th th av info fps pos)
                 (fail) )
 
         (set gain <info "gain">)
@@ -337,6 +345,7 @@
 
         (if (or (= s undef) (= len 0))
         then    (close raw)
+                (play-audio-close info1 info2)
                 (fail) )
 
         (sdl-set-audio-stream-gain s gain)
@@ -426,6 +435,76 @@
         (play-audio-open info info1 info2)
         (set @res (and (assocp info1) (assocp info2)))
         (play-audio-close info1 info2) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet play-audio-alternate-th (th av info fps pos)
+        (deflocal ts raw s gain i)
+
+        (set av (av-avformat-open-input-audio (av-path av)))
+        (if (= av undef)
+        then    (receive ts from th)
+                (send (sdl-get-ticks-ns) to th)
+                (fail) )
+
+        (av-set-ignore-invalid-data av true)
+
+        (set raw (av-audio-seek-and-read-frame av (max 0 (- (/ pos fps) 0.01))))
+        (if (= raw undef)
+        then    (receive ts from th)
+                (send (sdl-get-ticks-ns) to th)
+                (close av)
+                (fail) )
+
+        (set s (sdl-open-audio-stream (av-audio-channels av) (av-audio-sample-rate av) 16))
+        (if (= s undef)
+        then    (receive ts from th)
+                (send (sdl-get-ticks-ns) to th)
+                (close av raw)
+                (fail) )
+
+        (receive ts from th)
+        (set ts (sdl-get-ticks-ns))
+        (sendbuf 100 ts to th)
+
+        (set gain <info "gain">)
+
+        (sdl-set-audio-stream-gain s gain)
+
+        ; questo hack ha l'effetto di inviare subito allo stream mezzo secondo di dati
+        ; allo scopo di riempire i buffer di sdl
+        (dec ts (* 0.5 1000000000))
+
+        (sdl-resume-audio-stream-device s)
+
+        (opt*   (not <_abort 0>)
+                (if (= raw undef)
+                then    (play-sleep ts (* 0.5 1000000000))
+                        (fail) )
+                (sdl-put-audio-stream-data s raw)
+                (set i (av-audio-buf-duration av raw))
+                (close raw)
+                (set raw (av-audio-read-frame av))
+                (not <_abort 0>)
+                (play-sleep ts (* i 1000000000))
+                (set i <info "gain">)
+                (if (<> i gain)
+                then    (set gain i)
+                        (sdl-set-audio-stream-gain s gain) ))
+
+        (sdl-pause-audio-stream-device s)
+        (sdl-clear-audio-stream s)
+        (if (rawp raw)
+        then    (close raw) )
+        (close av s) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

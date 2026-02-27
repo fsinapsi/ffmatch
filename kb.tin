@@ -89,6 +89,7 @@
         (avcodecp av)
         (case c of
                 (cmacro K_ESC)          (set <_abort 0> true)
+                (cmacro K_q)            (set <_abort 0> true)
                 (cmacro K_SP)           (seq    (set <info "action"> "space")
                                                 (set i (not <info "pause">))
                                                 (set <info "pause"> i)
@@ -141,7 +142,8 @@
                 (cmacro K_c4)           (seq    (set i (- <info "delay2"> 0.05))
                                                 (set <info "delay2"> i)
                                                 (set msg (+ "delay 2: " i)) )
-                (cmacro K_cD)           (seq    (set i (not <info "dub">))
+                (cmacro K_cD)           (seq    (not <info "force-not-dub">)
+                                                (set i (not <info "dub">))
                                                 (set <info "dub"> i)
                                                 (set msg (if i "dubbed" "not dubbed")) ))
         (if (stringp msg)
