@@ -43,7 +43,7 @@
         (set nthreads (cfg-get-or-default-num "scd-threads" default-info))
         (set nframes (+ (length v) 1))
 
-        (set t (sdl-get-ticks))
+        (set t (my-get-ticks))
 
         (repeat (set d (/ (- (length v) 1) nthreads))
                 until (= nthreads 1)
@@ -71,7 +71,7 @@
                 (receive msg from th in threads)
                 (alt    (seq    (integerp msg)
                                 (set tot (min (+ tot msg) nframes))
-                                (set i (/ (- (sdl-get-ticks) t) 1000))
+                                (set i (- (my-get-ticks) t))
                                 (sendbuf 100 (cons "c1" (+ "frame " (* (rint (/ tot 100)) 100) "/" nframes
                                     " (" (* (rint (/ tot i 10)) 10) " fps) ("
                                     (rint (/ tot nframes 0.01)) "%) rem "
@@ -93,7 +93,7 @@
 
         (not <_abort 0>)
         (sendbuf 100 (cons "c1" (+ "frame " nframes "/" nframes
-            " (" (rint (/ tot (- (sdl-get-ticks) t) 0.001)) " fps) (100%)")) to th-main ))
+            " (" (rint (/ tot (- (my-get-ticks) t))) " fps) (100%)")) to th-main ))
 
 (defnet scdscan-segment-th (th path accel beg end v rem)
         (deflocal res)

@@ -49,7 +49,6 @@
                                 false
                                 map-exists ))
                 (iup-set-active <menu-info "clear-map"> i)
-                (iup-set-active <menu-info "optimize-map"> i)
                 (iup-set-active <menu-info "final-closure"> i)
                 (iup-set-active <menu-info "print-diff-stats"> i)
 

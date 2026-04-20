@@ -13,7 +13,7 @@
 
         (repeat (receive delay from th)
                 until (= delay undef)
-                (sdl-delay-ns (rint (* delay 1000000000)))
+                (my-sleep delay)
                 (send true to th) ))
 
 (defnet th-clock-send (delay)
@@ -28,7 +28,7 @@
                                 (set done true) )
                         (success) )
                 until done
-                (sdl-delay 10) ))
+                (my-sleep 0.01) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

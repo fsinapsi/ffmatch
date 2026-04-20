@@ -681,9 +681,9 @@
 1
 "timestamp troppo irregolari non supportati\n(maggiori info nella guida)"
 
-"delay (ms): "
+"delay"
 1
-"ritardo (ms): "
+"ritardo"
 
 "Import data from cfg"
 1
@@ -941,7 +941,19 @@
 1
 "Rifai"
 
-        )
+"switch to the other movie"
+1
+"passa all'altro filmato"
+
+"Alternative strategies"
+1
+"Strategie alternative"
+
+"cycle through the audio streams"
+1
+"passa da uno stream audio all'altro"
+
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

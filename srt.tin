@@ -199,7 +199,7 @@
         (stringp path)
 
         (set map (array 0))
-        (for i in (map-segment (car (get-map)) 1 (maxint)) do
+        (for i in (map-segment (get-map) 1) do
                 (set a1 <i 0>)
                 (set b1 <i 1>)
                 (set a2 <i 2>)

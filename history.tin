@@ -28,17 +28,27 @@
         (opt (history-update-low)) )
 
 (defnet history-update-low ()
-        (deflocal av1 av2 p key-map)
+        (deflocal av1 av2 key-map k a i p)
 
         (set av1 <_kv "av1">)
         (<> av1 undef)
         (set av2 <_kv "av2">)
         (<> av2 undef)
-        (set p (+ <_kv "history-pos"> 1))
         (set key-map (key-map av1 av2))
+        (set k (cfg-get key-map))
+        (<> k undef)
+        (set a (array 0))
+        (for i in (car (get-map-low k)) do
+                (set p <i 2>)
+                (if (integerp p)
+                then    (array-append a (list <i 0> p (- <i 1> <i 0> -1))) ))
+        (if (< (length a) (length <k 2>))
+        then    (set k (list <k 0> <k 1> a))
+                (cfg-set key-map k) )
+        (set p (+ <_kv "history-pos"> 1))
         (sqlite3-exec _db undef "DELETE FROM history WHERE idx>=" p)
         (sqlite3-exec _db undef "INSERT INTO history VALUES(" p ",'"
-                (list (cons key-map (cfg-get key-map)))
+                (list (cons key-map k))
                 "')" )
         (set <_kv "history-pos"> p)
         (set <_kv "history-max"> p) )
@@ -62,7 +72,7 @@
         (gui-not-locked)
         (set p <_kv "history-pos">)
         (> p 0)
-        (history-set-pos (- p 1)) )
+        (history-set-pos p -1) )
 
 (defnet history-redo-cb (self)
         (opt (history-redo)) )
@@ -73,17 +83,16 @@
         (gui-not-locked)
         (set p <_kv "history-pos">)
         (< p <_kv "history-max">)
-        (history-set-pos (+ p 1)) )
+        (history-set-pos p 1) )
 
-(defnet history-set-pos (p)
+(defnet history-set-pos (p incr)
         (deflocal i)
 
+        (inc p incr)
         (for i in <(sqlite3-exec _db "SELECT val FROM history WHERE idx=" p) 0 0> do
                 (cfg-set (car i) (cdr i)) )
         (set <_kv "history-pos"> p)
-        ;(perm-set-local)
-        (gui-report-low false)
-        (move-text1-on-current-value 1)
+        (gui-report)
         (update-buttons) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

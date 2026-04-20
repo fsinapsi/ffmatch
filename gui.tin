@@ -182,42 +182,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet gui-text1-hack (flush)
-        (deflocal parent text1)
-
-        (set parent <_kv "vbox-parent-of-text1">)
-        (set text1 <_kv "text1">)
-        (set <_kv "gui-text1-hack-caretpos"> (iup-get-int text1 "CARETPOS"))
-        (assoc-clr _kv "gui-text1-hack-selectionpos")
-        (iup-detach text1)
-        (close text1)
-        (set text1 (setup-text-low 1))
-        (iup-insert parent undef text1)
-        (iup-map text1)
-        (iup-refresh parent)
-        (iup-set-callback text1 "BUTTON_CB" (netptr gui-text1-button-cb))
-        (if flush
-        then    (iup-flush) ))
-
-(defnet gui-text1-hack-post ()
-        (deflocal text1 selpos)
-
-        (set text1 <_kv "text1">)
-        (iup-set-int text1 "CARETPOS" (min <_kv "gui-text1-hack-caretpos"> (iup-get-int text1 "COUNT")))
-        (set selpos <_kv "gui-text1-hack-selectionpos">)
-        (if (<> selpos undef)
-        then    (iup-set-str-attribute text1 "SELECTIONPOS" selpos) ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defnet gui-disable-menu ()
         (deflocal wid i)
 
@@ -286,15 +250,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-report ()
-        (gui-report-low true) )
+        (deflocal av1 av2 k sck buf links)
 
-(defnet gui-report-low (go-home)
-        (deflocal text1 ab av1 av2 k sck)
-
-        (set text1 <_kv "text1">)
-        (set ab <_kv "a-combo-goto">)
-        (while (> (length ab) 0) do
-                (array-remove ab 0) )
+        (setup-text-reset 1)
         (alt    (seq    (set av1 <_kv "av1">)
                         (<> av1 undef)
                         (set av2 <_kv "av2">)
@@ -303,33 +261,21 @@
                         (<> k undef)
                         (set sck (cfg-get (key-sck av1 av2)))
                         (<> sck undef)
-                        (map-report-low (cons text1 ab)
-                                (get-map-low k)
+                        (report (get-map-low k)
                                 av1
                                 av2
                                 (/ <sck 3> <sck 2>)
                                 (/ <sck 5> <sck 4>)
-                                (length <sck 0>) <sck 1>
-                                go-home ))
-                (iup-set-str-attribute text1 "VALUE" "") )
-        (if (= (length ab) 0)
-        then    (array-append ab [ 1 1 0 ]) ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet gui-text1-move1 (self)
+                                (length <sck 0>)
+                                <sck 1>
+                                buf
+                                links )
+                        (iup-text-buffer-flush buf <_kv "text1">) )
+                (set links (array 0)) )
+        (if (= (length links) 0)
+        then    (array-append links [ 1 1 0 ]) )
+        (set <_kv "a-combo-goto"> links)
         (move-text1-on-current-value 1) )
-
-(defnet gui-text1-move2 (self)
-        (move-text1-on-current-value 2) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -407,16 +353,13 @@
         (set h (height pix))
         (if (or (and (> incr 0) (or (>= w 4000) (>= h 6000)))
                 (and (< incr 0) (or (<= w 40) (<= h 80))) )
-        then    (iup-text-append-and-go-end <_kv "text2"> (+ "zoom in/out: limit reached" nl))
+        then    (print-append-nl "zoom in/out: limit reached")
         else    (assoc-inc _kv "zoom-level" incr)
                 (gui-resize-post)
                 (set pix <_kv "pix">)
                 (set w (width pix))
                 (set h (height pix)) )
-        (iup-text-append-and-go-end <_kv "text2"> (+
-                "zoom level: " <_kv "zoom-level"> nl
-                ;"display area: " w " x " h nl nl
-                ))
+        (print-append-nl (+ "zoom level: " <_kv "zoom-level">))
         (update-buttons) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -471,7 +414,8 @@
                 (not <info "pause">)
                 (set <info "action"> "goto")
                 (set <_abort 0> true)
-        else    (iup-set-focus <_kv "spin1">) ))
+        else    (move-text1-on-current-value-no-scroll 1)
+                (iup-set-focus <_kv "spin1">) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -516,9 +460,8 @@
                         (if (not player)
                         then    (update-image) )
                         (fail) )
-                (map-bind-low (car map) p q n)
-                (map-bind-low (cdr map) q p n) )
-        (set u (map-undef-low (car map) (cdr map)))
+                (map-bind map p q n) )
+        (set u (map-undef1 map))
         (set ut (queue-get u))
         (for i in (car map) do
                 (set p <i 0>)
@@ -619,39 +562,41 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet gui-report-failed-cb (self)
-        (gui-disable-menu)
-        (opt (gui-report-failed-low self))
-        (gui-enable-menu) )
+        (deflocal av1 av2 sck)
 
-(defnet gui-report-failed-low (self)
-        (deflocal av1 av2 key sck)
+        (opt    (gui-not-locked)
+                (set av1 <_kv "av1">)
+                (<> av1 undef)
+                (set av2 <_kv "av2">)
+                (<> av2 undef)
+                (set sck (cfg-get (key-sck av1 av2)))
+                (<> sck undef)
+                (if (= <sck 1> (length <sck 0>))
+                then    (iup-info60 self $"There are no failed checks.")
+                        (fail) )
+                (gui-start-low (netptr gui-start-failed-thread) av1 av2) ))
 
-        (set av1 <_kv "av1">)
-        (<> av1 undef)
-        (set av2 <_kv "av2">)
-        (<> av2 undef)
-        (set key (key-sck av1 av2))
-        (set sck (cfg-get key))
-        (<> sck undef)
-        (if (= (- (length <sck 0>) <sck 1>) 0)
-        then    (iup-info60 self $"There are no failed checks.")
-                (fail) )
-        (iup-text-clear <_kv "text2">)
-        (gui-start-low (netptr gui-start-failed-thread)) )
+(defnet gui-start-post-cb (self)
+        (iup-post-call (netptr gui-start-cb) self) )
 
 (defnet gui-start-cb (self)
+        (deflocal av1 av2)
+
+        (opt    (gui-not-locked)
+                (set av1 <_kv "av1">)
+                (<> av1 undef)
+                (set av2 <_kv "av2">)
+                (<> av2 undef)
+                (gui-start-low (netptr gui-start-thread) av1 av2) ))
+
+(defnet gui-start-low (net av1 av2)
         (gui-disable-menu)
-        (opt (gui-start-low (netptr gui-start-thread)))
+        (opt (gui-start-low-low net av1 av2))
         (gui-enable-menu) )
 
-(defnet gui-start-low (net)
-        (deflocal av1 av2 th text1 text2 done delay-step thclk req msg)
+(defnet gui-start-low-low (net av1 av2)
+        (deflocal th text1 text2 done delay-step thclk req msg)
 
-        (gui-not-locked)
-        (set av1 <_kv "av1">)
-        (<> av1 undef)
-        (set av2 <_kv "av2">)
-        (<> av2 undef)
         (set <_abort 0> false)
         (set th (thread-create net
                         (thread-self)
@@ -663,13 +608,11 @@
         (set <_kv "th"> th)
         (set <_kv "start-time"> (now))
         (update-buttons)
+        (setup-text-reset 2)
+        (iup-flush)
+        (frame-rate-warning)
         (set text1 <_kv "text1">)
         (set text2 <_kv "text2">)
-
-        (if (change-frame-detected av1 av2)
-        then    (iup-text-append-and-go-end-color text2 (red) (+ "\n"
-                        $"Warning: one of the two movies\nmay have undergone a frame rate change"
-                        nl nl )))
 
         (set delay-step 0.05)
         (set thclk <_kv "th-clock">)
@@ -687,10 +630,9 @@
                                 "p1c"   (iup-text-append-and-go-end-color text1 (car msg) (cdr msg))
                                 "h1"    (seq    (iup-set-int text1 "CARETPOS" 0)
                                                 (iup-flush) )
-                                "c2"    (iup-text-set-and-go-end text2 msg)
-                                "p2"    (iup-text-append-and-go-end text2 msg)
-                                "p2c"   (iup-text-append-and-go-end-color text2 (car msg) (cdr msg))
-                                "bf1"   (seq    (gui-text1-hack false)
+                                "p2"    (print-append msg)
+                                "p2c"   (print-append-color (car msg) (cdr msg))
+                                "bf1"   (seq    (setup-text-reset 1)
                                                 (set text1 <_kv "text1">)
                                                 (iup-text-buffer-flush msg text1) )
                                 "q"     (seq    (set <_abort 0> msg)
@@ -699,20 +641,16 @@
                 (iup-flush)
                 (send delay-step to thclk) )
 
-        (iup-text-append-and-go-end text2 (+ "\n" $"elapsed time" ": "
-                (date-s2hhmmss (- (now) <_kv "start-time">)) nl ))
+        (print-append-nl (+ "\n" $"elapsed time" ": " (date-s2hhmmss (- (now) <_kv "start-time">))))
         (if <_abort 0>
-        then    (iup-text-append-and-go-end text2 (+ $"Aborted" nl))
+        then    (print-append-nl $"Aborted")
         else    (sound-alert) )
         (thread-join th)
         (assoc-clr _kv "th")
-        (if (cfg-get-or-default "optimize-map" <_kv "default">)
-        then    (optimize-map true) )
         (history-update)
         (gui-report)
         (update-buttons)
-        (gui-resize-post)
-        (move-text1-on-current-value 1) )
+        (gui-resize-post) )
 
 (defnet gui-start-thread (th-main av1 av2 pix default-info)
         (deflocal abort scd1 scd2)
@@ -739,7 +677,7 @@
                 (pix-wip pix)
                 (gui-draw-image-th th-main)
                 (set m (match-create av1 av2 scd1 scd2 th-main pix default-info))
-                (map-report m)
+                (match-map-report m)
                 (set cache (match-cache m))
                 (for i in cache do
                         (if (booleanp (cdr i))

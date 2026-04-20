@@ -87,7 +87,7 @@
         (set <audio-info (+ "sb-delay" which)> spin)
         (iup-set-active spin false)
 
-        (set @wid (iup-hbox but text (iup-label $"delay (ms): ") spin))
+        (set @wid (iup-hbox but text (iup-label (+ $"delay" " (ms): ")) spin))
         (iup-set-int @wid "NGAP" 4)
         (iup-set-str-attribute @wid "ALIGNMENT" "ACENTER") )
 
@@ -433,11 +433,11 @@
                 (set i delay1)
                 (set delay1 delay2)
                 (set delay2 i) )
-        (set last-ts (/ (+ <map -1 1> 1) fps))
+        (set last-ts (/ (+ (map-max-half map) 1) fps))
         (set ts 0)
         (set err 0)
         (filecopy-basic f1 g a1 buf)
-        (for i in (map-segment map which (audio-segment-max)) do
+        (for i in (map-segment-half map which (audio-segment-max)) do
                 (not (iup-progress-aborted dlg))
                 (set p (/ (+ <i 1> 1) fps))
                 (set n (- p ts))
@@ -466,15 +466,16 @@
 
                                 (if (< q 0)
                                 then    (set j (min pf -q))
-                                        (fsetpos a f)
-                                        (filecopy-basic f g (* j smplsize) buf)
+                                        (fwritechar g (* j smplsize) (int->char 0))
                                         (dec pf j)
                                         (set q 0) )
-                                (while (> pf 0) do
-                                        (set j (min pf (- smpl q)))
+                                (if (> pf 0)
+                                then    (set j (min pf (- smpl q)))
                                         (fsetpos (+ a (* q smplsize)) f)
                                         (filecopy-basic f g (* j smplsize) buf)
-                                        (dec pf j) )))
+                                        (dec pf j)
+                                        (if (> pf 0)
+                                        then    (fwritechar g (* pf smplsize) (int->char 0)) ))))
                 (set err (- p ts)) )
         (set p (* ts freq))
         (if (< p smpl1)

@@ -18,24 +18,24 @@
         (set scd-min-avg-block-size (cfg-get-or-default-num "scd-min-avg-block-size" default-info))
 
         (set m (match-create av1 av2 scd1 scd2 th-main pix default-info))
-        (set i (map-free1 m))
-        (map-report m)
+        (set i (match-map-free1 m))
+        (match-map-report m)
 
         (set avg1 (array-avg scd1))
         (set avg2 (array-avg scd2))
 
         (for alternate in [ false true ] do
                 (if alternate
-                then    (msg-log m "\n\n\nstarting alternate strategies\n\n\n") )
+                then    (msg-log m "\n\n\nstarting alternative strategies\n\n\n") )
                 (set thres (match-params m "init-scd-threshold"))
                 (while (>= thres (match-params m "min-scd-threshold")) do
                         (set thres1 (* avg1 thres))
                         (set thres2 (* avg2 thres))
-                        (repeat (msg-log m (+ "begin match-step: " (approx3 thres1) "-" (approx3 thres2) nl))
+                        (repeat (msg-log m (+ "\nbegin match-step: " (approx3 thres1) "-" (approx3 thres2) nl))
                                 (set j i)
-                                (match-step false alternate false m thres1 thres2 scd-min-blocks scd-min-avg-block-size)
+                                (match-step alternate false m thres1 thres2 scd-min-blocks scd-min-avg-block-size)
                                 until (match-abort m)
-                                (set i (map-free1 m))
+                                (set i (match-map-free1 m))
                                 (msg-log m (+ "end match-step: " (approx3 thres1) "-" (approx3 thres2) " -> " (- j i) nl))
                                 until (= i j) )
                         until (match-abort m)
@@ -43,7 +43,7 @@
                 until (match-abort m) )
 
         (if (and (not (match-abort m)) (cfg-get-or-default "final-closure" default-info))
-        then    (match-step false true true m thres1 thres2 scd-min-blocks scd-min-avg-block-size) )
+        then    (match-step true true m thres1 thres2 scd-min-blocks scd-min-avg-block-size) )
 
         (match-destroy m true) )
 
@@ -57,15 +57,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet match-step (ignore-false alternate final-closure m thres1 thres2 scd-min-blocks scd-min-avg-block-size)
+(defnet match-step (alternate final-closure m thres1 thres2 scd-min-blocks scd-min-avg-block-size)
         (deflocal u ut a1 a2 p1a p1b p2a p2b
                   best-p2 best-d1 best-d2 n mdb segfirst seglast bound )
 
-        (set u (map-undef1 m))
+        (set u (match-map-undef1 m))
         (while (> (length u) 0) do
                 (set ut (queue-get u))
                 (set segfirst (= <ut 0> 1))
-                (set seglast (= <ut 1> (map-max1 m)))
+                (set seglast (= <ut 1> (map-max1 (match-map m))))
                 (set bound 0)
                 (set a1 (seq-threshold (match-scd1 m) <ut 0> <ut 1> thres1))
                 (set a2 (seq-threshold (match-scd2 m) <ut 2> <ut 3> thres2))
@@ -75,7 +75,7 @@
                 (set p2b (- (length a2) 1))
                 (while (and (<= p1a p1b) (not (match-abort m))) do
                         (alt    (match-receivenb m)
-                                (seq    (match-best ignore-false a1 a2 p1a p1b p2a p2b best-p2 best-d1 best-d2 n)
+                                (seq    (match-best a1 a2 p1a p1b p2a p2b best-p2 best-d1 best-d2 n)
                                         (set mdb (/ n (max best-d1 best-d2)))
                                         (>= mdb 8)
                                         (or (and (>= (min best-d1 best-d2) scd-min-blocks)
@@ -109,8 +109,8 @@
                                               "] <-> ["
                                               (int->str p2a 6 '0') "-" (int->str (+ p2a n -1) 6 '0')
                                               "] (" n ")" nl ))
-                                (map-bind m p1a p2a n)
-                                (map-report m)
+                                (match-map-bind m p1a p2a n)
+                                (match-map-report m)
                         else    (match-check-and-bind true m p1a p2a n) ))
 
                 (truep (match-abort m))
@@ -155,7 +155,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet match-best (ignore-false a1 a2 p1 p1b p2a p2b @best-p2 @best-d1 @best-d2 @best-n)
+(defnet match-best (a1 a2 p1 p1b p2a p2b @best-p2 @best-d1 @best-d2 @best-n)
         (deflocal d1 d2 x1 x2 n i done ab1 ab2)
 
         (set ab1 true)
@@ -172,23 +172,7 @@
                                 (inc d2)
                                 (inc n x1)
                                 (set done false)
-                        else (if ignore-false
-                        then    (alt    (seq    (= ab1 true)
-                                                (match-best-ignore-false x1 a2 d2 p2b i)
-                                                (inc d1)
-                                                (inc d2 i)
-                                                (inc n x1)
-                                                (set ab2 false)
-                                                (set done false) )
-                                        (seq    (= ab2 true)
-                                                (match-best-ignore-false x2 a1 d1 p1b i)
-                                                (inc d1 i)
-                                                (inc d2)
-                                                (inc n x2)
-                                                (set ab1 false)
-                                                (set done false) )
-                                        (set done true) )
-                        else    (set done true) ))
+                        else    (set done true) )
                         until done
                         until (> d1 p1b)
                         until (> d2 p2b) )
@@ -200,18 +184,6 @@
                         (set @best-n n) )
                 (inc p2a) )
         (> @best-d1 0) )
-
-(defnet match-best-ignore-false (target a p1 p2 @n)
-        (deflocal sum)
-
-        (set sum 0)
-        (set @n 0)
-        (repeat (inc sum (car <a p1>))
-                (<= sum target)
-                (inc @n)
-                until (= sum target)
-                (< p1 p2)
-                (inc p1) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -253,8 +225,8 @@
                 "] (" n ")" nl ))
 
         (match-check alternate m p1 p2 n score)
-        (map-bind m p1 p2 n)
-        (map-report m)
+        (match-map-bind m p1 p2 n)
+        (match-map-report m)
 
         (msg-log m (+ "\ninterval accepted: ["
                 (int->str p1 6 '0') "-" (int->str (+ p1 n -1) 6 '0')
@@ -349,7 +321,7 @@
         (set k (cfg-get (key-map av1 av2)))
         (if (<> k undef)
         then    (for v in <k 2> do
-                        (map-bind @m <v 0> <v 1> <v 2>) )))
+                        (match-map-bind @m <v 0> <v 1> <v 2>) )))
 
 (defun match-create-frm (which av sift-scale sift-scale-pixels) net match-create-frm)
 (defnet match-create-frm (which av sift-scale sift-scale-pixels @frm)
@@ -378,6 +350,44 @@
         (thread-join (match-th-sift1 m))
         (thread-join (match-th-sift2 m))
         (not (match-abort m)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defnet match-map-bind (m p q n)
+        (array-append (match-map-step m) (list p q n))
+        (map-bind (match-map m) p q n) )
+
+(defun match-map-undef1 (m)
+        (map-undef1 (match-map m)) )
+
+(defun match-map-undef2 (m)
+        (map-undef2 (match-map m)) )
+
+(defun match-map-free1 (m)
+        (map-free1 (match-map m)) )
+
+(defun match-map-free2 (m)
+        (map-free2 (match-map m)) )
+
+(defnet match-map-report (m)
+        (deflocal th buf links)
+
+        (set th (match-th-main m))
+        (report (match-map m)
+                (match-av1 m) (match-av2 m)
+                (match-rx m) (match-ry m)
+                (length (match-cache m)) (match-passed m)
+                buf links )
+        (sendbuf 100 (cons "bf1" buf) to th)
+        (sendbuf 100 [ "h1" . undef ] to th) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

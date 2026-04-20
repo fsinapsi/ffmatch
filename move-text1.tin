@@ -9,12 +9,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet move-text1-on-current-value (which)
-        (opt (move-text1-low which (gui-spin-value which) false)) )
+        (opt (move-text1-low which (gui-spin-value which) false true)) )
+
+(defnet move-text1-on-current-value-no-scroll (which)
+        (opt (move-text1-low which (gui-spin-value which) false false)) )
 
 (defnet move-text1-now (which pos)
-        (opt (move-text1-low which pos true)) )
+        (opt (move-text1-low which pos true false)) )
 
-(defnet move-text1-low (which pos now)
+(defnet move-text1-low (which pos now scroll)
         (deflocal text1 s t u l x1 y1 x2 y2 i found)
 
         (set text1 <_kv "text1">)
@@ -57,22 +60,27 @@
                         (set found (or (and (= which 1) (in pos x1 .. y1))
                                        (and (= which 2) (in pos x2 .. y2)) )))
                 until found )
-        (search l t pos)
-        (set i (utf8-length (sub 0 pos t)))
-        (set t (sub pos (maxint) t))
-        (set s i)
-        (set u 0)
-        (opt*   (< u 6)
-                (str-readline t pos)
-                (<> pos undef)
-                (inc s (utf8-length pos))
-                (inc u) )
-        (iup-set-int text1 "CARETPOS" s)
-        (set <_kv "gui-text1-hack-caretpos"> i)
-        (set <_kv "gui-text1-hack-selectionpos"> (sprint i ":" (+ i (utf8-length l))))
+        (search-and-cut l t i)
+        (set i (utf8-length i))
+        (set pos (cons i (sprint i ":" (+ i (utf8-length l)))))
         (if now
-        then    (gui-text1-hack-post)
-        else    (iup-post-call (netptr gui-text1-hack-post)) ))
+        then    (move-text1-post pos)
+        else    (if scroll
+                then    (set u 0)
+                        (opt*   (< u 6)
+                                (str-readline t l)
+                                (<> l undef)
+                                (inc i (utf8-length l))
+                                (inc u) )
+                        (iup-set-int text1 "CARETPOS" i) )
+                (iup-post-call (netptr move-text1-post) pos) ))
+
+(defnet move-text1-post (pos)
+        (deflocal text1)
+
+        (set text1 <_kv "text1">)
+        (iup-set-int text1 "CARETPOS" (car pos))
+        (iup-set-str-attribute text1 "SELECTIONPOS" (cdr pos)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

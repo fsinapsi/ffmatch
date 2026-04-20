@@ -30,6 +30,7 @@
 (include "scdscan.tin")
 (include "match.tin")
 (include "map.tin")
+(include "report.tin")
 (include "sift.tin")
 (include "audio.tin")
 (include "srt.tin")

@@ -14,6 +14,9 @@
 (defnet play-no-dub-cb (self)
         (opt (play-low false)) )
 
+(defnet play-post-cb (self)
+        (iup-post-call (netptr play-low) true) )
+
 (defnet play-low (dub)
         (deflocal info which av zoom-level)
 
@@ -21,7 +24,6 @@
         (= <_kv "th"> undef)
         (set info <_kv "audio">)
         (assocp info)
-        (set <info "dub"> dub)
         (set which <info "which">)
         (set av <_kv (+ "av" which)>)
         (<> av undef)
@@ -33,7 +35,7 @@
         (set <_kv "th"> "play")
         (gui-disable-menu)
         (update-buttons)
-        (opt (play-main-loop info which av))
+        (opt (play-main-loop info which av dub))
         (gui-enable-menu)
         (if (<> zoom-level 0)
         then    (set <_kv "zoom-level"> zoom-level) )
@@ -42,95 +44,123 @@
         (gui-resize-post)
         (move-text1-on-current-value 1) )
 
-(defnet play-main-loop (info which av)
-        (deflocal fps dar pld pos map done newpos)
+(defnet play-main-loop (info which av dub)
+        (deflocal audio-exists fps dar map newpos backward pos onestep done)
+
+        (debug-print (+ "play-main-loop (begin) " (width av) "x" (height av)))
+
+        (set audio-exists (play-audio-exists info))
 
         (set fps <info "fps">)
         (set dar (av-dar av))
-        (set pld (rint (* (cfg-get-or-default-num "play-delay" <_kv "default">) fps)))
-        ;(set newpos (max 0 (+ (gui-spin-value which) pld)))
-        ;(if (= pld 0)
-        ;then    (set pos newpos)
-        ;else    (set pos (av-nearest-keyframe av newpos (< pld 0)))
-        ;        (if (= pos undef)
-        ;        then    (set pos (av-nearest-keyframe av newpos (> pld 0))) )
-        ;        (if (= pos undef)
-        ;        then    (set pos newpos) ))
-        (set pos (max 0 (+ (gui-spin-value which) pld)))
 
         (set map (get-map))
-        (if (= map undef)
-        then    (set map (map-create 1 1))
-                (set <info "dub"> false) )
-        (set map (map-segment (if (= which 1) (car map) (cdr map)) which (maxint)))
-
-        (if (play-audio-exists info)
+        (if (and dub audio-exists (<> map undef))
         then    (set <info "force-not-dub"> false)
+                (set <info "dub"> true)
+                (set <info "audio-streams"> 0)
+                (set <info "subtitle-streams"> 0)
         else    (set <info "force-not-dub"> true)
-                (set <info "dub"> false) )
+                (set <info "dub"> false)
+                (set <info "audio-streams"> (av-type-streams av (cmacro AVMEDIA_TYPE_AUDIO)))
+                (set <info "subtitle-streams"> (av-type-streams av (cmacro AVMEDIA_TYPE_SUBTITLE)))
+                (if (= map undef)
+                then    (set map (map-create 1 1)) ))
+        (set map (map-segment map which))
+        (set <info "audio-stream-idx"> 0)
+        (set <info "subtitle-stream-idx"> -1)
 
-        (iup-text-append-and-go-end <_kv "text2"> (sprint nl
-                "Esc: quit" nl
-                "+/-: gain" nl
-                "arrow keys (←, →, ↑, ↓): skip back/forward" nl
-                "space: pause/resume" nl (if <info "dub"> (+
-                "Ctrl+D: not dubbed/dubbed" nl ) "" )
-                "Ctrl+1/Ctrl+2: delay 1" nl
-                "Ctrl+3/Ctrl+4: delay 2" nl
-                nl
-                (if <info "force-not-dub">
-                        (+ $"note: no valid audio tracks were selected" nl)
-                        "" )
-                "video: " which nl
+        (setup-text-reset 2)
+        (iup-flush)
+
+        (print-append (+
+                "Esc, q: quit" nl
+                "Space: pause/resume" nl (if (not <info "force-not-dub">) (+
+                "Tab: " $"switch to the other movie" nl
+                "Ctrl+D: not dubbed/dubbed" nl
+                "Ctrl+1/Ctrl+2: " $"delay" " 1" nl
+                "Ctrl+3/Ctrl+4: " $"delay" " 2" nl ) "" ) (if (> <info "audio-streams"> 1) (+
+                "$: " $"cycle through the audio streams" nl ) "" )
+                "+/-: volume" nl
+                "Arrow keys (←, →, ↑, ↓): skip back/forward" nl
+                nl ))
+        (if (not audio-exists)
+        then    (print-append-color (brown) (+ $"note: no valid audio tracks were selected" nl nl)) )
+        (print-append (+
+                "movie: " which nl
                 "frame rate: " (approx3 fps) " fps" nl
-                "gain: " <info "gain"> nl
-                "delay 1: " <info "delay1"> nl
-                "delay 2: " <info "delay2"> nl ))
-
-        (if (not <info "dub">)
-        then    (set <info "force-not-dub"> true) )
+                "volume: " <info "gain"> nl (if (> <info "audio-streams"> 1) (+
+                "audio streams: " <info "audio-streams"> nl
+                "audio stream: " <info "audio-stream-idx"> nl ) "") (if (> <info "subtitle-streams"> 0) (+
+                "subtitle streams: " <info "subtitle-streams"> nl
+                "subtitle stream: " <info "subtitle-stream-idx"> nl ) "") (if (not <info "force-not-dub">) (+
+                $"delay" " 1: " <info "delay1"> nl
+                $"delay" " 2: " <info "delay2"> nl ) "" )))
 
         (set <info "pause"> false)
         (set <_kv "running"> "player")
 
+        (set newpos (- (gui-spin-value which) (* 5 fps)))
+        (set backward true)
+
+        (set onestep false)
+        (set done false)
+
         (repeat (set <info "action"> undef)
-                (play-sync-loop info which av fps pos map)
+                (if (rationalp newpos)
+                then    (set pos (my-av-nearest-keyframe av newpos backward)) )
+                (clr newpos)
+                (play-sync-loop info which av fps pos map onestep)
+                (set onestep false)
+                (if (<> (av-dar av) dar)
+                then    (set dar (av-dar av))
+                        (key-mod-set-dar av dar) )
                 until (= <info "action"> undef)
                 (set <_abort 0> false)
-                (set done false)
-                (clr newpos)
                 (case <info "action"> of
                         "space"         (seq    (repeat (set <info "action"> undef)
                                                         (iup-flush)
                                                         until <_abort 0>
-                                                        (sdl-delay 50) )
+                                                        (my-sleep 0.05) )
                                                 (if <info "pause">
                                                 then    (gui-spin-set-value which pos)
                                                         (gui-sync-low which true true)
-                                                        (set done true) ))
-                        "left"          (set newpos (- pos (* 10 fps)))
-                        "right"         (set newpos (+ pos (* 10 fps)))
-                        "down"          (set newpos (- pos (* 60 fps)))
-                        "up"            (set newpos (+ pos (* 60 fps)))
-                        ;"sleft"         (set pos (max 0 (- pos (rint (* 10 fps)))))
-                        ;"sright"        (set pos (+ pos (rint (* 10 fps))))
-                        "goto"          (seq    (set newpos (+ (gui-spin-value which) pld))
-                                                (set pos (+ newpos (if (<= pld 0) 1 -1))) ))
-                until done
-                (if (rationalp newpos)
-                then    (set newpos (rint newpos))
-                        (set pos (av-nearest-keyframe av newpos (< newpos pos)))
-                        (if (= pos undef)
-                        then    (set pos (av-nearest-keyframe av newpos (> newpos pos))) )
-                        (if (= pos undef)
-                        then    (set pos newpos) )))
-
-        (if (<> (av-dar av) dar)
-        then    (key-mod-set-dar av (av-dar av)) )
+                                                        (set done true)
+                                                else    (case <info "action"> of
+                                                                "step-left"     (seq    (set pos (max 0 (- pos 1)))
+                                                                                        (set onestep true) )
+                                                                "step-right"    (seq    (inc pos)
+                                                                                        (set onestep true) )
+                                                                "change-ar"     (set onestep true) )))
+                        "left"          (seq    (set newpos (- pos (* 10 fps)))
+                                                (set backward true) )
+                        "right"         (seq    (set newpos (+ pos (* 10 fps)))
+                                                (set backward false) )
+                        "down"          (seq    (set newpos (- pos (* 60 fps)))
+                                                (set backward true) )
+                        "up"            (seq    (set newpos (+ pos (* 60 fps)))
+                                                (set backward false) )
+                        "switch"        (seq    (gui-spin-set-value which pos)
+                                                (gui-sync-low which false true)
+                                                (set which (- 3 which))
+                                                (set av <_kv (+ "av" which)>)
+                                                (set dar (av-dar av))
+                                                (set map (map-segment (get-map) which))
+                                                (set newpos (gui-spin-value which))
+                                                (set backward true) )
+                        "goto"          (seq    (set newpos (- (gui-spin-value which) (* 5 fps)))
+                                                (set backward true) ))
+                until done )
 
         (assoc-clr info "pause")
+        (assoc-clr info "force-not-dub")
+        (assoc-clr info "dub")
+        (assoc-clr info "audio-streams")
+        (assoc-clr info "audio-stream-idx")
         (assoc-clr _kv "running")
-        (iup-text-append-and-go-end <_kv "text2"> "quit\n") )
+        (print-append "quit\n")
+
+        (debug-print "play-main-loop (end)") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -142,15 +172,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet play-sync-loop (info which av fps @pos map)
+(defnet play-sync-loop (info which av fps @pos map onestep)
         (deflocal video-th audio-th finished lbl img imn ts-step ts pix idx idx-prv)
+
+        (debug-print "play-sync-loop (begin)")
 
         (set <_abort 0> false)
 
         (set @pos (max 1 @pos))
 
         (set video-th (thread-create (netptr play-video-th) (thread-self) map which av @pos (width <_kv "pix">) (height <_kv "pix">) info fps))
-        (set audio-th (thread-create (netptr play-audio-th) (thread-self) map which av info fps @pos))
+        (if (not onestep)
+        then    (set audio-th (thread-create (netptr play-audio-th) (thread-self) map which av info fps @pos)) )
         (set finished (array default false 1))
 
         (set lbl <_kv "sbx" 0>)
@@ -161,11 +194,16 @@
         then    (set <finished 0> true)
         else    (set imn (iup-image-rgba pix))
                 (close pix)
-                (set idx 0) )
+                (set idx 0)
+                (if onestep
+                then    (set <info "action"> "space")
+                        (set <info "pause"> true)
+                        (set <_abort 0> true) ))
 
-        (set ts-step (/ 1000000000 fps))
-        (sendbuf 100 true to audio-th)
-        (receive ts from audio-th)
+        (if (not onestep)
+        then    (set ts-step (/ 1 fps))
+                (sendbuf 100 true to audio-th)
+                (receive ts from audio-th) )
 
         (opt*   (not <finished 0>)
                 (iup-set-attribute-handle lbl "IMAGE" imn)
@@ -194,7 +232,10 @@
                         (close pix) ))
 
         (thread-join video-th)
-        (thread-join audio-th) )
+        (if (not onestep)
+        then    (thread-join audio-th) )
+
+        (debug-print "play-sync-loop (end)") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -207,7 +248,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet play-video-th (th map which av pos wo ho info fps)
-        (deflocal maxpos dur red1 red2 green1 green2 idx read-th finished pixi pixo dar ws hs x y pixs)
+        (deflocal maxpos dur red1 red2 green1 green2 idx read-th finished pixi pixo x y pixs)
+
+        (debug-print "play-video-th (begin)")
 
         (set maxpos (av-approximated-number-of-frames av))
         (set dur (date-s2hhmmss (/ maxpos fps)))
@@ -227,19 +270,13 @@
         (set pixo (pix-create wo ho))
         (pix-black pixo)
 
-        (set dar (av-dar av))
-        (play-video-update-resolution dar wo ho ws hs x y pixs)
+        (play-video-update-resolution (av-dar av) wo ho x y pixs)
 
         (opt*   (not <_abort 0>)
                 (receive pixi from read-th)
                 (if (= pixi "bye")
                 then    (set <finished 0> true) )
                 (not <finished 0>)
-                (if (<> (av-dar av) dar)
-                then    (set dar (av-dar av))
-                        (pix-black pixo)
-                        (close pixs)
-                        (play-video-update-resolution dar wo ho ws hs x y pixs) )
                 (pix-sws-scale-lanczos pixi pixs)
                 (close pixi)
                 (play-video-draw-text pixs (+ (date-s2hhmmss (/ (- pos 1) fps)) "/" dur " " (rint (/ pos maxpos 0.01)) "% (" (- pos 1) ")"))
@@ -260,19 +297,23 @@
                 (if (= pixi "bye")
                 then    (set <finished 0> true)
                 else    (close pixi) ))
-        (thread-join read-th) )
+        (thread-join read-th)
 
-(defnet play-video-update-resolution (dar wo ho @ws @hs @x @y @pixs)
+        (debug-print "play-video-th (end)") )
+
+(defnet play-video-update-resolution (dar wo ho @x @y @pixs)
+        (deflocal ws hs)
+
         (if (>= dar (/ wo ho))
-        then    (set @ws wo)
-                (set @hs (rint (/ @ws dar)))
+        then    (set ws wo)
+                (set hs (rint (/ ws dar)))
                 (set @x 0)
-                (set @y (div (- ho @hs) 2))
-        else    (set @hs ho)
-                (set @ws (rint (* @hs dar)))
-                (set @x (div (- wo @ws) 2))
+                (set @y (div (- ho hs) 2))
+        else    (set hs ho)
+                (set ws (rint (* hs dar)))
+                (set @x (div (- wo ws) 2))
                 (set @y 0) )
-        (set @pixs (pix-create @ws @hs)) )
+        (set @pixs (pix-create ws hs)) )
 
 (defnet play-video-update (map @idx @pos)
         (repeat until (= @idx (length map))
@@ -335,24 +376,27 @@
         (play-audio-update map idx pos raw pos1 pos2 which info1 info2 fps delay1 delay2 info)
 
         (set s (sdl-open-audio-stream (wav-channels info1) frequency (wav-bps info1)))
+        (if (= s undef)
+        then    (close raw)
+                (play-audio-close info1 info2)
+                (receive ts from th)
+                (send (my-get-ticks) to th)
+                (fail) )
 
-        (set ts-step (* (/ len samplesize frequency) 1000000000))
+        (debug-print "play-audio-th (begin)")
+
+        (set ts-step (/ len samplesize frequency))
         ; il rendez-vous stretto serve per generare ts quando sono entrambi pronti;
         ; è meglio che ts lo generi l'audio perché il video ha la possibilità di recuperare
         (receive ts from th)
-        (set ts (sdl-get-ticks-ns))
+        (set ts (my-get-ticks))
         (sendbuf 100 ts to th)
-
-        (if (or (= s undef) (= len 0))
-        then    (close raw)
-                (play-audio-close info1 info2)
-                (fail) )
 
         (sdl-set-audio-stream-gain s gain)
 
         ; questo hack ha l'effetto di inviare subito allo stream mezzo secondo di dati
         ; allo scopo di riempire i buffer di sdl
-        (dec ts (* 0.5 1000000000))
+        (dec ts 0.5)
 
         (sdl-resume-audio-stream-device s)
 
@@ -377,7 +421,9 @@
         (sdl-pause-audio-stream-device s)
         (sdl-clear-audio-stream s)
         (close raw s)
-        (play-audio-close info1 info2) )
+        (play-audio-close info1 info2)
+
+        (debug-print "play-audio-th (end)") )
 
 (defnet play-audio-update (map @idx @pos raw @pos1 @pos2 which info1 info2 fps delay1 delay2 info)
         (deflocal f1 f2 n)
@@ -403,6 +449,7 @@
 
 (defnet play-audio-read (@pos newpos info raw fps delay)
         (deflocal f i)
+        ;(deflocal f i t)
 
         (set f (wav-fp info))
         (alt    (seq    (= @pos newpos)
@@ -412,11 +459,23 @@
                         (>= i 0)
                         (set i (wav-timestamp->sample info i))
                         (< i (wav-samples info))
+                        ;(set t (my-get-ticks))
                         (fsetpos (+ (wav-offset info) (* (wav-samplesize info) i)) f)
+                        ;(debug-print (+ "fsetpos: " (approx10 (- (my-get-ticks) t))))
                         (set @pos newpos)
                         (skip (raw-read raw f))
                         (inc @pos) )
                 (success) ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet play-audio-open (info @info1 @info2)
         (set @info1 (wav-open <info "path1">))
@@ -449,10 +508,10 @@
 (defnet play-audio-alternate-th (th av info fps pos)
         (deflocal ts raw s gain i)
 
-        (set av (av-avformat-open-input-audio (av-path av)))
+        (set av (av-avformat-open-input-audio (av-path av) <info "audio-stream-idx">))
         (if (= av undef)
         then    (receive ts from th)
-                (send (sdl-get-ticks-ns) to th)
+                (send (my-get-ticks) to th)
                 (fail) )
 
         (av-set-ignore-invalid-data av true)
@@ -460,19 +519,21 @@
         (set raw (av-audio-seek-and-read-frame av (max 0 (- (/ pos fps) 0.01))))
         (if (= raw undef)
         then    (receive ts from th)
-                (send (sdl-get-ticks-ns) to th)
+                (send (my-get-ticks) to th)
                 (close av)
                 (fail) )
 
         (set s (sdl-open-audio-stream (av-audio-channels av) (av-audio-sample-rate av) 16))
         (if (= s undef)
         then    (receive ts from th)
-                (send (sdl-get-ticks-ns) to th)
+                (send (my-get-ticks) to th)
                 (close av raw)
                 (fail) )
 
+        (debug-print "play-audio-alternate-th (begin)")
+
         (receive ts from th)
-        (set ts (sdl-get-ticks-ns))
+        (set ts (my-get-ticks))
         (sendbuf 100 ts to th)
 
         (set gain <info "gain">)
@@ -481,20 +542,20 @@
 
         ; questo hack ha l'effetto di inviare subito allo stream mezzo secondo di dati
         ; allo scopo di riempire i buffer di sdl
-        (dec ts (* 0.5 1000000000))
+        (dec ts 0.5)
 
         (sdl-resume-audio-stream-device s)
 
         (opt*   (not <_abort 0>)
                 (if (= raw undef)
-                then    (play-sleep ts (* 0.5 1000000000))
+                then    (play-sleep ts 0.5)
                         (fail) )
                 (sdl-put-audio-stream-data s raw)
                 (set i (av-audio-buf-duration av raw))
                 (close raw)
                 (set raw (av-audio-read-frame av))
                 (not <_abort 0>)
-                (play-sleep ts (* i 1000000000))
+                (play-sleep ts i)
                 (set i <info "gain">)
                 (if (<> i gain)
                 then    (set gain i)
@@ -504,7 +565,9 @@
         (sdl-clear-audio-stream s)
         (if (rawp raw)
         then    (close raw) )
-        (close av s) )
+        (close av s)
+
+        (debug-print "play-audio-alternate-th (end)") )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -518,7 +581,10 @@
 
 (defnet play-sleep (@ts ts-step)
         (inc @ts ts-step)
-        (sdl-delay-ns (rint (- @ts (sdl-get-ticks-ns)))) )
+        (set ts-step (- @ts (my-get-ticks)))
+        (if (< ts-step 0.001)
+        then    (debug-print (+ "loss of synchrony (" (approx3 ts-step) ")")) )
+        (my-sleep ts-step) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

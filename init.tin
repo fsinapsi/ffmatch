@@ -129,7 +129,7 @@
                                 "val char not null)" ))
         (db-end)
         (set-lang (cfg-get-lang))
-        (set <_kv "debug-enabled"> (= (cfg-get "debug-enabled") true)) )
+        (set <_kv "debug-enabled"> (cfg-get-or-default "debug-enabled" <_kv "default">)) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

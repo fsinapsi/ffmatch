@@ -35,17 +35,21 @@
 (defun key-aud (av1 av2)
         (+ "aud-" (key-basic av1) (key-basic av2)) )
 
-(defun key-basic (av) net key-basic)
-(defnet key-basic (av @key)
-        (deflocal v)
+(defun key-basic (av)
+        (key-basic-low
+                (av-get-filter-rows av)
+                (width av)
+                (height av)
+                (av-approximated-number-of-frames av)
+                (av-path av) ))
 
-        (set v (av-get-filter-rows av))
-        (set @key (gcry-sha1sum-fast (+
-                              (if (= v 0) "" (+ "deint=" v))
-                              (int->str (width av) 5 '0')
-                              (int->str (height av) 5 '0')
-                              (int->str (av-approximated-number-of-frames av) 6 '0')
-                              (fullpath->name (av-path av)) ))))
+(defun key-basic-low (filter-rows width height nframes path)
+        (gcry-sha1sum-fast (+
+                (if (= filter-rows 0) "" (+ "deint=" filter-rows))
+                (int->str width 5 '0')
+                (int->str height 5 '0')
+                (int->str nframes 6 '0')
+                (fullpath->name path) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -133,16 +137,31 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet key-mod-set (av field val)
-        (deflocal key m)
+        (deflocal key m filter-rows framerate)
 
         (set key (key-mod av))
         (set m (cfg-get key))
-        (if (not (assocp m))
-        then    (set m (assoc)) )
+        (if (assocp m)
+        then    (assoc-clr m "new-key")
+                (assoc-clr m "name")
+        else    (set m (assoc)) )
         (set <m field> val)
         (if (= (length m) 0)
         then    (cfg-clr key)
-        else    (cfg-set key m) ))
+        else    (set filter-rows <m "deint">)
+                (if (= filter-rows undef)
+                then    (set filter-rows 0) )
+                (set framerate <m "framerate">)
+                (if (= framerate undef)
+                then    (set framerate (av-video-frame-rate av)) )
+                (set <m "new-key"> (key-basic-low
+                        filter-rows
+                        (width av)
+                        (height av)
+                        (rint (* framerate (av-duration av)))
+                        (av-path av) ))
+                (set <m "name"> (fullpath->name (av-path av)))
+                (cfg-set key m) ))
 
 (defnet key-mod-clr (av field)
         (key-mod-set av field undef) )

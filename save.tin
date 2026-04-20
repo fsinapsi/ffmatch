@@ -131,7 +131,7 @@
                 (fail) )
         (cfg-set "save-path" path)
         (set s "")
-        (for i in (map-segment (car (get-map)) 1 (maxint)) do
+        (for i in (map-segment (get-map) 1) do
                 (set p <i 0>)
                 (set q <i 1>)
                 (set n <i 2>)
@@ -193,7 +193,7 @@
                   "movie2=\"" (fullpath->name (av-path <_kv "av2">)) "\"" nl
                   "prefix=\"vid -ifps $fr -odar " odar "\"" nl
                   "scale=' -hscale " w " -vscale " h "'" nl ))
-        (for i in (map-segment (if (= which 1) (car (get-map)) (cdr (get-map))) which (maxint)) do
+        (for i in (map-segment (get-map) which) do
                 (set p <i 0>)
                 (set q <i 1>)
                 (set n <i 2>)
@@ -254,7 +254,7 @@
                   "audio1='audio1.wav'" nl
                   "audio2='audio2.wav'" nl
                   "prefix=\"wavcat -fps $fr\"" nl ))
-        (for i in (map-segment (if (= which 1) (car (get-map)) (cdr (get-map))) which (maxint)) do
+        (for i in (map-segment (get-map) which) do
                 (set p <i 0>)
                 (set q <i 1>)
                 (set n <i 2>)
@@ -321,7 +321,7 @@
                   "aprefix=\"wavcat -fps $fr\"" nl ))
         (set st (stack))
         (set vskip 0)
-        (for i in (map-segment (if (= which 1) (car (get-map)) (cdr (get-map))) which (maxint)) do
+        (for i in (map-segment (get-map) which) do
                 (set p <i 0>)
                 (set q <i 1>)
                 (set n <i 2>)

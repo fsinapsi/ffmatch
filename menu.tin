@@ -69,6 +69,9 @@
                                             (cons (raw-load-static "svg/codex-icon-redo-color-warning.svg") q) )
                                       (netptr history-redo-cb) )
                                 (iup-separator)
+                                (cons (list $"Undo the last movement" (cons a "undo-last-movement"))
+                                      (netptr force-undo-last-movement-cb) )
+                                (iup-separator)
                                 (cons (list (+ $"Edit" " framerate 1")
                                             (cons a "edit-framerate1")
                                             (cons (raw-load-static "svg/editar.svg") q) )
@@ -203,21 +206,15 @@
                                       (netptr clear-failed-sck-cb) )
                                 (cons (list $"Clear \"mapping\" data" (cons a "clear-map"))
                                       (netptr clear-map-cb) )
-                                (cons (list $"Optimize \"mapping\" data" (cons a "optimize-map"))
-                                      (netptr clear-optimize-map-cb) )
-                                (iup-separator)
-                                (cons (list $"Undo the last movement" (cons a "undo-last-movement"))
-                                      (netptr force-undo-last-movement-cb) )
-                                (iup-separator)
-                                (cons $"Delete obsolete paths"
-                                      (netptr clear-paths-cb) )
-                                (cons $"Delete obsolete projects"
-                                      (netptr clear-projects-cb) )
                                 (iup-separator)
                                 (cons $"Data management"
                                       (netptr clear-data-management-cb) )
                                 (cons $"Delete orphan data"
                                       (netptr clear-orphan-data-cb) )
+                                (cons $"Delete obsolete paths"
+                                      (netptr clear-paths-cb) )
+                                (cons $"Delete obsolete projects"
+                                      (netptr clear-projects-cb) )
                                 (cons "Db vacuum"
                                       (netptr clear-db-vacuum-cb) )
                                 (iup-separator)

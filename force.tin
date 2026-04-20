@@ -32,8 +32,7 @@
                 then    (set d1 (for-pos)) )
                 (if (in n2 q .. (+ q n -1))
                 then    (set d2 (for-pos)) )
-                (map-bind-low (car map) p q n)
-                (map-bind-low (cdr map) q p n) )
+                (map-bind map p q n) )
         (if (and (integerp d1) (= d1 d2))
         then    (set p <a d1 0>)
                 (set q <a d1 1>)
@@ -61,7 +60,7 @@
                 (fail) )
         ; n1 e n2 sono entrambi liberi
         (set p false)
-        (for i in (map-undef-low-low (car map) (cdr map) true) do
+        (for i in (map-undef1-also-empty map) do
                 (set p (in n1 <i 0> .. <i 1>))
                 until p )
         (truep p) ; non può mai fallire perché n1 è libero
@@ -74,9 +73,8 @@
                 ; e, in caso positivo, si chiede conferma all'utente se desidera
                 ; collegare tutto l'intervallo...
 
-                (map-bind-low (car map) n1 n2 1)
-                (map-bind-low (cdr map) n2 n1 1)
-                (set u (map-undef-low (car map) (cdr map)))
+                (map-bind map n1 n2 1)
+                (set u (map-undef1 map))
                 (set ut (queue-get u))
                 (for i in (car map) do
                         (if (= <i 2> undef)
@@ -94,7 +92,7 @@
                 (force-update key k)
                 (fail) )
         (set p false)
-        (for u in (map-undef-low-low (cdr map) (car map) true) do
+        (for u in (map-undef2-also-empty map) do
                 (set p (in n2 <u 0> .. <u 1>))
                 until p )
         (truep p) ; non può mai fallire perché n2 è libero
@@ -114,9 +112,8 @@
         (history-clear)
         (sqlite3-end _db)
         (gui-spin-set-value 2 (+ q (- n2 p)))
-        (gui-report-low false)
+        (gui-report)
         (print-selected-cb self)
-        (move-text1-on-current-value 1)
         (update-buttons) )
 
 (defnet force-low-move-th (th src dst n)
@@ -236,9 +233,8 @@
         (history-clear)
         (sqlite3-end _db)
         (gui-spin-set-value 2 <(perm-move (perm-identity <k-map 1>) src dst n) (gui-spin-value 2)>)
-        (gui-report-low false)
+        (gui-report)
         (print-selected-cb self)
-        (move-text1-on-current-value 1)
         (update-buttons) )
 
 (defnet force-undo-last-movement-th (th src dst n key-prm key-map k-map l)
@@ -293,7 +289,7 @@
         (set map (get-map-low k))
         (set cf (queue))
         (set n 0)
-        (for i in (map-undef-low (car map) (cdr map)) do
+        (for i in (map-undef1 map) do
                 (set p (- <i 1> <i 0> -1))
                 (if (= p (- <i 3> <i 2> -1))
                 then    (queue-put cf i)
@@ -363,13 +359,53 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defnet force-delete-cb (self)
+        (opt (force-delete self)) )
+
+(defnet force-delete (self)
+        (deflocal key k a n1 n2 i p q n d)
+
+        (gui-not-locked)
+        (set key (key-map <_kv "av1"> <_kv "av2">))
+        (set k (cfg-get key))
+        (<> k undef)
+        (set a <k 2>)
+        (set n1 (gui-spin-value 1))
+        (set n2 (gui-spin-value 2))
+        (for i in a do
+                (set p <i 0>)
+                (set q <i 1>)
+                (set n <i 2>)
+                (if (in n1 p .. (+ p n -1))
+                then    (= (- n1 p) (- n2 q))
+                        (set d (for-pos))
+                else    (not (in n2 q .. (+ q n -1))) )
+                until (integerp d) )
+        (integerp d)
+        (iup-confirm60 self $"Do you want to remove the link?")
+        (case n1 of
+                p               (set <a d> (list (+ p 1) (+ q 1) (- n 1)))
+                (+ p n -1)      (set <a d> (list p q (- n 1)))
+                default         (seq    (set i (- n1 p))
+                                        (set <a d> (list p q i))
+                                        (inc i)
+                                        (array-append a (list (+ p i) (+ q i) (- n i))) ))
+        (force-update key k) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defnet force-update (key k)
         (cfg-set key k)
-        (if (cfg-get-or-default "optimize-map" <_kv "default">)
-        then    (optimize-map true) )
         (history-update)
-        (gui-report-low false)
-        (move-text1-on-current-value 1)
+        (gui-report)
         (update-buttons) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

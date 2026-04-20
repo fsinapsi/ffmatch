@@ -83,13 +83,8 @@
                 (set <_kv "audio" "fps"> (av-video-frame-rate <_kv (+ "av" n)>)) )
 
         (print-info-on-selected-file which)
-        (opt    (truep warning)
-                (<> av1 undef)
-                (<> av2 undef)
-                (truep (change-frame-detected av1 av2))
-                (iup-text-append-and-go-end-color <_kv "text2"> (red) (+
-                        $"Warning: one of the two movies\nmay have undergone a frame rate change"
-                        nl nl ))))
+        (if warning
+        then    (frame-rate-warning) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

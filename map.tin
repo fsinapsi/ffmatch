@@ -35,39 +35,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun map-max1 (m)
-        (map-max-low (car (match-map m))) )
+(defun map-max1 (map)
+        (map-max-half (car map)) )
 
-(defun map-max2 (m)
-        (map-max-low (cdr (match-map m))) )
+(defun map-max2 (map)
+        (map-max-half (cdr map)) )
 
-(defun map-max-low (map)
-        <map -1 1> )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun map-free1 (m)
-        (map-free-low (map-undef1 m)) )
-
-(defun map-free2 (m)
-        (map-free-low (map-undef2 m)) )
-
-(defun map-free-low (u) net map-free-low)
-(defnet map-free-low (u @n)
-        (deflocal ut)
-
-        (set @n 0)
-        (while (> (length u) 0) do
-                (set ut (queue-get u))
-                (inc @n (- <ut 1> <ut 0> -1)) ))
+(defun map-max-half (halfmap)
+        <halfmap -1 1> )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -79,17 +54,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet map-bind (m p q n)
-        (array-append (match-map-step m) (list p q n))
-        (set m (match-map m))
-        (map-bind-low (car m) p q n)
-        (map-bind-low (cdr m) q p n) )
+(defnet map-bind (map p q n)
+        (map-bind-half (car map) p q n)
+        (map-bind-half (cdr map) q p n) )
 
-(defnet map-bind-low (map p q n)
+(defnet map-bind-half (halfmap p q n)
         (deflocal i j a aa freea freeb found)
 
-        (for i in 0 .. (- (length map) 1) do
-                (set a <map i>)
+        (for i in 0 .. (- (length halfmap) 1) do
+                (set a <halfmap i>)
                 (set freea <a 0>)
                 (set freeb <a 1>)
                 (set found (in p freea .. freeb))
@@ -102,31 +75,31 @@
         then    (set aa (array 3))
                 (set <aa 0> freea)
                 (set <aa 1> (- p 1))
-                (array-insert map i aa)
+                (array-insert halfmap i aa)
                 (inc i) )
         (if (< j freeb)
         then    (set aa (array 3))
                 (set <aa 0> (+ j 1))
                 (set <aa 1> freeb)
-                (array-insert map (+ i 1) aa) )
+                (array-insert halfmap (+ i 1) aa) )
         (set <a 0> p)
         (set <a 1> j)
         (set <a 2> q)
         (if (and (> i 0)
                  (= p freea)
-                 (= (- <map (- i 1) 2> <map (- i 1) 0>)
+                 (= (- <halfmap (- i 1) 2> <halfmap (- i 1) 0>)
                     (- q p) ))
-        then    (array-remove map i)
-                (inc i -1)
-                (set a <map i>)
+        then    (array-remove halfmap i)
+                (dec i)
+                (set a <halfmap i>)
                 (set <a 1> j)
                 (set p <a 0>)
                 (set q <a 2>) )
         (if (and (= j freeb)
-                 (= (- <map (+ i 1) 2> <map (+ i 1) 0>)
+                 (= (- <halfmap (+ i 1) 2> <halfmap (+ i 1) 0>)
                     (- q p) ))
-        then    (set <a 1> <map (+ i 1) 1>)
-                (array-remove map (+ i 1)) ))
+        then    (set <a 1> <halfmap (+ i 1) 1>)
+                (array-remove halfmap (+ i 1)) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -138,30 +111,33 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun map-undef1 (m)
-        (map-undef-low (car (match-map m)) (cdr (match-map m))) )
+(defun map-undef1 (map)
+        (map-undef-half (car map) <(cdr map) -1 1> false) )
 
-(defun map-undef2 (m)
-        (map-undef-low (cdr (match-map m)) (car (match-map m))) )
+(defun map-undef2 (map)
+        (map-undef-half (cdr map) <(car map) -1 1> false) )
 
-(defun map-undef-low (map1 map2)
-    (map-undef-low-low map1 map2 false) )
+(defun map-undef1-also-empty (map)
+        (map-undef-half (car map) <(cdr map) -1 1> true) )
 
-(defun map-undef-low-low (map1 map2 also-empty) net map-undef-low-low)
-(defnet map-undef-low-low (map1 map2 also-empty @q)
-        (deflocal i a min max)
+(defun map-undef2-also-empty (map)
+        (map-undef-half (cdr map) <(car map) -1 1> true) )
+
+(defun map-undef-half (halfmap1 max2 also-empty) net map-undef-half)
+(defnet map-undef-half (halfmap1 max2 also-empty @q)
+        (deflocal i a min1 max1)
 
         (set @q (queue))
-        (set min 1)
-        (for i in 1 .. (length map1) do
-                (set a <map1 (for-pos)>)
+        (set min1 1)
+        (for i in 1 .. (length halfmap1) do
+                (set a <halfmap1 (for-pos)>)
                 (if (= <a 2> undef)
-                then    (set max (if (= i (length map1))
-                                <map2 -1 1>
-                                (- <map1 i 2> 1) ))
-                        (if (or also-empty (<= min max))
-                        then    (queue-put @q (list <a 0> <a 1> min max)) )
-                else    (set min (+ <a 2> <a 1> -<a 0> 1)) )))
+                then    (set max1 (if (= i (length halfmap1))
+                                max2
+                                (- <halfmap1 i 2> 1) ))
+                        (if (or also-empty (<= min1 max1))
+                        then    (queue-put @q (list <a 0> <a 1> min1 max1)) )
+                else    (set min1 (+ <a 2> <a 1> -<a 0> 1)) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -173,150 +149,27 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun map-point1 (m p)
-        (map-point-low (car (match-map m)) p) )
+(defun map-free1 (map)
+        (map-free-half (car map) <(cdr map) -1 1>) )
 
-(defun map-point2 (m p)
-        (map-point-low (cdr (match-map m)) p) )
+(defun map-free2 (map)
+        (map-free-half (cdr map) <(car map) -1 1>) )
 
-(defun map-point-low (map p) net map-point-low)
-(defnet map-point-low (map p @q)
-        (deflocal i a found)
+(defun map-free-half (halfmap1 max2) net map-free-half)
+(defnet map-free-half (halfmap1 max2 @n)
+        (deflocal i a min1 max1)
 
-        (set found false)
-        (for i in 1 .. (length map) do
-                (set a <map (for-pos)>)
-                (if (in p <a 0> .. <a 1>)
-                then    (set @q (+ <a 2> p -<a 0>))
-                        (set found true) )
-                until found )
-        (= found true) )
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defnet map-report (m)
-        (map-report-low (match-th-main m) (match-map m)
-                (match-av1 m) (match-av2 m)
-                (match-rx m) (match-ry m)
-                (length (match-cache m)) (match-passed m) true ))
-
-(defnet map-report-low (target map av1 av2 rx ry nchecks npassed go-home)
-        (deflocal buf buf2 ab map-max1 map-max2 wrn1 wrn2 u ut a p1 p2 q prv freecnt diffcnt diff diffprv i)
-
-        (if (listp target)
-        then    (set ab (cdr target))
-                (set target (car target)) )
-        (set map-max1 (map-max-low (car map)))
-        (set map-max2 (map-max-low (cdr map)))
-        (set buf (iup-text-buffer))
-        (set buf2 (iup-text-buffer))
-        (map-report-print (cons "p1" (+
-                "(1) " (fullpath->name (av-path av1)) nl
-                "(2) " (fullpath->name (av-path av2)) nl
-                nl
-                "free (1): " (map-free-low (map-undef-low (car map) (cdr map))) "/" map-max1 nl
-                "free (2): " (map-free-low (map-undef-low (cdr map) (car map))) "/" map-max2 nl
-                nl
-                $"checks: " nchecks $" (passed: " npassed ")" nl
-                (if (= rx undef) "" (+
-                $"horizontal ratio: " (approx3 rx) nl ))
-                (if (= ry undef) "" (+
-                $"vertical ratio: " (approx3 ry) nl )))) buf )
-        (set wrn1 (queue))
-        (set wrn2 (queue))
-        (set u (map-undef-low (car map) (cdr map)))
-        (set ut (queue-get u))
-        (set map (car map))
-        (set freecnt 0)
-        (set diffcnt 0)
-        (for i in 1 .. (length map) do
-                (set a <map (for-pos)>)
-                (set p1 <a 0>)
-                (set p2 <a 1>)
-                (set q <a 2>)
-                (if (= q undef)
-                then    (if (and (= p1 <ut 0>) (= p2 <ut 1>))
-                        then    (map-report-print-range p1 p2 (red) (blue) buf2)
-                                (map-report-print (cons "p1c" (cons (red) (+ " -/-> ???" " {" (- p2 p1 -1) "-" (- <ut 3> <ut 2> -1) "}" nl))) buf2)
-                                (if (arrayp ab)
-                                then    (array-append ab (list p1 <ut 2> 0) (list p2 <ut 3> 0)) )
-                                (set ut (queue-get u))
-                                (inc freecnt)
-                        else    (queue-put wrn1 (list p1 p2 (if (= prv undef) 0 prv))) )
-                        (clr prv)
-                else    (if (integerp prv)
-                        then    (queue-put wrn2 (list (+ prv 1) (- q 1) (- p1 1))) )
-                        (set prv (+ q p2 -p1))
-                        (set diff (- q p1))
-                        (if (integerp diffprv)
-                        then    (if (<> diff diffprv)
-                                then    (inc diffcnt) ))
-                        (set diffprv diff)
-                        (map-report-print-range p1 p2 (darkgreen) (blue) buf2)
-                        (map-report-print (cons "p1c" (cons (darkgreen) (+ " ---> ["
-                            (int->str q 6 '0') "-" (int->str prv 6 '0') "] {"
-                            (int->str (- p2 p1 -1) 6 '0') "} (diff=" diff ")" nl))) buf2 )
-                        (if (arrayp ab)
-                        then    (if (= p1 p2)
-                                then    (array-append ab (list p1 q 3))
-                                else    (array-append ab (list p1 q 1) (list p2 prv 2)) ))
-                        (if (and (= i 1) (= p1 1) (> q 1))
-                        then    (queue-put wrn2 (list 1 (- q 1) 0)) )
-                        (if (and (= i (length map)) (= p2 map-max1) (< (+ q p2 -p1) map-max2))
-                        then    (queue-put wrn2 (list (+ q p2 -p1 1) map-max2 map-max1)) )))
-        (if (> (length wrn1) 0)
-        then    (map-report-print (cons "p1" $"\n1st movie frame(s) not found in the 2nd one:\n") buf2)
-                (map-report-diff wrn1 buf2 0) )
-        (if (> (length wrn2) 0)
-        then    (map-report-print (cons "p1" $"\n2nd movie frame(s) not found in the 1st one:\n") buf2)
-                (map-report-diff wrn2 buf2 1) )
-        (map-report-print (cons "p1" (+ "internal diff: " diffcnt nl
-                                        "free segm: " freecnt nl
-                                        nl )) buf )
-        (iup-text-buffer-cat buf buf2)
-        (if (arrayp ab)
-        then    (gui-text1-hack true)
-                (set target <_kv "text1">)
-                (iup-text-buffer-flush buf target)
-                (if go-home
-                then    (iup-set-int target "CARETPOS" 0)
-                else    (gui-text1-hack-post) )
-        else    (sendbuf 100 (cons "bf1" buf) to target)
-                (if go-home
-                then    (sendbuf 100 [ "h1" . undef ] to target) )))
-
-(defnet map-report-diff (wrn buf which)
-        (deflocal i)
-
-        (while (> (length wrn) 0) do
-                (set i (queue-get wrn))
-                (map-report-print-range <i 0> <i 1> (black) (blue) buf)
-                (map-report-print (cons "p1" (+ <[ "¹" "²" ] which> "---> [" (int->str <i 2> 6 '0') "] {"
-                        (- <i 1> <i 0> -1) "}" nl )) buf )))
-
-(defnet map-report-print-range (p1 p2 color1 color2 buf)
-        (map-report-print (cons "p1c" (cons color1 "[")) buf)
-        (map-report-print (cons "p1c" (cons color2 (int->str p1 6 '0'))) buf)
-        (map-report-print (cons "p1c" (cons color1 "-")) buf)
-        (map-report-print (cons "p1c" (cons color2 (int->str p2 6 '0'))) buf)
-        (map-report-print (cons "p1c" (cons color1 "]")) buf) )
-
-(defnet map-report-print (msg buf)
-        (deflocal req)
-
-        (set req (car msg))
-        (set msg (cdr msg))
-        (case req of
-            "p1"    (iup-text-buffer-append buf msg)
-            "p1c"   (iup-text-buffer-append-color buf (car msg) (cdr msg)) ))
+        (set @n 0)
+        (set min1 1)
+        (for i in 1 .. (length halfmap1) do
+                (set a <halfmap1 (for-pos)>)
+                (if (= <a 2> undef)
+                then    (set max1 (if (= i (length halfmap1))
+                                max2
+                                (- <halfmap1 i 2> 1) ))
+                        (if (<= min1 max1)
+                        then    (inc @n <a 1> -<a 0> 1) )
+                else    (set min1 (+ <a 2> <a 1> -<a 0> 1)) )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -328,13 +181,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun map-segment (map which map-segment-max) net map-segment)
-(defnet map-segment (map which map-segment-max @a)
+(defun map-segment (map which)
+        (map-segment-half (if (= which 1) (car map) (cdr map)) which (maxint)) )
+
+(defun map-segment-half (halfmap which segment-max) net map-segment-half)
+(defnet map-segment-half (halfmap which segment-max @a)
         (deflocal prm i p q n real-p real-n a)
 
         (set prm <_kv "prm">)
         (set @a (array 0))
-        (for i in map do
+        (for i in halfmap do
                 (set p <i 0>)
                 (set q <i 1>)
                 (set n <i 2>)
@@ -354,7 +210,7 @@
                                         then    (integerp <@a -1 2>)
                                                 (= (- real-n <@a -1 2>) (- real-p <@a -1 0>))
                                         else    (not (integerp <@a -1 2>)) )
-                                        (< (- <@a -1 1> <@a -1 0> -1) map-segment-max)
+                                        (< (- <@a -1 1> <@a -1 0> -1) segment-max)
                                         (inc <@a (- (length @a) 1) 1>) )
                                 (seq    (set a (array 3))
                                         (set <a 0> real-p)
@@ -366,6 +222,28 @@
                         (if (integerp n)
                         then    (inc n) )))
         (sort @a (funptr less0)) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun map-point-half (halfmap p) net map-point-half)
+(defnet map-point-half (halfmap p @q)
+        (deflocal a found)
+
+        (set found false)
+        (for a in halfmap do
+                (if (in p <a 0> .. <a 1>)
+                then    (set @q (+ <a 2> p -<a 0>))
+                        (set found true) )
+                until found )
+        (= found true) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -78,8 +78,6 @@
                 (iup-label
                         "RAM: " (approx1 ram) " Gib" nl
                         "Logical CPU cores: " (sdl-get-num-logical-cpu-cores) nl
-                        $"Current number of threads" ": " (thread-cur) nl
-                        $"Max number of threads" ": " (thread-max) nl
                         $"Selected language" ": " <(languages) (lang)> nl
                         ;$"Sound" ": " (if <_kv "enabled-sound"> $"enabled" $"disabled") nl
                         "Display: " (display-name) nl
@@ -223,16 +221,19 @@
 
 (defun info-keyboard-shortcuts ()
         "F5: start\n" \
+        "F12: play\n" \
         "Esc: abort\n" \
         "Ctrl+1: selects the segment to which frame 1 belongs\n" \
         "Ctrl+2: selects the segment to which frame 2 belongs\n" \
-        "Shift+'left arrow': same as 'simple blue left arrow button'\n" \
-        "Shift+'right arrow': same as 'simple blue right arrow button'\n" \
-        "Ctrl+'left arrow': same as 'double blue left arrow button'\n" \
-        "Ctrl+'right arrow': same as 'double blue right arrow button'\n" \
-        "Ctrl+Shift+'left arrow': same as 'first of segment blue left arrow button'\n" \
-        "Ctrl+Shift+'right arrow': same as 'last of segment blue right arrow button'\n" \
+        "Shift+← (left arrow): same as 'simple blue left arrow button'\n" \
+        "Shift+→ (right arrow): same as 'simple blue right arrow button'\n" \
+        "Ctrl+← (left arrow): same as 'double blue left arrow button'\n" \
+        "Ctrl+→ (right arrow): same as 'double blue right arrow button'\n" \
+        "Ctrl+Shift+← (left arrow): same as 'first of segment blue left arrow button'\n" \
+        "Ctrl+Shift+→ (right arrow): same as 'last of segment blue right arrow button'\n" \
         "Ctrl+Enter: same as 'link button'\n" \
+        "Alt+Shift+← (left arrow): short to the left\n" \
+        "Alt+Shift+→ (right arrow): short to the right\n" \
         "'down arrow': ...\n" \
         "'up arrow': ...\n" \
         "Shift+'down arrow': ...\n" \

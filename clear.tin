@@ -255,21 +255,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defnet clear-optimize-map-cb (self)
-        (opt    (optimize-map-low false)
-                (gui-report)
-                (update-buttons) ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;                                                                      ;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defnet clear-data-management-cb (self)
         (opt (clear-data-management self)) )
 
@@ -466,33 +451,29 @@
                         (sqlite3-exec-data _db (netptr clear-data-management-info-text-cback) j "SELECT key" (key-query-range-aud)) )))
 
 (defnet clear-data-management-info-text-cback (z key)
-        (opt (clear-data-management-info-text-cback-low z key)) )
+        (deflocal code i mate)
 
-(defnet clear-data-management-info-text-cback-low (z key)
-        (deflocal idx code mate i)
-
-        (lmatch setidx idx key "mod-" "scd-" "sck-" "map-" "prm-" "aud-")
-        (set code (car z))
-        (set z (cdr z))
-        (set i (length key))
-        (alt    (seq    (<= idx 1)
-                        (= i 44)
-                        (= (sub 4 40 key) code) )
-                (seq    (>= idx 2)
-                        (= i 84)
-                        (alt    (seq    (= (sub 4 40 key) code)
-                                        (set mate (sub 44 40 key)) )
-                                (seq    (= (sub 44 40 key) code)
-                                        (set mate (sub 4 40 key)) ))))
-        (inc <z 0> (sub 0 3 key))
-        (if (stringp mate)
-        then    (if (= mate code)
-                then    (set i "<self>")
-                else    (set i (key-code->name mate))
-                        (if (= i undef)
-                        then    (set i "<unknown>") ))
-                (inc <z 0> " vs " i) )
-        (inc <z 0> nl) )
+        (opt    (set code (car z))
+                (set z (cdr z))
+                (set i (length key))
+                (alt    (seq    (lmatch key "mod-" "scd-")
+                                (= i 44)
+                                (= (sub 4 40 key) code) )
+                        (seq    (lmatch key "sck-" "map-" "prm-" "aud-")
+                                (= i 84)
+                                (alt    (seq    (= (sub 4 40 key) code)
+                                                (set mate (sub 44 40 key)) )
+                                        (seq    (= (sub 44 40 key) code)
+                                                (set mate (sub 4 40 key)) ))))
+                (inc <z 0> (sub 0 3 key))
+                (if (stringp mate)
+                then    (if (= mate code)
+                        then    (set i "<self>")
+                        else    (set i (key-code->name mate))
+                                (if (= i undef)
+                                then    (set i "<unknown>") ))
+                        (inc <z 0> " vs " i) )
+                (inc <z 0> nl) ))
 
 (defnet clear-data-management-delete-cb (self)
         (opt (clear-data-management-delete self))
@@ -523,21 +504,19 @@
                 (iup-set-int lst "REMOVEITEM" (+ i 1)) ))
 
 (defnet clear-data-management-delete-cback (s key)
-        (opt (clear-data-management-delete-cback-low s key)) )
+        (deflocal code i)
 
-(defnet clear-data-management-delete-cback-low (s key)
-        (deflocal idx i code)
-
-        (lmatch setidx idx key "mod-" "scd-" "sck-" "map-" "prm-" "aud-")
-        (set i (length key))
-        (or (and (<= idx 1) (= i 44)) (and (>= idx 2) (= i 84)))
-        (set code (car s))
-        (set s (cdr s))
-        (if (<= idx 1)
-        then    (= (sub 4 40 key) code)
-        else    (or (= (sub 4 40 key) code)
-                    (= (sub 44 40 key) code) ))
-        (set-insert s key) )
+        (opt    (set code (car s))
+                (set s (cdr s))
+                (set i (length key))
+                (alt    (seq    (lmatch key "scd-")
+                                (= i 44)
+                                (= (sub 4 40 key) code) )
+                        (seq    (lmatch key "sck-" "map-" "prm-" "aud-")
+                                (= i 84)
+                                (or (= (sub 4 40 key) code)
+                                    (= (sub 44 40 key) code) )))
+                (set-insert s key) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -557,27 +536,23 @@
 
         (set s (set))
         (sqlite3-exec-data _db (netptr clear-orphan-data-cback) s "SELECT key FROM config")
-        ;(sqlite3-exec-data _db (netptr clear-orphan-data-mod-cback) s "SELECT key" (key-query-range-mod))
         (clear-delete-set self s) )
 
 (defnet clear-orphan-data-cback (s key)
-        (opt (clear-orphan-data-cback-low s key)) )
+        (deflocal i)
 
-(defnet clear-orphan-data-cback-low (s key)
-        (deflocal idx i)
-
-        (lmatch setidx idx key "sck-" "map-" "prm-" "aud-")
-        (set i (length key))
-        (or (and (= idx 0) (= i 44)) (and (>= idx 1) (= i 84)))
-        (not (cfg-exists (+ "scd-" (sub 4 40 key))))
-        (if (>= idx 1)
-        then    (not (cfg-exists (+ "scd-" (sub 44 40 key)))) )
-        (set-insert s key) )
-
-(defnet clear-orphan-data-mod-cback (s key)
-        (if (and (= (length key) 44)
-                 (not (cfg-exists (+ "scd-" (sub 4 40 key)))) )
-        then    (set-insert s key) ))
+        (opt    (set i (length key))
+                (alt    (seq    (lmatch key "mod-")
+                                (= i 44)
+                                (not (cfg-exists (+ "scd-" (sub 4 40 key))))
+                                (set i <(cfg-get key) "new-key">)
+                                (stringp i)
+                                (not (cfg-exists (+ "scd-" i))) )
+                        (seq    (lmatch key "sck-" "map-" "prm-" "aud-")
+                                (= i 84)
+                                (not (cfg-exists (+ "scd-" (sub 4 40 key))))
+                                (not (cfg-exists (+ "scd-" (sub 44 40 key)))) ))
+                (set-insert s key) ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
