@@ -80,7 +80,8 @@
                 "Ctrl+D: not dubbed/dubbed" nl
                 "Ctrl+1/Ctrl+2: " $"delay" " 1" nl
                 "Ctrl+3/Ctrl+4: " $"delay" " 2" nl ) "" ) (if (> <info "audio-streams"> 1) (+
-                "$: " $"cycle through the audio streams" nl ) "" )
+                "F8: " $"cycle through the audio streams" nl ) "" ) (if (> <info "subtitle-streams"> 0) (+
+                "F9: " $"cycle through the subtitle streams" nl ) "" )
                 "+/-: volume" nl
                 "Arrow keys (←, →, ↑, ↓): skip back/forward" nl
                 nl ))
@@ -248,7 +249,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defnet play-video-th (th map which av pos wo ho info fps)
-        (deflocal maxpos dur red1 red2 green1 green2 idx read-th finished pixi pixo x y pixs)
+        (deflocal maxpos dur red1 red2 green1 green2 idx read-th subtitle-th finished pixi pixo x y pixs ts sub)
 
         (debug-print "play-video-th (begin)")
 
@@ -262,6 +263,10 @@
         (set green2 (rsvg-load-size (raw-load-static "svg/two-green.svg") x x))
 
         (set read-th (thread-create (netptr play-video-read-th) (thread-self) av pos))
+        (set idx <info "subtitle-stream-idx">)
+        (if (>= idx 0)
+        then    (set subtitle-th (thread-create (netptr play-video-subtitle-th) (thread-self) av idx (/ pos fps)))
+                (receive sub from subtitle-th) )
         (set finished (array default false 1))
 
         (set idx 0)
@@ -279,7 +284,23 @@
                 (not <finished 0>)
                 (pix-sws-scale-lanczos pixi pixs)
                 (close pixi)
-                (play-video-draw-text pixs (+ (date-s2hhmmss (/ (- pos 1) fps)) "/" dur " " (rint (/ pos maxpos 0.01)) "% (" (- pos 1) ")"))
+                (set ts (/ (- pos 1) fps))
+                (play-video-draw-text
+                        pixs
+                        (+ (date-s2hhmmss ts) "/" dur " " (rint (/ pos maxpos 0.01)) "% (" (- pos 1) ")")
+                        (threadp subtitle-th) )
+                (if (threadp subtitle-th)
+                then    (if (= sub undef)
+                        then    (opt (receivenb sub from subtitle-th)) )
+                        (if (and (<> sub undef) (<> sub "bye"))
+                        then    (if (> ts (cdr (car sub)))
+                                then    (play-video-clear-sub sub)
+                                else    (if (>= ts (car (car sub)))
+                                        then    (pix-draw-pix-alpha
+                                                        pixs
+                                                        (/ (- (width pixs) (width (cdr sub))) 2)
+                                                        (- (height pixs) (height (cdr sub)) 5)
+                                                        (cdr sub) )))))
                 (play-video-update map idx pos)
                 (if (and <info "dub"> (< idx (length map)))
                 then    (pix-draw-pix-alpha pixs 5 5
@@ -290,6 +311,7 @@
                 (sendbuf 10 (pix-clone pixo) to th) )
 
         (close pixo pixs red1 red2 green1 green2)
+        (play-video-clear-sub sub)
 
         (send "bye" to th)
         (opt*   (not <finished 0>)
@@ -298,6 +320,11 @@
                 then    (set <finished 0> true)
                 else    (close pixi) ))
         (thread-join read-th)
+
+        (if (threadp subtitle-th)
+        then    (while (<> sub "bye") do
+                        (receive sub from subtitle-th) )
+                (thread-join subtitle-th) )
 
         (debug-print "play-video-th (end)") )
 
@@ -321,13 +348,18 @@
                 (inc @idx) )
         (inc @pos) )
 
-(defnet play-video-draw-text (pix s)
+(defnet play-video-draw-text (pix s top)
         (deflocal pixt)
 
         (set pixt (pix-text s))
         (pix-negative pixt)
-        (pix-draw-pix-alpha pix 5 (- (height pix) (height pixt) 5) pixt)
+        (pix-draw-pix-alpha pix 5 (if top 5 (- (height pix) (height pixt) 5)) pixt)
         (close pixt) )
+
+(defnet play-video-clear-sub (@sub)
+        (if (and (<> @sub undef) (<> @sub "bye"))
+        then    (close (cdr @sub))
+                (clr @sub) ))
 
 (defnet play-video-read-th (th av pos)
         (deflocal w h pix)
@@ -341,6 +373,25 @@
                                 (fail) ))
                 (inc pos)
                 (sendbuf 10 pix to th) )
+        (send "bye" to th) )
+
+(defnet play-video-subtitle-th (th av idx ts)
+        (deflocal s pix)
+
+        (set av (av-avformat-open-input-subtitle (av-path av) idx))
+        (if (avcodecp av)
+        then    (opt*   (not <_abort 0>)
+                        (if (<> ts undef)
+                        then    (set s (av-subtitle-seek-and-read-frame av ts))
+                                (clr ts)
+                        else    (set s (av-subtitle-read-frame av)) )
+                        (<> s undef)
+                        (if (pixp (cdr s))
+                        then    (set pix (cdr s))
+                        else    (set pix (my-pix-text (clear-text-sub (cdr s))))
+                                (pix-negative pix) )
+                        (sendbuf 10 (cons (car s) pix) to th) )
+                (close av) )
         (send "bye" to th) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

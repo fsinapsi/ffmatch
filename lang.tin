@@ -953,6 +953,10 @@
 1
 "passa da uno stream audio all'altro"
 
+"cycle through the subtitle streams"
+1
+"passa da un sottotitolo all'altro"
+
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

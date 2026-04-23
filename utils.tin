@@ -320,6 +320,43 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun clear-text-sub (s) net clear-text-sub)
+(defnet clear-text-sub (s @s)
+        (deflocal t)
+
+        (opt    (search-and-cut "," s t)
+                (search-and-cut "," s t)
+                (search-and-cut "," s t)
+                (search-and-cut "," s t)
+                (search-and-cut "," s t)
+                (search-and-cut "," s t)
+                (search-and-cut "," s t)
+                (search-and-cut "," s t) )
+        (set @s "")
+        (opt*   (search-and-cut "\\N" s t)
+                (inc @s t nl) )
+        (inc @s s) )
+
+(defun my-pix-text (s) net my-pix-text)
+(defnet my-pix-text (s @pix)
+        (deflocal svg1 svg2)
+
+        (set svg1 (svg-text s))
+        (set svg2 (svg-scale svg1 1.6 1.6))
+        (close svg1)
+        (set @pix (rsvg-load svg2))
+        (close svg2) )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;                                                                      ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defnet debug-print (msg)
         (deflocal f)
 
