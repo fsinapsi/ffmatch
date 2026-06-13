@@ -24,6 +24,8 @@
         (= <_kv "th"> undef)
         (set info <_kv "audio">)
         (assocp info)
+        (if (= <info "speed"> undef)
+        then    (set <info "speed"> 1) )
         (set which <info "which">)
         (set av <_kv (+ "av" which)>)
         (<> av undef)
@@ -87,19 +89,21 @@
                 "Ctrl+3/Ctrl+4: " $"delay" " 2" nl ) "" ) (if (> <info "audio-streams"> 1) (+
                 "F8: " $"cycle through the audio streams" nl ) "" ) (if (> <info "subtitle-streams"> 0) (+
                 "F9: " $"cycle through the subtitle streams" nl ) "" )
-                "+/-: volume" nl
+                "+/-: volume" nl (if (not audio-exists) (+
+                "Ctrl++/Ctrl+-: speed" nl ) "" )
                 "Arrow keys (←, →, ↑, ↓): skip back/forward" nl
                 nl ))
         (if (not audio-exists)
         then    (print-append-color (brown) (+ $"note: no valid audio tracks were selected" nl nl)) )
         (print-append (+
                 "movie: " which nl
-                "frame rate: " (approx3 fps) " fps" nl
-                "volume: " <info "gain"> nl (if (> <info "audio-streams"> 1) (+
+                "frame rate: " (approx3 fps) " fps" nl (if (not audio-exists) (+
+                "speed: " (approx3 <info "speed">) nl ) "" )
+                "volume: " (approx3 <info "gain">) nl (if (> <info "audio-streams"> 1) (+
                 "audio streams: " <info "audio-streams"> nl
-                "audio stream: " <info "audio-stream-idx"> nl ) "") (if (> <info "subtitle-streams"> 0) (+
+                "audio stream: " <info "audio-stream-idx"> nl ) "" ) (if (> <info "subtitle-streams"> 0) (+
                 "subtitle streams: " <info "subtitle-streams"> nl
-                "subtitle stream: " <info "subtitle-stream-idx"> nl ) "") (if (not <info "force-not-dub">) (+
+                "subtitle stream: " <info "subtitle-stream-idx"> nl ) "" ) (if (not <info "force-not-dub">) (+
                 $"delay" " 1: " <info "delay1"> nl
                 $"delay" " 2: " <info "delay2"> nl ) "" )))
 
@@ -155,6 +159,9 @@
                                                 (set newpos (gui-spin-value which))
                                                 (set backward true) )
                         "goto"          (seq    (set newpos (- (gui-spin-value which) (* 5 fps)))
+                                                (set backward true) )
+                        "rewind"        (seq    (sound-pop)
+                                                (set newpos 0)
                                                 (set backward true) ))
                 until done )
 
@@ -207,7 +214,7 @@
                         (set <_abort 0> true) ))
 
         (if (not onestep)
-        then    (set ts-step (/ 1 fps))
+        then    (set ts-step (/ 1 fps <info "speed">))
                 (sendbuf 100 true to audio-th)
                 (receive ts from audio-th) )
 
@@ -229,7 +236,10 @@
                 (not <finished 0>)
                 (play-sleep ts ts-step) )
 
-        (set <_abort 0> true)
+        (if (not <_abort 0>)
+        then    (set <info "action"> "rewind")
+                (set <info "pause"> false)
+                (set <_abort 0> true) )
         (set <_kv "img"> img)
 
         (if (not <finished 0>)
@@ -574,6 +584,7 @@
                 (fail) )
 
         (av-set-ignore-invalid-data av true)
+        (av-audio-set-output av undef undef undef <info "speed"> undef)
 
         (set raw (av-audio-seek-and-read-frame av (max 0 (- (/ pos fps) 0.01))))
         (if (= raw undef)
@@ -582,7 +593,7 @@
                 (close av)
                 (fail) )
 
-        (set s (sdl-open-audio-stream (av-audio-channels av) (av-audio-sample-rate av) 16))
+        (set s (sdl-open-audio-stream (av-audio-out-channels av) (av-audio-out-sample-rate av) 16))
         (if (= s undef)
         then    (receive ts from th)
                 (send (my-get-ticks) to th)
